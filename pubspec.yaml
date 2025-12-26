@@ -1,29 +1,41 @@
 name: lpro2
-description: "LPro Real Estate Platform - Premium Version"
+description: "LPro Real Estate Platform - Learn, Develop, PRO"
 publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.2.3 <4.0.0'
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
-
-  firebase_core: ^2.24.2
-  firebase_auth: ^4.15.3
-  cloud_firestore: ^4.13.6
-  flutter_svg: ^2.0.9
-  intl_phone_field: ^3.2.0
-  url_launcher: ^6.3.2 # أعدنا إضافة هذه المكتبة هنا
   cupertino_icons: ^1.0.6
+  
+  # Firebase & Authentication
+  firebase_core: any
+  firebase_auth: any
+  
+  # UI Packages
+  carousel_slider_plus: ^7.1.1    # تم التحديث للإصدار الموصى به من فلاتر
+  intl_phone_field: any
+  flutter_svg: any
+  google_fonts: any
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+
+# إعدادات أيقونة التطبيق
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.png"
+  adaptive_icon_background: "#1B3358"
+  adaptive_icon_foreground: "assets/logo.png"
 
 flutter:
   uses-material-design: true
   assets:
-    - assets/logo.svg
+    - assets/

@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 class QuizScreen extends StatefulWidget {
   const QuizScreen({super.key});
@@ -10,232 +8,179 @@ class QuizScreen extends StatefulWidget {
 }
 
 class _QuizScreenState extends State<QuizScreen> {
-  int currentQuestionIndex = 0;
-  int score = 0;
-  bool isFinished = false;
+  // ألوان الثيم المتفق عليها
+  static const Color brandOrange = Color(0xFFFF4D00);
+  static const Color electricBlue = Color(0xFF00D2FF);
+  static const Color navyDark = Color(0xFF080E1D);
 
-  // دالة تحديد المسمى التحفيزي بناءً على النقاط
-  String _determineLevel(int totalPoints) {
-    if (totalPoints >= 1500) return "👑 الإمبراطور";
-    if (totalPoints >= 700) return "🔥 الأسطوري";
-    if (totalPoints >= 300) return "💎 المتألق";
-    if (totalPoints >= 100) return "🚀 المحلق";
-    return "⚡ المنطلق";
-  }
+  int _currentIndex = 0;
+  bool _showAnswer = false;
 
-  // تحديث نقاط المستخدم ومستواه في Firebase
-  Future<void> _updateUserPointsAndLevel(int pointsToAdd) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+  // قائمة المعلومات الحقيقية (تقدري تعدلي الأسئلة دي بسهولة)
+  final List<Map<String, String>> _questions = [
+    {
+      "question": "إيه هو 'التحميل' في المساحات العقارية؟",
+      "answer": "هو الفرق بين المساحة الصافية للشقة والمساحة الإجمالية (بإضافة نصيبك في الأسانسير والسلم والمداخل). المعلومة الأمينة: التحميل الطبيعي بيكون من 20% لـ 25%.",
+      "tip": "دايماً اسأل على المساحة الصافية (Net Area) قبل ما تمضي."
+    },
+    {
+      "question": "يعني إيه استلام فوري 'نص تشطيب'؟",
+      "answer": "يعني الشقة واصل لها كهرباء ومياه وصرف، ومحارة وحلوق خشب فقط. ده بيوفر لك فرصة تشطب على ذوقك الشخصي.",
+      "tip": "اتأكد إن العدادات راكبة أو جاهزة للتركيب فوراً."
+    },
+    {
+      "question": "ليه منطقة R7 في العاصمة الإدارية مميزة؟",
+      "answer": "لأنها 'حي سكني متكامل' فيه أعلى نسبة إنجاز، وقريبة جداً من الحي الدبلوماسي والنهر الأخضر، وأسعارها حالياً تعتبر فرصة استثمارية.",
+      "tip": "المنطقة دي هي أول منطقة هتسكن فعلياً في العاصمة."
+    },
+    {
+      "question": "إيه الفرق بين المطور العقاري والمقاول؟",
+      "answer": "المطور هو صاحب الفكرة والرؤية والتمويل والمسؤول أمامك، أما المقاول فهو الشركة اللي بتنفذ البناء فقط تحت إشراف المطور.",
+      "tip": "دايماً دور على سابقة أعمال 'المطور' وقوته المالية."
+    },
+  ];
 
-    final userDoc = FirebaseFirestore.instance.collection('users').doc(user.uid);
-    final snapshot = await userDoc.get();
-    
-    int currentPoints = 0;
-    if (snapshot.exists) {
-      currentPoints = (snapshot.data() as Map<String, dynamic>)['points'] ?? 0;
-    }
-
-    int newTotal = currentPoints + pointsToAdd;
-    String newLevel = _determineLevel(newTotal);
-
-    await userDoc.update({
-      'points': newTotal,
-      'level': newLevel,
+  void _nextQuestion() {
+    setState(() {
+      if (_currentIndex < _questions.length - 1) {
+        _currentIndex++;
+        _showAnswer = false;
+      } else {
+        // لو خلص الأسئلة يرجع للأول
+        _currentIndex = 0;
+        _showAnswer = false;
+      }
     });
-  }
-
-  // نافذة لوحة الشرف (تفتح عند الضغط على الأيقونة في الـ AppBar)
-  void _showLeaderboard(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.75,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 15),
-            Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
-            const SizedBox(height: 20),
-            const Text("🏆 متصدري الدوري العقاري", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF102A43))),
-            const SizedBox(height: 15),
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('users')
-                    .orderBy('points', descending: true)
-                    .limit(20)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                  
-                  final topUsers = snapshot.data!.docs;
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 15),
-                    itemCount: topUsers.length,
-                    itemBuilder: (context, index) {
-                      var userData = topUsers[index].data() as Map<String, dynamic>;
-                      bool isTopThree = index < 3;
-                      
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        decoration: BoxDecoration(
-                          color: isTopThree ? _getPodiumColor(index).withOpacity(0.1) : Colors.white,
-                          borderRadius: BorderRadius.circular(15),
-                          border: isTopThree ? Border.all(color: _getPodiumColor(index), width: 1.5) : Border.all(color: Colors.grey.shade200),
-                        ),
-                        child: ListTile(
-                          leading: _buildRankBadge(index),
-                          title: Text(userData['name'] ?? "مشارك", style: TextStyle(fontWeight: isTopThree ? FontWeight.bold : FontWeight.normal)),
-                          subtitle: Text(userData['level'] ?? "⚡ المنطلق", style: const TextStyle(fontSize: 12)),
-                          trailing: Text("${userData['points']} pts", style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF102A43))),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRankBadge(int index) {
-    if (index == 0) return const Icon(Icons.workspace_premium, color: Color(0xFFFFD700), size: 32);
-    if (index == 1) return const Icon(Icons.workspace_premium, color: Color(0xFFC0C0C0), size: 28);
-    if (index == 2) return const Icon(Icons.workspace_premium, color: Color(0xFFCD7F32), size: 26);
-    return CircleAvatar(backgroundColor: Colors.grey[100], radius: 14, child: Text("${index + 1}", style: const TextStyle(fontSize: 12, color: Colors.black54)));
-  }
-
-  Color _getPodiumColor(int index) {
-    if (index == 0) return const Color(0xFFFFD700);
-    if (index == 1) return const Color(0xFFC0C0C0);
-    if (index == 2) return const Color(0xFFCD7F32);
-    return Colors.transparent;
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentQ = _questions[_currentIndex];
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7F9),
-      appBar: AppBar(
-        title: const Text("الدوري العقاري 🏆", style: TextStyle(fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF102A43),
-        elevation: 0,
-        actions: [
-          // هذا هو الزر الذي طلبته لإظهار لوحة الشرف
-          IconButton(
-            icon: const Icon(Icons.leaderboard_rounded, color: Color(0xFFD68A1A), size: 28),
-            onPressed: () => _showLeaderboard(context),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0, -0.5),
+            radius: 1.2,
+            colors: [Color(0xFF1E293B), navyDark],
           ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('quizzes').snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text("لا توجد أسئلة حالياً"));
-
-          final questions = snapshot.data!.docs;
-          if (isFinished) return _buildResultScreen();
-
-          final currentQuestion = questions[currentQuestionIndex].data() as Map<String, dynamic>;
-          final List options = currentQuestion['options'] ?? [];
-
-          return Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                LinearProgressIndicator(
-                  value: (currentQuestionIndex + 1) / questions.length, 
-                  color: const Color(0xFFD68A1A),
-                  backgroundColor: Colors.orange.withOpacity(0.1),
-                ),
-                const SizedBox(height: 30),
-                Text("السؤال ${currentQuestionIndex + 1} من ${questions.length}", textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.all(25),
-                  decoration: BoxDecoration(
-                    color: Colors.white, 
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
-                  ),
-                  child: Text(
-                    currentQuestion['question'] ?? "", 
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), 
-                    textAlign: TextAlign.center
-                  ),
-                ),
-                const SizedBox(height: 30),
-                ...List.generate(options.length, (index) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.all(18),
-                        backgroundColor: Colors.white,
-                        foregroundColor: const Color(0xFF102A43),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                        elevation: 2,
-                      ),
-                      onPressed: () {
-                        if (index == currentQuestion['answerIndex']) score += 10;
-                        setState(() {
-                          if (currentQuestionIndex < questions.length - 1) {
-                            currentQuestionIndex++;
-                          } else {
-                            isFinished = true;
-                            _updateUserPointsAndLevel(score);
-                          }
-                        });
-                      },
-                      child: Text(options[index], style: const TextStyle(fontSize: 16)),
-                    ),
-                  );
-                }),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildResultScreen() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(30.0),
+        ),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.stars_rounded, size: 120, color: Colors.amber),
+            // AppBar مخصص
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.white, size: 30),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const Expanded(
+                      child: Text(
+                        "نشط ذهنك عقارياً",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(width: 48), // للتوازن
+                  ],
+                ),
+              ),
+            ),
+
             const SizedBox(height: 20),
-            const Text("مجهود رائع!", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Text("لقد أضفت $score نقطة إلى رصيدك", style: const TextStyle(fontSize: 18, color: Colors.blueGrey)),
-            const SizedBox(height: 40),
-            SizedBox(
-              width: double.infinity,
-              height: 55,
+
+            // عداد الأسئلة
+            Text(
+              "معلومة ${_currentIndex + 1} من ${_questions.length}",
+              style: const TextStyle(color: electricBlue, fontWeight: FontWeight.bold),
+            ),
+
+            const SizedBox(height: 30),
+
+            // كارت السؤال والجواب
+            Expanded(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+                padding: const EdgeInsets.all(30),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(40),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // أيقونة متغيرة
+                    Icon(
+                      _showAnswer ? Icons.lightbulb_rounded : Icons.help_outline_rounded,
+                      color: _showAnswer ? Colors.amber : brandOrange,
+                      size: 80,
+                    ),
+                    const SizedBox(height: 40),
+                    
+                    // السؤال
+                    Text(
+                      currentQ['question']!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, height: 1.3),
+                    ),
+
+                    if (_showAnswer) ...[
+                      const SizedBox(height: 30),
+                      const Divider(color: Colors.white10),
+                      const SizedBox(height: 20),
+                      // الإجابة
+                      Text(
+                        currentQ['answer']!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white70, fontSize: 16, height: 1.5),
+                      ),
+                      const SizedBox(height: 20),
+                      // نصيحة إضافية
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: electricBlue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Text(
+                          "💡 نصيحة مريم: ${currentQ['tip']}",
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: electricBlue, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+
+            // أزرار التحكم
+            Padding(
+              padding: const EdgeInsets.all(40),
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF102A43), 
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))
+                  backgroundColor: _showAnswer ? brandOrange : electricBlue,
+                  minimumSize: const Size(double.infinity, 65),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  elevation: 10,
+                  shadowColor: (_showAnswer ? brandOrange : electricBlue).withOpacity(0.4),
                 ),
-                onPressed: () => Navigator.pop(context),
-                child: const Text("العودة للرئيسية", style: TextStyle(color: Colors.white, fontSize: 16)),
+                onPressed: () {
+                  if (!_showAnswer) {
+                    setState(() => _showAnswer = true);
+                  } else {
+                    _nextQuestion();
+                  }
+                },
+                child: Text(
+                  _showAnswer ? "المعلومة التالية" : "اعرف الحقيقة",
+                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
               ),
             ),
           ],
