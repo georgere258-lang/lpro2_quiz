@@ -83,4 +83,5 @@ class DefaultFirebaseOptions {
     authDomain: 'g-lpro.firebaseapp.com',
     storageBucket: 'g-lpro.firebasestorage.app',
   );
+
 }

@@ -12,7 +12,7 @@ dependencies:
   cupertino_icons: ^1.0.6
   
   # Firebase & Authentication
-  firebase_core: any
+  firebase_core: ^4.3.0
   firebase_auth: any
   
   # UI Packages
@@ -20,6 +20,7 @@ dependencies:
   intl_phone_field: any
   flutter_svg: any
   google_fonts: any
+  cloud_firestore: ^6.1.1
 
 dev_dependencies:
   flutter_test:
