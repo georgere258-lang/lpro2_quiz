@@ -14,13 +14,16 @@ dependencies:
   # Firebase & Authentication
   firebase_core: ^4.3.0
   firebase_auth: any
+  cloud_firestore: ^6.1.1
   
   # UI Packages
-  carousel_slider_plus: ^7.1.1    # تم التحديث للإصدار الموصى به من فلاتر
+  carousel_slider_plus: ^7.1.1
   intl_phone_field: any
   flutter_svg: any
   google_fonts: any
-  cloud_firestore: ^6.1.1
+
+  # Storage & Preferences
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:
@@ -38,5 +41,7 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+  
+  # تم حذف قسم fonts المسبب للخطأ لاعتمادنا على google_fonts برمجياً
   assets:
     - assets/
