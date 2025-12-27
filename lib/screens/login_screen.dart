@@ -1,8 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'main_wrapper.dart';
+
+// --- ملف تسجيل الدخول الشامل (Login Screen) ---
+// تم التصميم ليكون متوافقاً مع الهوية الملكية (Navy & Gold)
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,202 +16,134 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _otpController = TextEditingController();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   
-  String _fullPhoneNumber = "";
-  String _verificationId = ""; 
-  bool _codeSent = false;
+  // =============================================================
+  // [1] الإعدادات والمتغيرات (Controllers & State)
+  // =============================================================
+  final TextEditingController _phoneController = TextEditingController();
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  
   bool _isLoading = false;
+  String _completePhoneNumber = "";
+
+  // أنيميشن العناصر
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+
+  // الألوان الموحدة
+  static const Color brandOrange = Color(0xFFC67C32); 
+  static const Color navyDeep = Color(0xFF1E2B3E); 
+  static const Color navyLight = Color(0xFF2C3E50);
 
   @override
   void initState() {
     super.initState();
-    // مراقب ذكي: إذا تم تسجيل الدخول بنجاح في أي لحظة، يتم النقل فوراً
-    _auth.authStateChanges().listen((User? user) {
-      if (user != null && mounted) {
-        _goToHome();
-      }
-    });
-  }
-
-  // دالة إرسال الكود
-  Future<void> _sendCode() async {
-    if (_fullPhoneNumber.isEmpty) {
-      _showSnackBar("يرجى إدخال رقم الهاتف أولاً");
-      return;
-    }
-
-    setState(() => _isLoading = true);
-    try {
-      await _auth.verifyPhoneNumber(
-        phoneNumber: _fullPhoneNumber,
-        timeout: const Duration(seconds: 60),
-        verificationCompleted: (PhoneAuthCredential credential) async {
-          // التحقق التلقائي بواسطة أندرويد
-          await _auth.signInWithCredential(credential);
-        },
-        verificationFailed: (FirebaseAuthException e) {
-          setState(() => _isLoading = false);
-          _showSnackBar("فشل التحقق: ${e.message}");
-        },
-        codeSent: (String verId, int? resendToken) {
-          setState(() {
-            _verificationId = verId;
-            _codeSent = true;
-            _isLoading = false;
-          });
-          _showSnackBar("تم إرسال الكود بنجاح");
-        },
-        codeAutoRetrievalTimeout: (String verId) {
-          _verificationId = verId;
-        },
-      );
-    } catch (e) {
-      setState(() => _isLoading = false);
-      _showSnackBar("حدث خطأ غير متوقع");
-    }
-  }
-
-  // دالة التأكد من الكود يدوياً
-  Future<void> _verifyOtp() async {
-    if (_otpController.text.trim().length < 6) {
-      _showSnackBar("يرجى إدخال الكود كاملاً (6 أرقام)");
-      return;
-    }
-
-    setState(() => _isLoading = true);
-    try {
-      PhoneAuthCredential credential = PhoneAuthProvider.credential(
-        verificationId: _verificationId,
-        smsCode: _otpController.text.trim(),
-      );
-      
-      await _auth.signInWithCredential(credential);
-      _goToHome();
-    } on FirebaseAuthException catch (e) {
-      setState(() => _isLoading = false);
-      String errorMsg = "كود التحقق غير صحيح";
-      if (e.code == 'session-expired') errorMsg = "انتهت صلاحية الكود، اطلب كوداً جديداً";
-      _showSnackBar(errorMsg);
-    } catch (e) {
-      setState(() => _isLoading = false);
-      _showSnackBar("فشل تسجيل الدخول");
-    }
-  }
-
-  void _goToHome() {
-    if (mounted) {
-      Navigator.pushAndRemoveUntil(
-        context, 
-        MaterialPageRoute(builder: (c) => const MainWrapper()), 
-        (route) => false
-      );
-    }
-  }
-
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.black87),
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
     );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeIn),
+    );
+    _fadeController.forward();
   }
 
   @override
+  void dispose() {
+    _fadeController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  // =============================================================
+  // [2] المنطق البرمجي (Login & Navigation Logic)
+  // =============================================================
+
+  Future<void> _processLogin() async {
+    if (_formKey.currentState?.validate() ?? false) {
+      setState(() => _isLoading = true);
+
+      // محاكاة عملية الاتصال بالسيرفر
+      await Future.delayed(const Duration(seconds: 2));
+
+      // حفظ بيانات الدخول والتحقق (الدائم)
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isLoggedIn', true);
+      await prefs.setString('userPhone', _completePhoneNumber);
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _navigateToHome();
+      }
+    }
+  }
+
+  void _navigateToHome() {
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => const MainWrapper(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+      ),
+    );
+  }
+
+  // =============================================================
+  // [3] بناء واجهة المستخدم (The Detailed UI)
+  // =============================================================
+
+  @override
   Widget build(BuildContext context) {
-    const Color brandOrange = Color(0xFFFF8C42);
-    
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1B3358), Color(0xFF061121)],
-          ),
+      backgroundColor: navyDeep,
+      body: Stack(
+        children: [
+          _buildAnimatedBackground(),
+          _buildMainContent(),
+        ],
+      ),
+    );
+  }
+
+  // خلفية متدرجة مع جزيئات
+  Widget _buildAnimatedBackground() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [navyDeep, navyLight],
         ),
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 30),
+      ),
+      child: CustomPaint(painter: BackgroundParticlePainter()),
+    );
+  }
+
+  Widget _buildMainContent() {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 30),
+          child: Form(
+            key: _formKey,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                SvgPicture.asset('assets/logo.svg', height: 90),
+                _buildLogoSection(),
+                const SizedBox(height: 40),
+                _buildWelcomeText(),
                 const SizedBox(height: 50),
-                
-                if (!_codeSent)
-                  IntlPhoneField(
-                    style: const TextStyle(color: Colors.white),
-                    initialCountryCode: 'EG',
-                    languageCode: "ar",
-                    dropdownTextStyle: const TextStyle(color: Colors.white),
-                    cursorColor: brandOrange,
-                    decoration: InputDecoration(
-                      labelText: 'رقم الموبايل',
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: const BorderSide(color: Colors.white24),
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: const BorderSide(color: brandOrange),
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                    ),
-                    onChanged: (phone) => _fullPhoneNumber = phone.completeNumber,
-                  )
-                else
-                  TextField(
-                    controller: _otpController,
-                    textAlign: TextAlign.center,
-                    keyboardType: TextInputType.number,
-                    style: const TextStyle(color: Colors.white, fontSize: 24, letterSpacing: 8),
-                    cursorColor: brandOrange,
-                    decoration: InputDecoration(
-                      labelText: 'أدخل كود التحقق',
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: const BorderSide(color: Colors.white24),
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: const BorderSide(color: brandOrange),
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                    ),
-                  ),
-
+                _buildPhoneInputField(),
                 const SizedBox(height: 30),
-
-                _isLoading 
-                  ? const CircularProgressIndicator(color: brandOrange)
-                  : SizedBox(
-                      width: double.infinity,
-                      height: 55,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: brandOrange,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                          elevation: 5,
-                        ),
-                        onPressed: _codeSent ? _verifyOtp : _sendCode,
-                        child: Text(
-                          _codeSent ? "تأكيد ودخول" : "إرسال كود التحقق",
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                
-                if (_codeSent && !_isLoading)
-                  TextButton(
-                    onPressed: () => setState(() => _codeSent = false),
-                    child: const Text(
-                      "تعديل رقم الهاتف؟",
-                      style: TextStyle(color: Colors.white60),
-                    ),
-                  ),
+                _buildLoginButton(),
+                const SizedBox(height: 40),
+                _buildFooterLinks(),
               ],
             ),
           ),
@@ -214,4 +151,156 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+
+  // --- Widgets فرعية مفصلة ---
+
+  Widget _buildLogoSection() {
+    return Column(
+      children: [
+        SvgPicture.asset(
+          'assets/logo.svg',
+          height: 100,
+          colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+        ),
+        const SizedBox(height: 15),
+        Container(
+          height: 2,
+          width: 50,
+          color: brandOrange,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWelcomeText() {
+    return Column(
+      children: [
+        Text(
+          isArabic ? "مرحباً بكِ مجدداً" : "Welcome Back",
+          style: GoogleFonts.cairo(
+            color: Colors.white,
+            fontSize: 30,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          isArabic ? "سجلي دخولك للوصول لأدوات المحترفين" : "Login to access Pro tools",
+          textAlign: TextAlign.center,
+          style: GoogleFonts.cairo(
+            color: Colors.white.withOpacity(0.5),
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhoneInputField() {
+    return IntlPhoneField(
+      controller: _phoneController,
+      textAlign: isArabic ? TextAlign.right : TextAlign.left,
+      dropdownTextStyle: const TextStyle(color: Colors.white),
+      style: const TextStyle(color: Colors.white, fontSize: 18),
+      cursorColor: brandOrange,
+      autofocus: false,
+      decoration: InputDecoration(
+        labelText: isArabic ? 'رقم الهاتف' : 'Phone Number',
+        labelStyle: GoogleFonts.cairo(color: Colors.white70),
+        filled: true,
+        fillColor: Colors.white.withOpacity(0.05),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: brandOrange, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: Colors.redAccent),
+        ),
+      ),
+      initialCountryCode: 'EG',
+      languageCode: isArabic ? "ar" : "en",
+      onChanged: (phone) {
+        _completePhoneNumber = phone.completeNumber;
+      },
+    );
+  }
+
+  Widget _buildLoginButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 60,
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : _processLogin,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: brandOrange,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          elevation: 10,
+          shadowColor: brandOrange.withOpacity(0.4),
+        ),
+        child: _isLoading
+            ? const CircularProgressIndicator(color: Colors.white)
+            : Text(
+                isArabic ? "دخول آمن" : "Secure Login",
+                style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildFooterLinks() {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              isArabic ? "ليس لديكِ حساب؟ " : "Don't have an account? ",
+              style: GoogleFonts.cairo(color: Colors.white60),
+            ),
+            TextButton(
+              onPressed: () {},
+              child: Text(
+                isArabic ? "سجلي الآن" : "Register Now",
+                style: GoogleFonts.cairo(color: brandOrange, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        Text(
+          isArabic 
+            ? "سيتم إرسال رمز تحقق عند تفعيل الخدمة" 
+            : "Verification code will be sent upon activation",
+          style: GoogleFonts.cairo(color: Colors.white24, fontSize: 10),
+        ),
+      ],
+    );
+  }
+
+  bool get isArabic => Localizations.localeOf(context).languageCode == 'ar' || true;
+}
+
+// رسم جزيئات الخلفية لإعطاء عمق بصري (نفس فلسفة الـ Splash)
+class BackgroundParticlePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.03)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    for (var i = 0; i < size.width; i += 50) {
+      canvas.drawLine(Offset(i.toDouble(), 0), Offset(i.toDouble() - 100, size.height), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }

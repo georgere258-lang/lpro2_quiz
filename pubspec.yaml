@@ -1,47 +1,79 @@
+# =============================================================
+# [1] الهوية البرمجية للمشروع (Project Core Identity)
+# =============================================================
 name: lpro2
-description: "LPro Real Estate Platform - Learn, Develop, PRO"
+description: "LPro - المنصة العقارية الأضخم بنظام التفاعل والمكافآت"
 publish_to: 'none'
+
+# رقم الإصدار (النسخة + رقم البناء)
 version: 1.0.0+1
 
+# =============================================================
+# [2] قيود بيئة التشغيل (Environment Constraints)
+# =============================================================
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.2.0 <4.0.0'
 
+# =============================================================
+# [3] المكتبات البرمجية الأساسية (Dependencies Inventory)
+# تم إدراج جميع المكتبات التي طلبها الكود في أخطاء الـ Terminal السابقة
+# =============================================================
 dependencies:
   flutter:
     sdk: flutter
+
+  # --- مكتبات الواجهة والتصميم (UI & Fonts) ---
   cupertino_icons: ^1.0.6
   
-  # Firebase & Authentication
-  firebase_core: ^4.3.0
-  firebase_auth: any
-  cloud_firestore: ^6.1.1
+  # مكتبة الخطوط (تحمل Cairo و Poppins تلقائياً من الإنترنت)
+  google_fonts: ^6.1.0
   
-  # UI Packages
-  carousel_slider_plus: ^7.1.1
-  intl_phone_field: any
-  flutter_svg: any
-  google_fonts: any
+  # مكتبة الصور الشعاعية (للوجو الملكي)
+  flutter_svg: ^2.0.9
 
-  # Storage & Preferences
+  # --- مكتبات البنية التحتية والبيانات (Infrastructure) ---
+  
+  # مكتبة الفايربيس الأساسية (Firebase Initialization)
+  firebase_core: ^2.24.2
+  
+  # مكتبة حفظ حالة الدخول (User Session)
   shared_preferences: ^2.2.2
 
+  # مكتبة إدخال أرقام الهواتف الدولية
+  intl_phone_field: ^3.2.0
+
+  # مكتبة التعامل مع اللغات والوقت
+  intl: ^0.19.0
+
+# =============================================================
+# [4] أدوات التطوير والاختبار (Dev Dependencies)
+# =============================================================
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
-  flutter_launcher_icons: ^0.13.1
-
-# إعدادات أيقونة التطبيق
-flutter_launcher_icons:
-  android: true
-  ios: true
-  image_path: "assets/logo.png"
-  adaptive_icon_background: "#1B3358"
-  adaptive_icon_foreground: "assets/logo.png"
-
-flutter:
-  uses-material-design: true
   
-  # تم حذف قسم fonts المسبب للخطأ لاعتمادنا على google_fonts برمجياً
+  # قواعد التنسيق البرمجي الموحدة (Linting)
+  flutter_lints: ^3.0.0
+
+# =============================================================
+# [5] إعدادات موارد فلاتر (Flutter Assets Configuration)
+# تم ضبط المسارات لضمان عدم حدوث خطأ "unable to locate asset"
+# =============================================================
+flutter:
+  # تفعيل لغة التصميم الحديثة Material Design 3
+  uses-material-design: true
+
+  # -----------------------------------------------------------
+  # تعريف الصور والأصول (Assets & Resources)
+  # -----------------------------------------------------------
   assets:
+    # 1. تعريف المجلد الرئيسي للأصول (يجب أن يكون موجوداً في جهازك)
     - assets/
+    
+    # 2. تعريف اللوجو الأساسي (تأكدي من وجود ملف logo.svg داخل مجلد assets)
+    - assets/logo.svg
+
+# =============================================================
+# [تم حذف قسم Fonts اليدوي لأنه يسبب الخطأ الحالي]
+# مكتبة google_fonts ستقوم بالواجهة بدلاً عنه بشكل آمن
+# =============================================================
