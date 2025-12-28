@@ -11,18 +11,18 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // الألوان الموحدة
-  static const Color brandOrange = Color(0xFFC67C32);
-  static const Color navyDeep = Color(0xFF1E2B3E);
-  static const Color iceGray = Color(0xFFF2F4F7);
+  // --- ميثاق ألوان باكدج 3 المعتمد (LPro Deep Teal) ---
+  static const Color deepTeal = Color(0xFF005F6B);     // اللون القائد
+  static const Color safetyOrange = Color(0xFFFF8C00); // لون المثلث والتميز
+  static const Color iceWhite = Color(0xFFF8F9FA);     // الخلفية الأساسية
+  static const Color darkTealText = Color(0xFF002D33); // نصوص العناوين
 
-  // بيانات افتراضية (سيتم جلبها من السيرفر لاحقاً)
+  // بيانات افتراضية (سيتم جلبها من Firebase لاحقاً)
   String userName = "مريم جرجس";
   String userPhone = "+20 101 234 5678";
   int userCoins = 150;
   String userRank = "برو جونيور 🐣";
 
-  // دالة تسجيل الخروج
   Future<void> _logout() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isLoggedIn', false);
@@ -37,10 +37,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: iceGray,
+      backgroundColor: iceWhite,
       body: CustomScrollView(
         slivers: [
-          // 1. الهيدر المتطور مع الصورة
+          // 1. الهيدر الفيروزي العميق: تم ضبطه ليعكس الفخامة المطلوبة
           _buildProfileHeader(),
           
           SliverToBoxAdapter(
@@ -48,11 +48,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.all(20.0),
               child: Column(
                 children: [
-                  // 2. كارت الإحصائيات (الكوينات والرتبة)
+                  // 2. كارت الإحصائيات المحدث (النقاط والرتبة)
                   _buildStatsCard(),
                   const SizedBox(height: 25),
                   
-                  // 3. قائمة الإعدادات والمعلومات
+                  // 3. قائمة الإعدادات الاحترافية
                   _buildInfoSection(),
                   const SizedBox(height: 25),
                   
@@ -72,34 +72,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return SliverAppBar(
       expandedHeight: 280,
       pinned: true,
-      backgroundColor: navyDeep,
+      backgroundColor: deepTeal,
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           alignment: Alignment.center,
           children: [
-            // تدرج الخلفية
+            // تدرج الخلفية المطابق للسبلاش سكرين
             Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topRight,
                   end: Alignment.bottomLeft,
-                  colors: [navyDeep, Color(0xFF2C3E50)],
+                  colors: [deepTeal, Color(0xFF003D45)],
                 ),
               ),
             ),
-            // محتوى الهيدر
             Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const SizedBox(height: 40),
-                // إطار الصورة الذهبي
+                // إطار الصورة البرتقالي (Safety Orange) - رمز التميز
                 Container(
                   padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(color: brandOrange, shape: BoxShape.circle),
+                  decoration: const BoxDecoration(
+                    color: safetyOrange, 
+                    shape: BoxShape.circle,
+                    boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)]
+                  ),
                   child: const CircleAvatar(
                     radius: 50,
                     backgroundColor: Colors.white,
-                    child: Icon(Icons.person, size: 60, color: navyDeep),
+                    child: Icon(Icons.person_rounded, size: 60, color: deepTeal),
                   ),
                 ),
                 const SizedBox(height: 15),
@@ -107,9 +110,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   userName,
                   style: GoogleFonts.cairo(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
                 ),
+                // [المطلوب]: الجملة التحفيزية الخاصة بالملف الشخصي
+                Text(
+                  "خبير عقاري طموح في LPro 🏆",
+                  style: GoogleFonts.cairo(color: safetyOrange, fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 5),
                 Text(
                   userPhone,
-                  style: GoogleFonts.poppins(color: Colors.white60, fontSize: 14),
+                  style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12),
                 ),
               ],
             ),
@@ -125,14 +134,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15)],
+        boxShadow: [
+          BoxShadow(
+            color: deepTeal.withOpacity(0.08), 
+            blurRadius: 15, 
+            offset: const Offset(0, 5)
+          )
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStatItem("رصيدك", "$userCoins", Icons.stars_rounded),
-          Container(width: 1, height: 40, color: Colors.grey[200]),
-          _buildStatItem("الرتبة", userRank, Icons.emoji_events_rounded),
+          _buildStatItem("رصيد النقاط", "$userCoins", Icons.stars_rounded),
+          Container(width: 1, height: 40, color: Colors.grey[100]),
+          _buildStatItem("المستوى الحالي", userRank, Icons.emoji_events_rounded),
         ],
       ),
     );
@@ -141,10 +156,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildStatItem(String label, String value, IconData icon) {
     return Column(
       children: [
-        Icon(icon, color: brandOrange, size: 28),
+        Icon(icon, color: safetyOrange, size: 28),
         const SizedBox(height: 5),
-        Text(label, style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey)),
-        Text(value, style: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.bold, color: navyDeep)),
+        Text(label, style: GoogleFonts.cairo(fontSize: 12, color: Colors.grey[600])),
+        Text(value, style: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.bold, color: darkTealText)),
       ],
     );
   }
@@ -152,11 +167,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildInfoSection() {
     return Column(
       children: [
-        _buildMenuTile("تعديل الملف الشخصي", Icons.edit_note_rounded),
-        _buildMenuTile("سجل النشاطات", Icons.history_rounded),
-        _buildMenuTile("الإشعارات", Icons.notifications_active_outlined),
-        _buildMenuTile("تغيير اللغة", Icons.translate_rounded),
-        _buildMenuTile("الدعم الفني", Icons.support_agent_rounded),
+        _buildMenuTile("تعديل البيانات الشخصية", Icons.edit_note_rounded),
+        _buildMenuTile("سجل التحديات والمنافسات", Icons.history_rounded),
+        _buildMenuTile("تنبيهات الدوري العقاري", Icons.notifications_active_outlined),
+        _buildMenuTile("تغيير لغة التطبيق", Icons.translate_rounded),
+        _buildMenuTile("دعم LPro الفني", Icons.support_agent_rounded),
       ],
     );
   }
@@ -169,9 +184,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.circular(15),
       ),
       child: ListTile(
-        leading: Icon(icon, color: navyDeep),
-        title: Text(title, style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w600)),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: brandOrange),
+        leading: Icon(icon, color: deepTeal),
+        title: Text(title, style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w600, color: darkTealText)),
+        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: safetyOrange),
         onTap: () {},
       ),
     );
@@ -184,12 +199,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         onPressed: _logout,
         icon: const Icon(Icons.logout_rounded, color: Colors.redAccent),
         label: Text(
-          "تسجيل الخروج",
+          "تسجيل الخروج من الحساب",
           style: GoogleFonts.cairo(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16),
         ),
         style: TextButton.styleFrom(
           padding: const EdgeInsets.all(15),
-          backgroundColor: Colors.redAccent.withOpacity(0.1),
+          backgroundColor: Colors.redAccent.withOpacity(0.05),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         ),
       ),

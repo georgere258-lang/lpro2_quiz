@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class QuizPlayScreen extends StatefulWidget {
   const QuizPlayScreen({super.key});
@@ -8,10 +9,15 @@ class QuizPlayScreen extends StatefulWidget {
 }
 
 class _QuizPlayScreenState extends State<QuizPlayScreen> {
+  // --- ميثاق ألوان باكدج 3 المعتمد (LPro Deep Teal) ---
+  static const Color deepTeal = Color(0xFF005F6B);     // اللون القائد
+  static const Color safetyOrange = Color(0xFFFF8C00); // لون المثلث والتحفيز (10%)
+  static const Color iceWhite = Color(0xFFF8F9FA);     // الخلفية (60%)
+  static const Color darkTealText = Color(0xFF002D33); // نصوص العناوين
+
   int _currentQuestionIndex = 0;
   int _score = 0;
 
-  // قائمة الأسئلة (يمكنك زيادتها لاحقاً)
   final List<Map<String, dynamic>> _questions = [
     {
       "question": "ماذا يعني مصطلح ROI في الاستثمار العقاري؟",
@@ -32,22 +38,38 @@ class _QuizPlayScreenState extends State<QuizPlayScreen> {
 
   void _checkAnswer(int selectedIndex) {
     bool isCorrect = selectedIndex == _questions[_currentQuestionIndex]["answer"];
-    
     if (isCorrect) _score += 100;
 
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: Text(isCorrect ? "إجابة صحيحة! 🎉" : "للأسف خطأ ❌"),
-        content: Text(isCorrect ? "حصلت على 100 نقطة" : "حاول مرة أخرى في السؤال القادم"),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          isCorrect ? "إجابة عبقرية! 🎉" : "للأسف خطأ ❌",
+          textAlign: TextAlign.center,
+          style: GoogleFonts.cairo(color: isCorrect ? deepTeal : Colors.redAccent, fontWeight: FontWeight.bold),
+        ),
+        // [المطلوب]: الجملة التحفيزية
+        content: Text(
+          isCorrect ? "وحش عقارات حقيقي! ربحت 100 نقطة خبرة" : "لا بأس، المحارب يتعلم من أخطائه. ركزي في القادم!",
+          textAlign: TextAlign.center,
+          style: GoogleFonts.cairo(color: const Color(0xFF4A4A4A), fontSize: 14),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
         actions: [
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isCorrect ? deepTeal : const Color(0xFF5A5A5A),
+              padding: const EdgeInsets.symmetric(horizontal: 30),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
             onPressed: () {
               Navigator.pop(context);
               _nextQuestion();
             },
-            child: const Text("متابعة"),
+            child: Text("متابعة التحدي", style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
           )
         ],
       ),
@@ -69,15 +91,38 @@ class _QuizPlayScreenState extends State<QuizPlayScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text("انتهى التحدي! 🏆"),
-        content: Text("إجمالي نقاطك: $_score"),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        title: Text(
+          "اكتملت المعركة! 🏆",
+          textAlign: TextAlign.center,
+          style: GoogleFonts.cairo(color: deepTeal, fontWeight: FontWeight.w900, fontSize: 24),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text("أداء استثنائي يا مريم، رصيدك الآن:", style: GoogleFonts.cairo(fontSize: 15)),
+            const SizedBox(height: 15),
+            // [المطلوب]: عرض النقاط باللون البرتقالي (المثلث)
+            Text("$_score", style: GoogleFonts.poppins(fontSize: 45, fontWeight: FontWeight.bold, color: safetyOrange)),
+            Text("نقطة تميز", style: GoogleFonts.cairo(color: safetyOrange, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        actionsAlignment: MainAxisAlignment.center,
         actions: [
-          TextButton(
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: safetyOrange,
+              padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              elevation: 5,
+              shadowColor: safetyOrange.withOpacity(0.4),
+            ),
             onPressed: () {
-              Navigator.pop(context); // قفل الدايلوج
-              Navigator.pop(context); // العودة لشاشة المستويات
+              Navigator.pop(context);
+              Navigator.pop(context);
             },
-            child: const Text("الخروج"),
+            child: Text("حفظ الإنجاز", style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
           )
         ],
       ),
@@ -89,21 +134,34 @@ class _QuizPlayScreenState extends State<QuizPlayScreen> {
     final currentQuestion = _questions[_currentQuestionIndex];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      appBar: AppBar(title: Text("سؤال ${_currentQuestionIndex + 1}")),
+      backgroundColor: iceWhite,
+      appBar: AppBar(
+        backgroundColor: deepTeal,
+        elevation: 0,
+        centerTitle: true,
+        title: Text(
+          "تحدي وحوش LPro", 
+          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: Colors.white)
+        ),
+      ),
       body: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(25.0),
         child: Column(
           children: [
-            LinearProgressIndicator(
-              value: (_currentQuestionIndex + 1) / _questions.length,
-              backgroundColor: Colors.grey[300],
-              color: Colors.blue,
+            // [المطلوب]: شريط التقدم البرتقالي لزيادة الحماس
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: LinearProgressIndicator(
+                value: (_currentQuestionIndex + 1) / _questions.length,
+                minHeight: 12,
+                backgroundColor: deepTeal.withOpacity(0.1),
+                color: safetyOrange, 
+              ),
             ),
             const SizedBox(height: 40),
             Text(
               currentQuestion["question"],
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              style: GoogleFonts.cairo(fontSize: 22, fontWeight: FontWeight.bold, color: darkTealText, height: 1.4),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 40),
@@ -115,13 +173,19 @@ class _QuizPlayScreenState extends State<QuizPlayScreen> {
                   width: double.infinity,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.all(15),
+                      padding: const EdgeInsets.all(20),
                       backgroundColor: Colors.white,
-                      foregroundColor: Colors.black87,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      surfaceTintColor: Colors.white,
+                      elevation: 3,
+                      shadowColor: deepTeal.withOpacity(0.1),
+                      side: BorderSide(color: deepTeal.withOpacity(0.15), width: 1),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                     ),
                     onPressed: () => _checkAnswer(index),
-                    child: Text(currentQuestion["options"][index], style: const TextStyle(fontSize: 18)),
+                    child: Text(
+                      currentQuestion["options"][index], 
+                      style: GoogleFonts.cairo(fontSize: 16, color: darkTealText, fontWeight: FontWeight.w600)
+                    ),
                   ),
                 ),
               ),

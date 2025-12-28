@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class PracticeScreen extends StatefulWidget {
   const PracticeScreen({super.key});
@@ -9,6 +10,12 @@ class PracticeScreen extends StatefulWidget {
 }
 
 class _PracticeScreenState extends State<PracticeScreen> {
+  // --- ميثاق ألوان باكدج 3 المعتمد (LPro Deep Teal) ---
+  static const Color deepTeal = Color(0xFF005F6B);     // اللون القائد
+  static const Color safetyOrange = Color(0xFFFF8C00); // لون التحفيز (المثلث والأكشن)
+  static const Color iceWhite = Color(0xFFF8F9FA);     // الخلفية الأساسية
+  static const Color darkTealText = Color(0xFF002D33); // نصوص العناوين
+
   int currentQuestionIndex = 0;
   int? selectedAnswerIndex;
   bool isCorrect = false;
@@ -16,23 +23,22 @@ class _PracticeScreenState extends State<PracticeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7F9),
+      backgroundColor: iceWhite,
       appBar: AppBar(
-        title: const Text("تنشيط المعلومات", style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text("تنشيط المعلومات", style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 18)),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
-        foregroundColor: const Color(0xFF102A43),
+        foregroundColor: darkTealText,
       ),
       body: StreamBuilder<QuerySnapshot>(
-        // سنستخدم نفس مجموعة الأسئلة ولكن بمنطق مختلف
         stream: FirebaseFirestore.instance.collection('quizzes').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator(color: deepTeal));
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("لا توجد أسئلة للمراجعة حالياً"));
+            return Center(child: Text("لا توجد أسئلة للمراجعة حالياً", style: GoogleFonts.cairo()));
           }
 
           final questions = snapshot.data!.docs;
@@ -40,45 +46,63 @@ class _PracticeScreenState extends State<PracticeScreen> {
           final List options = currentQuestion['options'] ?? [];
 
           return Padding(
-            padding: const EdgeInsets.all(20.0),
+            padding: const EdgeInsets.all(25.0),
             child: Column(
               children: [
-                const Text(
-                  "وضع المراجعة (بدون نقاط) 💡",
-                  style: TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold),
+                // [المطلوب]: الجملة التحفيزية لوضع المراجعة
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.lightbulb_outline, color: safetyOrange, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      "وضع المراجعة (بدون نقاط) 💡",
+                      style: GoogleFonts.cairo(color: deepTeal, fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 20),
-                // كارت السؤال
+                const SizedBox(height: 25),
+                
+                // كارت السؤال الفخم
                 Container(
-                  padding: const EdgeInsets.all(25),
+                  padding: const EdgeInsets.all(30),
                   width: double.infinity,
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [
+                      BoxShadow(
+                        color: deepTeal.withOpacity(0.05), 
+                        blurRadius: 15, 
+                        offset: const Offset(0, 8)
+                      )
+                    ],
+                    border: Border.all(color: deepTeal.withOpacity(0.05)),
                   ),
                   child: Text(
                     currentQuestion['question'] ?? "",
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold, color: darkTealText, height: 1.5),
                     textAlign: TextAlign.center,
                   ),
                 ),
-                const SizedBox(height: 30),
-                // قائمة الإجابات
+                const SizedBox(height: 35),
+                
+                // قائمة الإجابات التفاعلية
                 ...List.generate(options.length, (index) {
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.only(bottom: 15),
                     child: SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.all(18),
+                          padding: const EdgeInsets.all(20),
                           backgroundColor: _getButtonColor(index, currentQuestion['answerIndex']),
-                          foregroundColor: const Color(0xFF102A43),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
-                            side: const BorderSide(color: Colors.white, width: 2),
+                          elevation: 0,
+                          side: BorderSide(
+                            color: _getBorderColor(index, currentQuestion['answerIndex']), 
+                            width: 1.5
                           ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                         ),
                         onPressed: selectedAnswerIndex != null ? null : () {
                           setState(() {
@@ -86,21 +110,32 @@ class _PracticeScreenState extends State<PracticeScreen> {
                             isCorrect = (index == currentQuestion['answerIndex']);
                           });
                         },
-                        child: Text(options[index], style: const TextStyle(fontSize: 16)),
+                        child: Text(
+                          options[index], 
+                          style: GoogleFonts.cairo(
+                            fontSize: 16, 
+                            fontWeight: FontWeight.w600,
+                            color: selectedAnswerIndex != null && index == currentQuestion['answerIndex'] 
+                                ? deepTeal : darkTealText
+                          )
+                        ),
                       ),
                     ),
                   );
                 }),
                 const Spacer(),
-                // زر السؤال التالي
+                
+                // زر السؤال التالي بأسلوب باكدج 3
                 if (selectedAnswerIndex != null)
                   SizedBox(
                     width: double.infinity,
-                    height: 55,
+                    height: 60,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF102A43),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        backgroundColor: deepTeal,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                       ),
                       onPressed: () {
                         setState(() {
@@ -112,7 +147,10 @@ class _PracticeScreenState extends State<PracticeScreen> {
                           }
                         });
                       },
-                      child: const Text("السؤال التالي", style: TextStyle(color: Colors.white)),
+                      child: Text(
+                        currentQuestionIndex < questions.length - 1 ? "السؤال التالي" : "إنهاء المراجعة", 
+                        style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16)
+                      ),
                     ),
                   ),
               ],
@@ -123,11 +161,17 @@ class _PracticeScreenState extends State<PracticeScreen> {
     );
   }
 
-  // دالة لتحديد لون الزر بناءً على الإجابة
   Color _getButtonColor(int index, int correctIndex) {
     if (selectedAnswerIndex == null) return Colors.white;
-    if (index == correctIndex) return Colors.green.shade100;
-    if (index == selectedAnswerIndex && index != correctIndex) return Colors.red.shade100;
+    if (index == correctIndex) return const Color(0xFFE8F5E9); // أخضر للنجاح
+    if (index == selectedAnswerIndex && index != correctIndex) return const Color(0xFFFFEBEE); // أحمر للخطأ
     return Colors.white;
+  }
+
+  Color _getBorderColor(int index, int correctIndex) {
+    if (selectedAnswerIndex == null) return deepTeal.withOpacity(0.1);
+    if (index == correctIndex) return Colors.green;
+    if (index == selectedAnswerIndex && index != correctIndex) return Colors.redAccent;
+    return deepTeal.withOpacity(0.05);
   }
 }
