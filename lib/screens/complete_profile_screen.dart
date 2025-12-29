@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'main_wrapper.dart';
+import 'home_screen.dart'; 
 
 class CompleteProfileScreen extends StatefulWidget {
   const CompleteProfileScreen({super.key});
@@ -12,11 +12,10 @@ class CompleteProfileScreen extends StatefulWidget {
 }
 
 class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
-  // --- ميثاق ألوان باكدج 3 المعتمد (LPro Deep Teal) ---
-  static const Color deepTeal = Color(0xFF005F6B);     // اللون القائد
-  static const Color safetyOrange = Color(0xFFFF8C00); // لون الأكشن (10%)
-  static const Color iceWhite = Color(0xFFF8F9FA);     // الخلفية (60%)
-  static const Color darkTealText = Color(0xFF002D33); // نصوص العناوين
+  static const Color deepTeal = Color(0xFF1B4D57); 
+  static const Color safetyOrange = Color(0xFFE67E22); 
+  static const Color iceWhite = Color(0xFFF8F9FA);
+  static const Color darkTealText = Color(0xFF002D33);
 
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -29,20 +28,22 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       
+      // نستخدم doc(user?.uid) لضمان ربط البيانات بالحساب المسجل حالياً
       await FirebaseFirestore.instance.collection('users').doc(user?.uid).set({
-        'name': isSkipped ? "مستخدم جديد" : _nameController.text.trim(),
+        'name': isSkipped ? "مستشار عقاري جديد" : _nameController.text.trim(),
         'email': isSkipped ? "" : _emailController.text.trim(),
         'experience': isSkipped ? "0" : _expController.text.trim(),
         'phone': user?.phoneNumber,
-        'points': 0,
-        'level': 'مبتدئ عقاري',
+        'points': 0, // النقاط تبدأ من الصفر
+        'level': 'مبتدئ عقاري', // المستوى الافتراضي
         'createdAt': FieldValue.serverTimestamp(),
       });
 
       if (mounted) {
+        // الانتقال للهوم وحذف شاشة الإدخال من الذاكرة
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const MainWrapper()),
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
         );
       }
     } catch (e) {
@@ -61,13 +62,12 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     return Scaffold(
       backgroundColor: iceWhite,
       appBar: AppBar(
-        title: Text("الملف الشخصي", style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 18)),
+        title: Text("إكمال الملف", style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 18)),
         centerTitle: true,
         actions: [
-          // زر التخطي بلمحة احترافية
           TextButton(
             onPressed: () => _saveData(isSkipped: true),
-            child: Text("تخطي الآن", style: GoogleFonts.cairo(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.bold)),
+            child: Text("تخطي", style: GoogleFonts.cairo(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.bold)),
           ),
         ],
         elevation: 0,
@@ -78,7 +78,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         padding: const EdgeInsets.all(30.0),
         child: Column(
           children: [
-            // أيقونة التعريف بلمسة فيروزية ناعمة
+            // أيقونة ترحيبية
             Container(
               padding: const EdgeInsets.all(25),
               decoration: BoxDecoration(
@@ -89,7 +89,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
             ),
             const SizedBox(height: 25),
             Text(
-              "أكمل بياناتك لتوثيق هويتك كخبير عقاري", 
+              "أهلاً بكِ مريم! أكملي بياناتك لنبدأ الرحلة", 
               style: GoogleFonts.cairo(color: Colors.grey[700], fontSize: 14, fontWeight: FontWeight.w500),
               textAlign: TextAlign.center,
             ),
@@ -97,13 +97,12 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
             
             _buildInput(_nameController, "الاسم الكامل", Icons.person_outline_rounded),
             const SizedBox(height: 20),
-            _buildInput(_emailController, "البريد الإلكتروني", Icons.email_outlined),
+            _buildInput(_emailController, "البريد الإلكتروني", Icons.email_outlined, type: TextInputType.emailAddress),
             const SizedBox(height: 20),
-            _buildInput(_expController, "سنوات الخبرة في السوق", Icons.trending_up_rounded, type: TextInputType.number),
+            _buildInput(_expController, "سنوات الخبرة", Icons.trending_up_rounded, type: TextInputType.number),
             
             const SizedBox(height: 60),
             
-            // زر الحفظ والمتابعة باللون الفيروزي العميق الفخم
             SizedBox(
               width: double.infinity,
               height: 60,
@@ -111,14 +110,12 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: deepTeal,
                   foregroundColor: Colors.white,
-                  elevation: 2,
-                  shadowColor: deepTeal.withOpacity(0.3),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
                 ),
                 onPressed: _isLoading ? null : () => _saveData(isSkipped: false),
                 child: _isLoading 
                   ? const SizedBox(height: 25, width: 25, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : Text("حفظ ومتابعة التميز", style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 17)),
+                  : Text("حفظ ومتابعة", style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 17)),
               ),
             ),
           ],

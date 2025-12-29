@@ -1,46 +1,45 @@
-name: lpro2
-description: "LPro Real Estate Platform"
+name: lpro2_quiz
+description: "تطبيق دوري العقارات المطور لمريم"
 publish_to: 'none'
+
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.2.0 <4.0.0'
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
+  
+  # دعم اللغة العربية
+  flutter_localizations:
+    sdk: flutter
 
-  cupertino_icons: ^1.0.6
+  # خطوط جوجل (Cairo)
   google_fonts: ^6.1.0
-  flutter_svg: ^2.0.9
 
-  # مكتبات Firebase المربوطة بنجاح
+  # أيقونات إضافية
+  cupertino_icons: ^1.0.6
+  font_awesome_flutter: ^10.6.0
+
+  # مكتبة تشغيل صور الـ SVG (مهمة عشان logo.svg)
+  flutter_svg: ^2.0.10
+
+  # مكتبات الفايربيز
   firebase_core: ^2.24.2
+  cloud_firestore: ^4.14.0
   firebase_auth: ^4.16.0
-  cloud_firestore: ^4.17.5
-
-  shared_preferences: ^2.2.2
-  intl: ^0.19.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
-  # أضفنا هذه فقط في قسم الـ dev_dependencies
-  flutter_launcher_icons: "^0.13.1"
-
-# إعدادات الأيقونة (توضع مستقلة في مستوى الـ name)
-flutter_launcher_icons:
-  android: "launcher_icon"
-  ios: true
-  image_path: "assets/icon.png"
-  min_sdk_android: 21 
-  adaptive_icon_background: "#1B4D57"
-  adaptive_icon_foreground: "assets/icon.png"
 
 flutter:
   uses-material-design: true
 
-  # أصول البرنامج (تم الحفاظ على مسارك المفتوح)
+  # إعداد الصور الموجودة فعلياً في مجلد assets
   assets:
-    - assets/
+    - assets/logo.svg
+    - assets/top_brand.png
+    - assets/icon.png

@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "740475912872",
-    "project_id": "g-lpro",
-    "storage_bucket": "g-lpro.firebasestorage.app"
+    "project_number": "905243871570",
+    "project_id": "lpro2-quiz",
+    "storage_bucket": "lpro2-quiz.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:740475912872:android:5ff41971629003eb32789d",
+        "mobilesdk_app_id": "1:905243871570:android:030ac8e7501ca39766928b",
         "android_client_info": {
-          "package_name": "com.example.lpro2"
+          "package_name": "com.georgere.lpro2_quiz"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDpOGf0pMAnfr3SpaV4oOPGQciyx48CyYw"
+          "current_key": "AIzaSyCtwb0fAIMq3q_YMIkHMLUD3_-GvGkYdVw"
         }
       ],
       "services": {
