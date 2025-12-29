@@ -1,5 +1,5 @@
 name: lpro2_quiz
-description: "تطبيق دوري العقارات المطور لمريم"
+description: "تطبيق دوري العقارات المطور لمريم - نسخة بريميوم"
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -11,21 +11,21 @@ dependencies:
   flutter:
     sdk: flutter
   
-  # دعم اللغة العربية
+  # دعم اللغة العربية والجهات (RTL)
   flutter_localizations:
     sdk: flutter
 
-  # خطوط جوجل (Cairo)
+  # خطوط جوجل الأساسية للهوية (Cairo & Poppins)
   google_fonts: ^6.1.0
 
-  # أيقونات إضافية
+  # أيقونات النظام والأيقونات العقارية
   cupertino_icons: ^1.0.6
   font_awesome_flutter: ^10.6.0
 
-  # مكتبة تشغيل صور الـ SVG
+  # مكتبة تشغيل الشعارات بصيغة SVG
   flutter_svg: ^2.0.10
 
-  # مكتبات الفايربيز
+  # منظومة الفايربيز (قواعد البيانات والمصادقة)
   firebase_core: ^2.24.2
   cloud_firestore: ^4.14.0
   firebase_auth: ^4.16.0
@@ -38,9 +38,12 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # إعداد الصور 
+  # تعريف كافة أصول الصور والمجلدات (Assets)
   assets:
-    - assets/logo.svg
-    - assets/top_brand.png
-    - assets/icon.png
-    - assets/plans/  # إضافة المجلد ده عشان صور الماستر بلان
+    - assets/logo.svg          # شعار التطبيق
+    - assets/top_brand.png     # شعار الهيدر
+    - assets/icon.png          # أيقونة التطبيق
+    - assets/plans/            # مجلد صور تحدي الماستر بلان (خرائط)
+    - assets/card_images/      # مجلد صور أقسام شاشة الترحيب (الخلفيات البريميوم)
+
+  # ملاحظة للمستقبل: أي صورة تضعينها داخل هذه المجلدات سيتم التعرف عليها تلقائياً

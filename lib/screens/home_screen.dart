@@ -19,7 +19,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final Color deepTeal = const Color(0xFF1B4D57);
   final Color safetyOrange = const Color(0xFFE67E22);
   
-  // استدعاء الاسم الأول فقط لإعطاء لمسة شخصية ودودة
+  int _currentIndex = 0;
   final String userName = FirebaseAuth.instance.currentUser?.displayName?.split(' ')[0] ?? "مريم";
 
   @override
@@ -62,37 +62,11 @@ class _HomeScreenState extends State<HomeScreen> {
           height: 40, 
           errorBuilder: (c, e, s) => const Icon(Icons.business, color: Colors.white),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.account_circle_outlined, size: 28, color: Colors.white),
-          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const ProfileScreen())),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.emoji_events_outlined, color: Colors.amber, size: 28),
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const LeaderboardScreen())),
-          ),
-        ],
       ),
+      bottomNavigationBar: _buildBottomNavBar(),
       body: Column(
         children: [
-          // شريط الأخبار المتحرك (الهوية البصرية)
-          Container(
-            height: 38, 
-            color: safetyOrange,
-            child: ListView(
-              controller: _scrollController,
-              scrollDirection: Axis.horizontal,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                Center(
-                  child: Text(
-                    "  📣 قريباً: تحديثات الماستر بلان لحي النرجس وبيت الوطن! 📣   |   🏆 مبروك لـ $userName تألقها في دوري العقارات 🏆   |   🚀 المعلومة بتفرق.. طور مهاراتك الآن! 🚀  ", 
-                    style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _buildMarqueeNews(),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
@@ -105,39 +79,121 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: GoogleFonts.cairo(fontSize: 14, color: Colors.grey[700])),
                   
                   const SizedBox(height: 25),
-                  
-                  // كارت التميز
                   _buildFeatureCard(),
 
-                  const SizedBox(height: 30),
-                  
-                  // شبكة الأقسام (تحديث الروابط)
-                  GridView.count(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 15,
-                    crossAxisSpacing: 15,
-                    childAspectRatio: 1.1,
+                  // قسم الإحصائيات الجديد لاستغلال المساحة
+                  const SizedBox(height: 25),
+                  Row(
                     children: [
-                      _buildGridCard("دوري النجوم", "🌱 لسه جديد", Icons.stars, Colors.blueGrey, 
-                        const QuizScreen(categoryTitle: "دوري النجوم", isTextQuiz: false)),
-                      
-                      _buildGridCard("دوري المحترفين", "💪 يا كبير", Icons.military_tech, safetyOrange, 
-                        const QuizScreen(categoryTitle: "دوري المحترفين", isTextQuiz: false)),
-                      
-                      // تحديث: نشط ذهنك أصبح MCQ لسرعة اللعب
-                      _buildGridCard("نشط ذهنك", "🧠 فكر بسرعة", Icons.psychology, Colors.purple, 
-                        const QuizScreen(categoryTitle: "نشط ذهنك", isTextQuiz: false)),
-                      
-                      _buildGridCard("الماستر بلان", "🗺️ تحدي الخرائط", Icons.map, deepTeal, 
-                        const MasterPlanScreen()),
+                      _buildSmallStatCard("نقاطك", "١,٢٥٠", Icons.stars, Colors.amber),
+                      const SizedBox(width: 12),
+                      _buildSmallStatCard("ترتيبك", "#١٢", Icons.leaderboard, Colors.blueAccent),
+                      const SizedBox(width: 12),
+                      _buildSmallStatCard("المستوى", "خبير", Icons.workspace_premium, Colors.purple),
                     ],
                   ),
+
+                  const SizedBox(height: 30),
+                  _buildGridMenu(),
                 ],
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // شريط الأخبار المتحرك
+  Widget _buildMarqueeNews() {
+    return Container(
+      height: 38, 
+      color: safetyOrange,
+      child: ListView(
+        controller: _scrollController,
+        scrollDirection: Axis.horizontal,
+        physics: const NeverScrollableScrollPhysics(),
+        children: [
+          Center(
+            child: Text(
+              "  📣 قريباً: تحديثات الماستر بلان لحي النرجس وبيت الوطن! 📣   |   🏆 مبروك لـ $userName تألقها في دوري العقارات 🏆   |   🚀 المعلومة بتفرق.. طور مهاراتك الآن! 🚀  ", 
+              style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ويجيت الإحصائيات الصغيرة
+  Widget _buildSmallStatCard(String title, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 15),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5))],
+          border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(height: 8),
+            Text(value, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14, color: deepTeal)),
+            Text(title, style: GoogleFonts.cairo(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // قائمة المسابقات (Grid)
+  Widget _buildGridMenu() {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      mainAxisSpacing: 18,
+      crossAxisSpacing: 18,
+      childAspectRatio: 0.85, 
+      children: [
+        _buildGridCard("دوري النجوم", "🌱 ابدأ رحلتك", Icons.stars_rounded, const Color(0xFF3498DB), 
+          "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=500", 
+          const QuizScreen(categoryTitle: "دوري النجوم")),
+        _buildGridCard("دوري المحترفين", "💪 يا كبير", Icons.workspace_premium_rounded, safetyOrange, 
+          "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=500", 
+          const QuizScreen(categoryTitle: "دوري المحترفين")),
+        _buildGridCard("نشط ذهنك", "🧠 فكر بسرعة", Icons.bolt_rounded, Colors.purpleAccent, 
+          "https://images.unsplash.com/photo-1558403194-611308249627?q=80&w=500", 
+          const QuizScreen(categoryTitle: "نشط ذهنك")),
+        _buildGridCard("الماستر بلان", "🗺️ تحدي الخرائط", Icons.map_rounded, const Color(0xFF2ECC71), 
+          "https://images.unsplash.com/photo-1503387762-592dea58ef23?q=80&w=500", 
+          const MasterPlanScreen()),
+      ],
+    );
+  }
+
+  Widget _buildBottomNavBar() {
+    return Container(
+      decoration: const BoxDecoration(boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 20)]),
+      child: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() => _currentIndex = index);
+          if (index == 1) Navigator.push(context, MaterialPageRoute(builder: (c) => const LeaderboardScreen()));
+          if (index == 2) Navigator.push(context, MaterialPageRoute(builder: (c) => const MasterPlanScreen()));
+          if (index == 3) Navigator.push(context, MaterialPageRoute(builder: (c) => const ProfileScreen()));
+        },
+        selectedItemColor: safetyOrange,
+        unselectedItemColor: deepTeal.withOpacity(0.5),
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.white,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home_max_rounded), label: 'الرئيسية'),
+          BottomNavigationBarItem(icon: Icon(Icons.emoji_events_rounded), label: 'المتصدرين'),
+          BottomNavigationBarItem(icon: Icon(Icons.map_rounded), label: 'الخرائط'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'حسابي'),
         ],
       ),
     );
@@ -148,9 +204,9 @@ class _HomeScreenState extends State<HomeScreen> {
       width: double.infinity, 
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [deepTeal, deepTeal.withOpacity(0.8)]),
+        gradient: LinearGradient(colors: [deepTeal, deepTeal.withOpacity(0.85)]),
         borderRadius: BorderRadius.circular(25),
-        boxShadow: [BoxShadow(color: deepTeal.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))]
+        boxShadow: [BoxShadow(color: deepTeal.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))]
       ),
       child: Row(
         children: [
@@ -171,28 +227,55 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildGridCard(String title, String sub, IconData icon, Color color, Widget screen) {
+  Widget _buildGridCard(String title, String sub, IconData icon, Color color, String imageUrl, Widget screen) {
     return InkWell(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => screen)),
+      borderRadius: BorderRadius.circular(25),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10)],
-          border: Border.all(color: Colors.grey.withOpacity(0.08)),
+          borderRadius: BorderRadius.circular(25),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 8))],
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
-              child: Icon(icon, color: color, size: 30),
-            ),
-            const SizedBox(height: 10),
-            Text(title, style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14, color: deepTeal)),
-            Text(sub, style: GoogleFonts.cairo(fontSize: 10, color: Colors.grey[500])),
-          ],
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(25),
+          child: Stack(
+            children: [
+              Positioned.fill(child: Image.network(imageUrl, fit: BoxFit.cover)),
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.black.withOpacity(0.1), Colors.black.withOpacity(0.85)],
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(15.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(color: color.withOpacity(0.9), shape: BoxShape.circle),
+                      child: Icon(icon, color: Colors.white, size: 24),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(title, style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
+                      child: Text(sub, style: GoogleFonts.cairo(color: Colors.white.withOpacity(0.9), fontSize: 10)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
