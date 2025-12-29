@@ -13,10 +13,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   static const Color safetyOrange = Color(0xFFE67E22);
   static const Color iceWhite = Color(0xFFF8F9FA);
   
-  // ألوان الميداليات المحسنة (تدرجات معدنية)
-  static const Color goldMedal = Color(0xFFFFD700);    // ذهبي ناصع
-  static const Color silverMedal = Color(0xFFE0E0E0);  // فضي لامع
-  static const Color bronzeMedal = Color(0xFFCD7F32);  // برونزي كلاسيكي
+  static const Color goldMedal = Color(0xFFFFD700);    
+  static const Color silverMedal = Color(0xFFE0E0E0);  
+  static const Color bronzeMedal = Color(0xFFCD7F32);  
 
   @override
   Widget build(BuildContext context) {
@@ -104,13 +103,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        // المركز الثاني - فضي
         _pillar(second['name'], second['points'].toString(), 105, silverMedal, "2"),
         const SizedBox(width: 15),
-        // المركز الأول - ذهبي
         _pillar(first['name'], first['points'].toString(), 150, goldMedal, "1"), 
         const SizedBox(width: 15),
-        // المركز الثالث - برونزي
         _pillar(third['name'], third['points'].toString(), 85, bronzeMedal, "3"),
       ],
     );
@@ -153,6 +149,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // استخدام خط Poppins لضمان الأرقام الإنجليزية
             Text("#$rank", 
               style: GoogleFonts.poppins(
                 color: rank == "1" ? Colors.black87 : Colors.white, 
@@ -160,7 +157,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 fontSize: 26)
             ),
             Text("$pts ن", 
-              style: GoogleFonts.cairo(
+              style: GoogleFonts.poppins( // تغيير هنا لـ Poppins
                 color: rank == "1" ? Colors.black54 : Colors.white70, 
                 fontSize: 11, 
                 fontWeight: FontWeight.bold)
@@ -189,9 +186,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
             boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 5, offset: const Offset(0, 2))]
           ),
           child: ListTile(
+            // إجبار الترتيب على خط إنجليزي
             leading: Text("${i + 4}", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.grey[400])),
             title: Text(user['name'], style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.w600, color: deepTeal)),
-            trailing: Text("${user['points']} ن", style: GoogleFonts.cairo(color: safetyOrange, fontWeight: FontWeight.bold)),
+            // إجبار النقاط على خط إنجليزي
+            trailing: Text("${user['points']} ن", style: GoogleFonts.poppins(color: safetyOrange, fontWeight: FontWeight.bold, fontSize: 14)),
           ),
         );
       },

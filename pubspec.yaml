@@ -22,7 +22,7 @@ dependencies:
   cupertino_icons: ^1.0.6
   font_awesome_flutter: ^10.6.0
 
-  # مكتبة تشغيل صور الـ SVG (مهمة عشان logo.svg)
+  # مكتبة تشغيل صور الـ SVG
   flutter_svg: ^2.0.10
 
   # مكتبات الفايربيز
@@ -38,8 +38,9 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # إعداد الصور الموجودة فعلياً في مجلد assets
+  # إعداد الصور 
   assets:
     - assets/logo.svg
     - assets/top_brand.png
     - assets/icon.png
+    - assets/plans/  # إضافة المجلد ده عشان صور الماستر بلان

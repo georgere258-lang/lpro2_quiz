@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; 
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
 
@@ -13,9 +14,9 @@ class QuizScreen extends StatefulWidget {
 }
 
 class _QuizScreenState extends State<QuizScreen> {
+  // تم حذف const هنا لأن الألوان تُستخدم في ويدجيتس غير ثابتة
   final Color deepTeal = const Color(0xFF1B4D57);
   final Color safetyOrange = const Color(0xFFE67E22);
-  final Color darkOrange = const Color(0xFFD35400); 
   final TextEditingController _ansController = TextEditingController();
 
   int currentQuestionIndex = 0;
@@ -35,12 +36,28 @@ class _QuizScreenState extends State<QuizScreen> {
     _loadQuestions();
   }
 
+  // دالة توحيد الحروف العربية لضمان صحة المقارنة
+  String normalizeArabic(String text) {
+    text = text.trim(); 
+    text = text.replaceAll(RegExp(r'[أإآ]'), 'ا');
+    text = text.replaceAll(RegExp(r'[ى]'), 'ي');
+    text = text.replaceAll(RegExp(r'[ة]'), 'ه');
+    return text.toLowerCase(); 
+  }
+
   void _loadQuestions() {
-    questions = [
-      {"q": "أين تقع منطقة الجولدن سكوير؟", "options": ["التجمع", "زايد", "أكتوبر"], "a": "التجمع"},
-      {"q": "ما هو اختصار العائد على الاستثمار؟", "options": ["ROI", "ROE", "ROA"], "a": "ROI"},
-      {"q": "أكبر مطور عقاري في مصر من حيث محفظة الأراضي؟", "options": ["طلعت مصطفى", "سوديك", "إعمار"], "a": "طلعت مصطفى"},
-    ];
+    if (widget.categoryTitle == "نشط ذهنك") {
+      questions = [
+        {"q": "كم عدد الأمتار في الفدان العقاري؟", "options": ["4200", "3500", "4000"], "a": "4200"},
+        {"q": "ما هي أكبر مدينة سكنية في مصر؟", "options": ["6 أكتوبر", "القاهرة الجديدة", "العاصمة الإدارية"], "a": "6 أكتوبر"},
+      ];
+    } else {
+      questions = [
+        {"q": "أين تقع منطقة الجولدن سكوير؟", "options": ["التجمع", "زايد", "أكتوبر"], "a": "التجمع"},
+        {"q": "ما هو اختصار العائد على الاستثمار؟", "options": ["ROI", "ROE", "ROA"], "a": "ROI"},
+        {"q": "أكبر مطور عقاري في مصر من حيث محفظة الأراضي؟", "options": ["طلعت مصطفى", "سوديك", "إعمار"], "a": "طلعت مصطفى"},
+      ];
+    }
   }
 
   void _startTimer() {
@@ -62,7 +79,11 @@ class _QuizScreenState extends State<QuizScreen> {
     setState(() {
       selectedOption = selected;
       showFeedback = true;
-      isCorrect = (selected == questions[currentQuestionIndex]['a']);
+      
+      String normalizedUserAns = normalizeArabic(selected);
+      String normalizedCorrectAns = normalizeArabic(questions[currentQuestionIndex]['a']);
+      
+      isCorrect = (normalizedUserAns == normalizedCorrectAns);
       if (isCorrect) score += 10;
     });
 
@@ -101,8 +122,7 @@ class _QuizScreenState extends State<QuizScreen> {
           children: [
             Text("المعلومة فرقت معاك!", style: GoogleFonts.cairo(fontSize: 14, color: Colors.grey)),
             const SizedBox(height: 15),
-            // تم التعديل هنا من .black إلى .w900
-            Text("$score", style: GoogleFonts.cairo(fontSize: 40, fontWeight: FontWeight.w900, color: safetyOrange)),
+            Text("$score", style: GoogleFonts.poppins(fontSize: 40, fontWeight: FontWeight.w900, color: safetyOrange)),
             Text("نقطة", style: GoogleFonts.cairo(fontSize: 16, color: deepTeal)),
           ],
         ),
@@ -127,6 +147,8 @@ class _QuizScreenState extends State<QuizScreen> {
     if (!gameStarted) return _buildStartView();
 
     var q = questions[currentQuestionIndex];
+    bool hasOptions = q.containsKey('options');
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFB),
       appBar: AppBar(
@@ -153,7 +175,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text("السكور: $score", style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: safetyOrange)),
+                      Text("السكور: $score", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: safetyOrange, fontSize: 16)),
                       Text("سؤال ${currentQuestionIndex + 1}/${questions.length}", style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: deepTeal)),
                     ],
                   ),
@@ -165,7 +187,7 @@ class _QuizScreenState extends State<QuizScreen> {
                     child: Text(q['q'], style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold, color: deepTeal, height: 1.5), textAlign: TextAlign.center),
                   ),
                   const SizedBox(height: 40),
-                  widget.isTextQuiz ? _buildTextInput() : _buildOptions(q['options']),
+                  hasOptions ? _buildOptions(q['options']) : _buildTextInput(),
                 ],
               ),
             ),
@@ -176,18 +198,26 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   Widget _buildTextInput() {
-    return TextField(
-      controller: _ansController,
-      keyboardType: TextInputType.text,
-      textAlign: TextAlign.center,
-      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-      decoration: InputDecoration(
-        hintText: "اكتب إجابتك هنا",
-        hintStyle: GoogleFonts.cairo(fontSize: 16, color: Colors.grey),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: deepTeal)),
-        filled: true, fillColor: Colors.white,
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: TextField(
+        controller: _ansController,
+        keyboardType: TextInputType.text,
+        textAlign: TextAlign.right,
+        style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold, color: deepTeal),
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\s\u0600-\u06FF]')),
+        ],
+        decoration: InputDecoration(
+          hintText: "اكتب إجابتك هنا...",
+          hintStyle: GoogleFonts.cairo(fontSize: 16, color: Colors.grey),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: deepTeal)),
+          filled: true, fillColor: Colors.white,
+          // تم حذف كلمة const من هنا لحل مشكلة Error: Not a constant expression
+          prefixIcon: Icon(Icons.edit_note, color: deepTeal),
+        ),
+        onSubmitted: (val) => _handleAnswer(val),
       ),
-      onSubmitted: (val) => _handleAnswer(val),
     );
   }
 
@@ -231,14 +261,7 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Widget _buildStartView() {
     String headerTitle = widget.categoryTitle;
-    String buttonText = "ابتدِ التحدي";
-    IconData headerIcon = Icons.stars;
-
-    if (widget.categoryTitle == "نشط ذهنك") {
-      buttonText = "يلا بينا"; headerIcon = Icons.psychology;
-    } else if (widget.categoryTitle == "دوري المحترفين") {
-      buttonText = "يله يا كبير"; headerIcon = Icons.military_tech;
-    }
+    IconData headerIcon = widget.categoryTitle == "نشط ذهنك" ? Icons.psychology : Icons.military_tech;
 
     return Scaffold(
       backgroundColor: deepTeal,
@@ -249,19 +272,16 @@ class _QuizScreenState extends State<QuizScreen> {
             Icon(headerIcon, size: 80, color: safetyOrange),
             const SizedBox(height: 20),
             Text(headerTitle, style: GoogleFonts.cairo(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Text("المعلومة بتفرق", style: GoogleFonts.cairo(fontSize: 18, color: safetyOrange.withOpacity(0.8), fontWeight: FontWeight.w600)),
             const SizedBox(height: 60),
             SizedBox(
               width: 220, height: 60,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: safetyOrange, 
-                  elevation: 10,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))
                 ),
                 onPressed: () { setState(() => gameStarted = true); _startTimer(); },
-                child: Text(buttonText, style: GoogleFonts.cairo(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold)),
+                child: Text("يلا بينا", style: GoogleFonts.cairo(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             )
           ],
@@ -271,5 +291,9 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   @override
-  void dispose() { timer?.cancel(); _ansController.dispose(); super.dispose(); }
+  void dispose() { 
+    timer?.cancel(); 
+    _ansController.dispose(); 
+    super.dispose(); 
+  }
 }

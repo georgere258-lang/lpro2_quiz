@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -6,17 +7,57 @@ import 'package:firebase_auth/firebase_auth.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
+  // دالة لتحديث البيانات في الفايربيز
+  Future<void> _updateUserData(BuildContext context, String field, String currentValue) async {
+    final TextEditingController editController = TextEditingController(text: currentValue);
+    const Color deepTeal = Color(0xFF1B4D57);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text("تعديل ${field == 'name' ? 'الاسم' : 'الخبرة'}", 
+            textAlign: TextAlign.right, style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: editController,
+          textAlign: TextAlign.right,
+          keyboardType: field == 'experience' ? TextInputType.number : TextInputType.text,
+          inputFormatters: field == 'experience' ? [FilteringTextInputFormatter.digitsOnly] : [],
+          decoration: InputDecoration(
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("إلغاء", style: GoogleFonts.cairo(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: deepTeal),
+            onPressed: () async {
+              final uid = FirebaseAuth.instance.currentUser?.uid;
+              await FirebaseFirestore.instance.collection('users').doc(uid).update({
+                field: editController.text.trim(),
+              });
+              Navigator.pop(context);
+            },
+            child: Text("حفظ", style: GoogleFonts.cairo(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     const Color deepTeal = Color(0xFF1B4D57);
     const Color safetyOrange = Color(0xFFE67E22);
-    
     final String? uid = FirebaseAuth.instance.currentUser?.uid;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      body: FutureBuilder<DocumentSnapshot>(
-        future: FirebaseFirestore.instance.collection('users').doc(uid).get(),
+      body: StreamBuilder<DocumentSnapshot>( // تم التغيير لـ Stream ليكون التحديث لحظياً
+        stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator(color: deepTeal));
@@ -30,7 +71,6 @@ class ProfileScreen extends StatelessWidget {
 
           return Column(
             children: [
-              // الهيدر المنحني مع صورة الملف الشخصي
               Stack(
                 alignment: Alignment.center,
                 clipBehavior: Clip.none,
@@ -41,8 +81,7 @@ class ProfileScreen extends StatelessWidget {
                     decoration: const BoxDecoration(
                       color: deepTeal,
                       borderRadius: BorderRadius.only(
-                        bottomLeft: Radius.circular(50),
-                        bottomRight: Radius.circular(50),
+                        bottomLeft: Radius.circular(50), bottomRight: Radius.circular(50),
                       ),
                     ),
                     child: AppBar(
@@ -50,8 +89,7 @@ class ProfileScreen extends StatelessWidget {
                       elevation: 0,
                       centerTitle: true,
                       leading: const BackButton(color: Colors.white),
-                      title: Text("ملفي الشخصي", 
-                          style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
+                      title: Text("ملفي الشخصي", style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
                     ),
                   ),
                   Positioned(
@@ -68,30 +106,33 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              
               const SizedBox(height: 65),
               
-              // اسم المستخدم ومستواه
-              Text(name, style: GoogleFonts.cairo(fontSize: 24, fontWeight: FontWeight.bold, color: deepTeal)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
+                    onPressed: () => _updateUserData(context, 'name', name),
+                  ),
+                  Text(name, style: GoogleFonts.cairo(fontSize: 24, fontWeight: FontWeight.bold, color: deepTeal)),
+                ],
+              ),
+              
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-                decoration: BoxDecoration(
-                  color: safetyOrange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
+                decoration: BoxDecoration(color: safetyOrange.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
                 child: Text(level, style: GoogleFonts.cairo(color: safetyOrange, fontWeight: FontWeight.bold, fontSize: 13)),
               ),
 
               const SizedBox(height: 30),
 
-              // كارت الإحصائيات (نقاط، خبرة، رتبة)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 20),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(25),
+                    color: Colors.white, borderRadius: BorderRadius.circular(25),
                     boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15)],
                   ),
                   child: Row(
@@ -99,9 +140,13 @@ class ProfileScreen extends StatelessWidget {
                     children: [
                       _buildStatItem("النقاط", points, Icons.emoji_events_outlined, Colors.amber[700]!),
                       Container(height: 40, width: 1, color: Colors.grey[200]),
-                      _buildStatItem("الخبرة", "$experience سنين", Icons.history_edu, deepTeal),
+                      // جعل الخبرة قابلة للتعديل عند الضغط
+                      GestureDetector(
+                        onTap: () => _updateUserData(context, 'experience', experience),
+                        child: _buildStatItem("الخبرة", experience, Icons.history_edu, deepTeal, suffix: " سنين"),
+                      ),
                       Container(height: 40, width: 1, color: Colors.grey[200]),
-                      _buildStatItem("الرتبة", "#12", Icons.trending_up, Colors.blue),
+                      _buildStatItem("الرتبة", "12", Icons.trending_up, Colors.blue, prefix: "#"),
                     ],
                   ),
                 ),
@@ -109,7 +154,6 @@ class ProfileScreen extends StatelessWidget {
 
               const SizedBox(height: 30),
 
-              // قائمة الخيارات بتصميم أنيق
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -129,12 +173,19 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
+  Widget _buildStatItem(String label, String value, IconData icon, Color color, {String suffix = "", String prefix = ""}) {
     return Column(
       children: [
         Icon(icon, color: color, size: 22),
         const SizedBox(height: 8),
-        Text(value, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold)),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (prefix.isNotEmpty) Text(prefix, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(value, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold)),
+            if (suffix.isNotEmpty) Text(suffix, style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87)),
+          ],
+        ),
         Text(label, style: GoogleFonts.cairo(fontSize: 11, color: Colors.grey)),
       ],
     );
@@ -143,10 +194,7 @@ class ProfileScreen extends StatelessWidget {
   Widget _buildMenuOption(IconData icon, String title) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-      ),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
       child: ListTile(
         leading: Icon(icon, color: const Color(0xFF1B4D57)),
         title: Text(title, style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w500)),
