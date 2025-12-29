@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'quiz_screen.dart'; 
 import 'master_plan_screen.dart';
-import 'profile_screen.dart'; // استيراد ملف البيانات الحقيقية
+import 'profile_screen.dart'; 
 import 'leaderboard_screen.dart';
 import 'dart:async';
 
@@ -19,7 +19,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final Color deepTeal = const Color(0xFF1B4D57);
   final Color safetyOrange = const Color(0xFFE67E22);
   
-  final String userName = FirebaseAuth.instance.currentUser?.displayName ?? "مريم";
+  final String userName = FirebaseAuth.instance.currentUser?.displayName?.split(' ')[0] ?? "مريم";
 
   @override
   void initState() {
@@ -31,7 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
-        duration: const Duration(seconds: 10),
+        duration: const Duration(seconds: 15),
         curve: Curves.linear,
       ).then((_) {
         if (mounted) {
@@ -51,29 +51,33 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7F8),
+      backgroundColor: const Color(0xFFF8FAFB),
       appBar: AppBar(
         backgroundColor: deepTeal,
         elevation: 0,
         centerTitle: true,
-        title: Image.asset('assets/top_brand.png', height: 40, 
-          errorBuilder: (c, e, s) => const Icon(Icons.business, color: Colors.white)),
+        // رجعنا اللوجو الأصلي بصيغة Image.asset
+        title: Image.asset(
+          'assets/top_brand.png', 
+          height: 40, 
+          errorBuilder: (c, e, s) => const Icon(Icons.business, color: Colors.white),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.account_circle, size: 32, color: Colors.white),
-          // تم الربط بشاشة ProfileScreen الحقيقية لعرض النقاط والبيانات
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const ProfileScreen())),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.emoji_events, color: Colors.amber),
+            icon: const Icon(Icons.emoji_events, color: Colors.amber, size: 28),
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const LeaderboardScreen())),
           ),
         ],
       ),
       body: Column(
         children: [
+          // شريط الأخبار المتحرك
           Container(
-            height: 40, 
+            height: 38, 
             color: safetyOrange,
             child: ListView(
               controller: _scrollController,
@@ -82,8 +86,8 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Center(
                   child: Text(
-                    "  📣 قريباً: تحديثات الماستر بلان لحي النرجس وبيت الوطن! 📣   |   🏆 مبروك لـ $userName تألقها في دوري العقارات 🏆  ", 
-                    style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)
+                    "  📣 قريباً: تحديثات الماستر بلان لحي النرجس وبيت الوطن! 📣   |   🏆 مبروك لـ $userName تألقها في دوري العقارات 🏆   |   🚀 المعلومة بتفرق.. طور مهاراتك الآن! 🚀  ", 
+                    style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)
                   ),
                 ),
               ],
@@ -97,11 +101,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text("يا أهلاً بكِ يا $userName ✨", 
                     style: GoogleFonts.cairo(fontSize: 26, fontWeight: FontWeight.bold, color: deepTeal)),
-                  const SizedBox(height: 5),
                   Text("مستعدة لنجاح جديد اليوم؟", 
                     style: GoogleFonts.cairo(fontSize: 16, color: Colors.grey[700])),
+                  
                   const SizedBox(height: 25),
                   
+                  // كارت "المعلومة بتفرق" - الهوية البصرية الأساسية
                   Container(
                     width: double.infinity, 
                     padding: const EdgeInsets.all(20),
@@ -110,15 +115,24 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [BoxShadow(color: deepTeal.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))]
                     ),
-                    child: Text(
-                      "المعلومة بتفرق! راجعي الأسئلة باستمرار لتبقي دائماً في صدارة وحوش العقارات. 😉",
-                      textAlign: TextAlign.right, 
-                      style: GoogleFonts.cairo(color: Colors.white, fontSize: 15, height: 1.4)
+                    child: Row(
+                      children: [
+                        const Icon(Icons.tips_and_updates, color: Colors.amber, size: 35),
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: Text(
+                            "المعلومة بتفرق! راجعي الأسئلة باستمرار لتبقي دائماً في صدارة وحوش العقارات. 😉",
+                            textAlign: TextAlign.right, 
+                            style: GoogleFonts.cairo(color: Colors.white, fontSize: 15, height: 1.4)
+                          ),
+                        ),
+                      ],
                     ),
                   ),
 
                   const SizedBox(height: 35),
                   
+                  // شبكة الأقسام (Grid)
                   GridView.count(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),

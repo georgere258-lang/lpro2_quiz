@@ -15,13 +15,6 @@ class ProfileScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        backgroundColor: deepTeal,
-        elevation: 0,
-        centerTitle: true,
-        title: Text("ملفي الشخصي", style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
-        leading: const BackButton(color: Colors.white),
-      ),
       body: FutureBuilder<DocumentSnapshot>(
         future: FirebaseFirestore.instance.collection('users').doc(uid).get(),
         builder: (context, snapshot) {
@@ -29,75 +22,152 @@ class ProfileScreen extends StatelessWidget {
             return const Center(child: CircularProgressIndicator(color: deepTeal));
           }
 
-          if (!snapshot.hasData || !snapshot.data!.exists) {
-            return const Center(child: Text("لم يتم العثور على بيانات"));
-          }
-
-          var userData = snapshot.data!.data() as Map<String, dynamic>;
+          var userData = snapshot.data?.data() as Map<String, dynamic>? ?? {};
           String name = userData['name'] ?? "مستشار عقاري";
-          String level = userData['level'] ?? "مبتدئ";
+          String level = userData['level'] ?? "مبتدئ عقاري";
           String points = (userData['points'] ?? 0).toString();
           String experience = (userData['experience'] ?? "0").toString();
 
-          return SingleChildScrollView(
-            child: Column(
-              children: [
-                const SizedBox(height: 30),
-                const CircleAvatar(
-                  radius: 50,
-                  backgroundColor: deepTeal,
-                  child: Icon(Icons.person, size: 60, color: Colors.white),
+          return Column(
+            children: [
+              // الهيدر المنحني مع صورة الملف الشخصي
+              Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    height: 200,
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      color: deepTeal,
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(50),
+                        bottomRight: Radius.circular(50),
+                      ),
+                    ),
+                    child: AppBar(
+                      backgroundColor: Colors.transparent,
+                      elevation: 0,
+                      centerTitle: true,
+                      leading: const BackButton(color: Colors.white),
+                      title: Text("ملفي الشخصي", 
+                          style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  Positioned(
+                    top: 130,
+                    child: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                      child: const CircleAvatar(
+                        radius: 60,
+                        backgroundColor: Color(0xFFE0E0E0),
+                        child: Icon(Icons.person, size: 70, color: deepTeal),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 65),
+              
+              // اسم المستخدم ومستواه
+              Text(name, style: GoogleFonts.cairo(fontSize: 24, fontWeight: FontWeight.bold, color: deepTeal)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+                decoration: BoxDecoration(
+                  color: safetyOrange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                const SizedBox(height: 15),
-                Text(name, style: GoogleFonts.cairo(fontSize: 22, fontWeight: FontWeight.bold)),
-                Text(level, style: GoogleFonts.cairo(color: Colors.grey)),
-                
-                const SizedBox(height: 30),
-                
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                child: Text(level, style: GoogleFonts.cairo(color: safetyOrange, fontWeight: FontWeight.bold, fontSize: 13)),
+              ),
+
+              const SizedBox(height: 30),
+
+              // كارت الإحصائيات (نقاط، خبرة، رتبة)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15)],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildStatItem("النقاط", points, Icons.emoji_events_outlined, Colors.amber[700]!),
+                      Container(height: 40, width: 1, color: Colors.grey[200]),
+                      _buildStatItem("الخبرة", "$experience سنين", Icons.history_edu, deepTeal),
+                      Container(height: 40, width: 1, color: Colors.grey[200]),
+                      _buildStatItem("الرتبة", "#12", Icons.trending_up, Colors.blue),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 30),
+
+              // قائمة الخيارات بتصميم أنيق
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   children: [
-                    _buildStatCard("نقاط الدوري", points, Colors.amber[800]!),
-                    _buildStatCard("سنين الخبرة", experience, deepTeal),
-                    _buildStatCard("المستوى", "ذهبي", safetyOrange),
+                    _buildMenuOption(Icons.settings_outlined, "إعدادات الحساب"),
+                    _buildMenuOption(Icons.help_outline, "مركز المساعدة"),
+                    _buildMenuOption(Icons.share_outlined, "دعوة زميل للبرنامج"),
+                    const SizedBox(height: 10),
+                    _buildLogoutButton(),
                   ],
                 ),
-                
-                const SizedBox(height: 30),
-                const Divider(),
-                
-                _buildOption(Icons.emoji_events, "إنجازاتي في المسابقات"),
-                _buildOption(Icons.history, "سجل الاختبارات"),
-                _buildOption(Icons.settings, "إعدادات الحساب"),
-                
-                const SizedBox(height: 30),
-                TextButton.icon(
-                  onPressed: () => FirebaseAuth.instance.signOut(),
-                  icon: const Icon(Icons.logout, color: Colors.red),
-                  label: const Text("تسجيل الخروج", style: TextStyle(color: Colors.red)),
-                )
-              ],
-            ),
+              ),
+            ],
           );
         },
       ),
     );
   }
 
-  Widget _buildStatCard(String label, String value, Color color) {
+  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
     return Column(
       children: [
-        Text(value, style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-        Text(label, style: GoogleFonts.cairo(fontSize: 12)),
+        Icon(icon, color: color, size: 22),
+        const SizedBox(height: 8),
+        Text(value, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text(label, style: GoogleFonts.cairo(fontSize: 11, color: Colors.grey)),
       ],
     );
   }
 
-  Widget _buildOption(IconData icon, String title) {
-    return ListTile(
-      leading: Icon(icon, color: const Color(0xFF1B4D57)),
-      title: Text(title, style: GoogleFonts.cairo()),
-      trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+  Widget _buildMenuOption(IconData icon, String title) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: ListTile(
+        leading: Icon(icon, color: const Color(0xFF1B4D57)),
+        title: Text(title, style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w500)),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+        onTap: () {},
+      ),
+    );
+  }
+
+  Widget _buildLogoutButton() {
+    return TextButton(
+      onPressed: () => FirebaseAuth.instance.signOut(),
+      style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 15)),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.logout, color: Colors.redAccent, size: 20),
+          const SizedBox(width: 10),
+          Text("تسجيل الخروج", style: GoogleFonts.cairo(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+        ],
+      ),
     );
   }
 }

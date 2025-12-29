@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // أضفنا الفايربيز هنا أيضاً
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
@@ -12,22 +12,27 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   static const Color deepTeal = Color(0xFF1B4D57);
   static const Color safetyOrange = Color(0xFFE67E22);
   static const Color iceWhite = Color(0xFFF8F9FA);
-  static const Color silverMedal = Color(0xFFC0C0C0); 
-  static const Color bronzeMedal = Color(0xFFCD7F32);
+  
+  // ألوان الميداليات المحسنة (تدرجات معدنية)
+  static const Color goldMedal = Color(0xFFFFD700);    // ذهبي ناصع
+  static const Color silverMedal = Color(0xFFE0E0E0);  // فضي لامع
+  static const Color bronzeMedal = Color(0xFFCD7F32);  // برونزي كلاسيكي
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // استخدام StreamBuilder هنا سيجعل الترتيب يتحدث تلقائياً بمجرد فوز أي مستشار عقاري بنقاط
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('users')
-            .orderBy('points', descending: true) // الترتيب من الأعلى للأقل
-            .limit(10) // أفضل 10 لاعبين
+            .orderBy('points', descending: true)
+            .limit(10)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: Colors.white));
+            return Container(
+              color: deepTeal,
+              child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+            );
           }
 
           var users = snapshot.data?.docs ?? [];
@@ -37,7 +42,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topRight,
                 end: Alignment.bottomLeft,
-                colors: [deepTeal, Color(0xFF003D45)],
+                colors: [deepTeal, Color(0xFF0D2A30)],
               ),
             ),
             child: Column(
@@ -45,7 +50,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 const SizedBox(height: 50),
                 _buildHeader(context),
                 const SizedBox(height: 20),
-                // تمرير بيانات أول 3 لاعبين لمنصة التتويج
                 _buildPodium(users), 
                 Expanded(
                   child: Container(
@@ -53,6 +57,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                     decoration: const BoxDecoration(
                       color: iceWhite, 
                       borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
+                      boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, -5))]
                     ),
                     child: _buildRankingsList(users),
                   ),
@@ -72,71 +77,124 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
             onPressed: () => Navigator.pop(context),
           ),
           Text("دوري وحوش العقارات", 
                 style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-          const SizedBox(width: 40), 
+          const Icon(Icons.emoji_events_outlined, color: goldMedal, size: 24),
         ],
       ),
     );
   }
 
-  // تحديث منصة التتويج لتقبل البيانات من الفايربيز
   Widget _buildPodium(List<QueryDocumentSnapshot> users) {
-    String u1 = users.length > 0 ? users[0]['name'] : "قادم..";
-    String u2 = users.length > 1 ? users[1]['name'] : "قادم..";
-    String u3 = users.length > 2 ? users[2]['name'] : "قادم..";
+    Map<String, dynamic> getUserData(int index) {
+      if (users.length > index) {
+        return users[index].data() as Map<String, dynamic>;
+      }
+      return {"name": "قادم..", "points": 0};
+    }
+
+    var first = getUserData(0);
+    var second = getUserData(1);
+    var third = getUserData(2);
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        _pillar(u2, 100, silverMedal, "2"),
+        // المركز الثاني - فضي
+        _pillar(second['name'], second['points'].toString(), 105, silverMedal, "2"),
         const SizedBox(width: 15),
-        _pillar(u1, 140, safetyOrange, "1"), 
+        // المركز الأول - ذهبي
+        _pillar(first['name'], first['points'].toString(), 150, goldMedal, "1"), 
         const SizedBox(width: 15),
-        _pillar(u3, 80, bronzeMedal, "3"),
+        // المركز الثالث - برونزي
+        _pillar(third['name'], third['points'].toString(), 85, bronzeMedal, "3"),
       ],
     );
   }
 
-  Widget _pillar(String name, double height, Color color, String rank) => Column(
+  Widget _pillar(String name, String pts, double height, Color color, String rank) => Column(
     children: [
-      Text(rank, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
+      if (rank == "1") 
+        const Icon(Icons.workspace_premium, color: goldMedal, size: 35),
+      const SizedBox(height: 5),
       CircleAvatar(
         backgroundColor: Colors.white24, 
-        radius: 25, 
-        child: Text(name.isNotEmpty ? name[0] : "?", style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold))
+        radius: rank == "1" ? 32 : 26, 
+        child: Text(name.isNotEmpty ? name[0] : "?", 
+               style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18))
       ),
-      const SizedBox(height: 10),
+      const SizedBox(height: 8),
+      SizedBox(
+        width: 75,
+        child: Text(name.split(' ')[0], 
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.cairo(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+      ),
+      const SizedBox(height: 5),
       Container(
-        width: 70, height: height, 
+        width: 75, height: height, 
         decoration: BoxDecoration(
-          color: color, 
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [color, color.withOpacity(0.6)],
+          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
+          boxShadow: [
+            BoxShadow(color: color.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4))
+          ]
         ),
-        child: Center(child: rank == "1" ? const Icon(Icons.emoji_events, color: Colors.white) : null),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text("#$rank", 
+              style: GoogleFonts.poppins(
+                color: rank == "1" ? Colors.black87 : Colors.white, 
+                fontWeight: FontWeight.w900, 
+                fontSize: 26)
+            ),
+            Text("$pts ن", 
+              style: GoogleFonts.cairo(
+                color: rank == "1" ? Colors.black54 : Colors.white70, 
+                fontSize: 11, 
+                fontWeight: FontWeight.bold)
+            ),
+          ],
+        ),
       ),
-      Text(name, style: GoogleFonts.cairo(color: Colors.white, fontSize: 12)),
     ],
   );
 
-  Widget _buildRankingsList(List<QueryDocumentSnapshot> users) => ListView.builder(
-    padding: const EdgeInsets.all(25),
-    itemCount: users.length > 3 ? users.length - 3 : 0, // عرض باقي اللاعبين بعد التوب 3
-    itemBuilder: (context, i) {
-      var user = users[i + 3];
-      return Card(
-        margin: const EdgeInsets.only(bottom: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        child: ListTile(
-          leading: CircleAvatar(backgroundColor: Colors.grey[200], child: Text("${i + 4}")),
-          title: Text(user['name'], style: GoogleFonts.cairo(fontSize: 14)),
-          trailing: Text("${user['points']} ن", style: GoogleFonts.cairo(color: deepTeal, fontWeight: FontWeight.bold)),
-        ),
-      );
-    },
-  );
+  Widget _buildRankingsList(List<QueryDocumentSnapshot> users) {
+    if (users.length <= 3) {
+      return Center(child: Text("المنافسة لسه بتبدأ.. شد حيلك!", style: GoogleFonts.cairo(color: deepTeal)));
+    }
+    
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 25),
+      itemCount: users.length - 3,
+      itemBuilder: (context, i) {
+        var user = users[i + 3];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 5, offset: const Offset(0, 2))]
+          ),
+          child: ListTile(
+            leading: Text("${i + 4}", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.grey[400])),
+            title: Text(user['name'], style: GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.w600, color: deepTeal)),
+            trailing: Text("${user['points']} ن", style: GoogleFonts.cairo(color: safetyOrange, fontWeight: FontWeight.bold)),
+          ),
+        );
+      },
+    );
+  }
 }
