@@ -17,17 +17,29 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      return web;
+      throw UnsupportedError(
+        'DefaultFirebaseOptions have not been configured for web - '
+        'you can reconfigure this by running the FlutterFire CLI again.',
+      );
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        return ios;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for ios - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.macOS:
-        return macos;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for macos - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.windows:
-        return windows;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for windows - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -40,48 +52,12 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBU9G5tJJnjknRXLXbmtZb1ruHGEPsWiwU',
-    appId: '1:740475912872:web:7cf9ddfd59cdc06732789d',
-    messagingSenderId: '740475912872',
-    projectId: 'g-lpro',
-    authDomain: 'g-lpro.firebaseapp.com',
-    storageBucket: 'g-lpro.firebasestorage.app',
-  );
-
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDpOGf0pMAnfr3SpaV4oOPGQciyx48CyYw',
-    appId: '1:740475912872:android:5ff41971629003eb32789d',
-    messagingSenderId: '740475912872',
-    projectId: 'g-lpro',
-    storageBucket: 'g-lpro.firebasestorage.app',
-  );
-
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCS7D6uUlprf1zl_OB9kjnAwpM6ynYUkLw',
-    appId: '1:740475912872:ios:cce524f2f3e55fe332789d',
-    messagingSenderId: '740475912872',
-    projectId: 'g-lpro',
-    storageBucket: 'g-lpro.firebasestorage.app',
-    iosBundleId: 'com.example.lpro2',
-  );
-
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyCS7D6uUlprf1zl_OB9kjnAwpM6ynYUkLw',
-    appId: '1:740475912872:ios:cce524f2f3e55fe332789d',
-    messagingSenderId: '740475912872',
-    projectId: 'g-lpro',
-    storageBucket: 'g-lpro.firebasestorage.app',
-    iosBundleId: 'com.example.lpro2',
-  );
-
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyBU9G5tJJnjknRXLXbmtZb1ruHGEPsWiwU',
-    appId: '1:740475912872:web:ab3d4bdd08bde87d32789d',
-    messagingSenderId: '740475912872',
-    projectId: 'g-lpro',
-    authDomain: 'g-lpro.firebaseapp.com',
-    storageBucket: 'g-lpro.firebasestorage.app',
+    apiKey: 'AIzaSyCtwb0fAIMq3q_YMIkHMLUD3_-GvGkYdVw',
+    appId: '1:905243871570:android:d884ea928cedb56b66928b',
+    messagingSenderId: '905243871570',
+    projectId: 'lpro2-quiz',
+    storageBucket: 'lpro2-quiz.firebasestorage.app',
   );
 
 }

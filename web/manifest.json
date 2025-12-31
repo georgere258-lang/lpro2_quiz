@@ -1,6 +1,6 @@
 {
-    "name": "lpro2",
-    "short_name": "lpro2",
+    "name": "lpro2_quiz",
+    "short_name": "lpro2_quiz",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

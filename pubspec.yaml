@@ -34,6 +34,17 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  # مكتبة توليد الأيقونات
+  flutter_launcher_icons: ^0.13.1
+
+# إعدادات أيقونة التطبيق (وحوش العقارات) - تم التعديل هنا لضمان القبول
+flutter_launcher_icons:
+  android: true 
+  ios: true
+  image_path: "assets/icon.png"
+  min_sdk_android: 21 
+  adaptive_icon_background: "#1B4D57" 
+  adaptive_icon_foreground: "assets/icon.png"
 
 flutter:
   uses-material-design: true
@@ -43,7 +54,5 @@ flutter:
     - assets/logo.svg          # شعار التطبيق
     - assets/top_brand.png     # شعار الهيدر
     - assets/icon.png          # أيقونة التطبيق
-    - assets/plans/            # مجلد صور تحدي الماستر بلان (خرائط)
-    - assets/card_images/      # مجلد صور أقسام شاشة الترحيب (الخلفيات البريميوم)
-
-  # ملاحظة للمستقبل: أي صورة تضعينها داخل هذه المجلدات سيتم التعرف عليها تلقائياً
+    - assets/plans/            # مجلد صور تحدي الماستر بلان
+    - assets/card_images/      # مجلد صور الخلفيات

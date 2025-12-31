@@ -1,4 +1,4 @@
-package com.example.lpro2
+package com.example.lpro2_quiz
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -1,62 +1,62 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; 
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 
 class QuizScreen extends StatefulWidget {
   final String categoryTitle;
-  final bool isTextQuiz;
-
-  const QuizScreen({super.key, required this.categoryTitle, this.isTextQuiz = false});
+  const QuizScreen({super.key, required this.categoryTitle});
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
 }
 
 class _QuizScreenState extends State<QuizScreen> {
-  // تم حذف const هنا لأن الألوان تُستخدم في ويدجيتس غير ثابتة
   final Color deepTeal = const Color(0xFF1B4D57);
   final Color safetyOrange = const Color(0xFFE67E22);
-  final TextEditingController _ansController = TextEditingController();
 
   int currentQuestionIndex = 0;
   int score = 0;
   int timeLeft = 25;
   Timer? timer;
   bool gameStarted = false;
-  String? selectedOption; 
-  bool isCorrect = false; 
-  bool showFeedback = false; 
+  String? selectedOption;
+  bool showFeedback = false;
+  bool isLoading = true;
 
-  late List<Map<String, dynamic>> questions;
+  List<Map<String, dynamic>> questions = [];
 
   @override
   void initState() {
     super.initState();
-    _loadQuestions();
+    _fetchQuestions();
   }
 
-  // دالة توحيد الحروف العربية لضمان صحة المقارنة
-  String normalizeArabic(String text) {
-    text = text.trim(); 
-    text = text.replaceAll(RegExp(r'[أإآ]'), 'ا');
-    text = text.replaceAll(RegExp(r'[ى]'), 'ي');
-    text = text.replaceAll(RegExp(r'[ة]'), 'ه');
-    return text.toLowerCase(); 
-  }
+  Future<void> _fetchQuestions() async {
+    try {
+      var snapshot = await FirebaseFirestore.instance
+          .collection('quizzes')
+          .where('category', isEqualTo: widget.categoryTitle)
+          .get();
 
-  void _loadQuestions() {
-    if (widget.categoryTitle == "نشط ذهنك") {
-      questions = [
-        {"q": "كم عدد الأمتار في الفدان العقاري؟", "options": ["4200", "3500", "4000"], "a": "4200"},
-        {"q": "ما هي أكبر مدينة سكنية في مصر؟", "options": ["6 أكتوبر", "القاهرة الجديدة", "العاصمة الإدارية"], "a": "6 أكتوبر"},
-      ];
-    } else {
-      questions = [
-        {"q": "أين تقع منطقة الجولدن سكوير؟", "options": ["التجمع", "زايد", "أكتوبر"], "a": "التجمع"},
-        {"q": "ما هو اختصار العائد على الاستثمار؟", "options": ["ROI", "ROE", "ROA"], "a": "ROI"},
-        {"q": "أكبر مطور عقاري في مصر من حيث محفظة الأراضي؟", "options": ["طلعت مصطفى", "سوديك", "إعمار"], "a": "طلعت مصطفى"},
-      ];
+      if (mounted) {
+        setState(() {
+          questions = snapshot.docs
+              .map((doc) => {
+                    "q": doc['question'],
+                    "options": doc['options'],
+                    "a": doc['options'][doc['correctAnswer']],
+                  })
+              .toList();
+          questions.shuffle();
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("خطأ في جلب الأسئلة: $e");
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -65,33 +65,49 @@ class _QuizScreenState extends State<QuizScreen> {
     timer?.cancel();
     timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (timeLeft > 0) {
-        setState(() => timeLeft--);
+        if (mounted) setState(() => timeLeft--);
       } else {
-        _handleAnswer(""); 
+        _handleAnswer("");
       }
     });
   }
 
   void _handleAnswer(String selected) {
-    if (showFeedback) return; 
+    if (showFeedback) return;
 
     timer?.cancel();
+    bool isCorrect = _normalize(selected) ==
+        _normalize(questions[currentQuestionIndex]['a'] ?? "");
+
+    if (isCorrect) {
+      HapticFeedback.mediumImpact();
+    } else {
+      HapticFeedback.heavyImpact();
+    }
+
     setState(() {
       selectedOption = selected;
       showFeedback = true;
-      
-      String normalizedUserAns = normalizeArabic(selected);
-      String normalizedCorrectAns = normalizeArabic(questions[currentQuestionIndex]['a']);
-      
-      isCorrect = (normalizedUserAns == normalizedCorrectAns);
-      if (isCorrect) score += 10;
-    });
 
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted) {
-        _nextStep();
+      if (isCorrect) {
+        int basePoints = (widget.categoryTitle == "دوري النجوم") ? 20 : 10;
+        int speedBonus = (timeLeft > 20) ? 5 : 0;
+        score += basePoints + speedBonus;
       }
     });
+
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) _nextStep();
+    });
+  }
+
+  String _normalize(String text) {
+    return text
+        .trim()
+        .replaceAll(RegExp(r'[أإآ]'), 'ا')
+        .replaceAll(RegExp(r'[ى]'), 'ي')
+        .replaceAll(RegExp(r'[ة]'), 'ه')
+        .toLowerCase();
   }
 
   void _nextStep() {
@@ -100,188 +116,77 @@ class _QuizScreenState extends State<QuizScreen> {
         currentQuestionIndex++;
         showFeedback = false;
         selectedOption = null;
-        _ansController.clear();
       });
       _startTimer();
     } else {
-      _showResult();
+      _saveScoreAndFinish();
     }
   }
 
+  Future<void> _saveScoreAndFinish() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && score > 0) {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .update({
+        'points': FieldValue.increment(score),
+        'lastQuiz': DateTime.now(),
+      });
+    }
+    _showResult();
+  }
+
   void _showResult() {
-    timer?.cancel();
+    String rankMsg =
+        score > 50 ? "وحش عقارات حقيقي! 🦁" : "بداية ممتازة يا بطل ✨";
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (c) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-        title: Text("انتهى التحدي 🏆", textAlign: TextAlign.center, style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: deepTeal)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text("المعلومة فرقت معاك!", style: GoogleFonts.cairo(fontSize: 14, color: Colors.grey)),
+            const Icon(Icons.emoji_events, size: 80, color: Colors.amber),
             const SizedBox(height: 15),
-            Text("$score", style: GoogleFonts.poppins(fontSize: 40, fontWeight: FontWeight.w900, color: safetyOrange)),
-            Text("نقطة", style: GoogleFonts.cairo(fontSize: 16, color: deepTeal)),
-          ],
-        ),
-        actions: [
-          Center(
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: deepTeal, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-              onPressed: () { Navigator.pop(context); Navigator.pop(context); },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text("العودة للرئيسية", style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            ),
-          )
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!gameStarted) return _buildStartView();
-
-    var q = questions[currentQuestionIndex];
-    bool hasOptions = q.containsKey('options');
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFB),
-      appBar: AppBar(
-        backgroundColor: deepTeal,
-        elevation: 0,
-        centerTitle: true,
-        title: Text("المعلومة بتفرق", style: GoogleFonts.cairo(color: safetyOrange, fontWeight: FontWeight.bold, fontSize: 18)),
-        leading: const BackButton(color: Colors.white),
-      ),
-      body: Column(
-        children: [
-          LinearProgressIndicator(
-            value: timeLeft / 25, 
-            color: timeLeft < 10 ? Colors.red : safetyOrange, 
-            backgroundColor: Colors.grey.shade200,
-            minHeight: 8,
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(25),
-              child: Column(
-                children: [
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text("السكور: $score", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: safetyOrange, fontSize: 16)),
-                      Text("سؤال ${currentQuestionIndex + 1}/${questions.length}", style: GoogleFonts.cairo(fontWeight: FontWeight.bold, color: deepTeal)),
-                    ],
-                  ),
-                  const SizedBox(height: 30),
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    width: double.infinity,
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
-                    child: Text(q['q'], style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold, color: deepTeal, height: 1.5), textAlign: TextAlign.center),
-                  ),
-                  const SizedBox(height: 40),
-                  hasOptions ? _buildOptions(q['options']) : _buildTextInput(),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTextInput() {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: TextField(
-        controller: _ansController,
-        keyboardType: TextInputType.text,
-        textAlign: TextAlign.right,
-        style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.bold, color: deepTeal),
-        inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9\s\u0600-\u06FF]')),
-        ],
-        decoration: InputDecoration(
-          hintText: "اكتب إجابتك هنا...",
-          hintStyle: GoogleFonts.cairo(fontSize: 16, color: Colors.grey),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide(color: deepTeal)),
-          filled: true, fillColor: Colors.white,
-          // تم حذف كلمة const من هنا لحل مشكلة Error: Not a constant expression
-          prefixIcon: Icon(Icons.edit_note, color: deepTeal),
-        ),
-        onSubmitted: (val) => _handleAnswer(val),
-      ),
-    );
-  }
-
-  Widget _buildOptions(List<dynamic> options) {
-    return Column(
-      children: options.map((opt) {
-        Color cardColor = Colors.white;
-        Color textColor = deepTeal;
-        
-        if (showFeedback) {
-          if (opt == questions[currentQuestionIndex]['a']) {
-            cardColor = Colors.green.shade400; textColor = Colors.white;
-          } else if (opt == selectedOption) {
-            cardColor = Colors.red.shade400; textColor = Colors.white;
-          }
-        }
-
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 15),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            child: InkWell(
-              onTap: () => _handleAnswer(opt),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5)],
-                  border: Border.all(color: showFeedback ? cardColor : Colors.grey.shade200),
-                ),
-                child: Text(opt, textAlign: TextAlign.center, style: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.bold, color: textColor)),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildStartView() {
-    String headerTitle = widget.categoryTitle;
-    IconData headerIcon = widget.categoryTitle == "نشط ذهنك" ? Icons.psychology : Icons.military_tech;
-
-    return Scaffold(
-      backgroundColor: deepTeal,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(headerIcon, size: 80, color: safetyOrange),
+            Text("تحدي مكتمل",
+                style: GoogleFonts.cairo(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 22,
+                    color: deepTeal)),
+            Text(rankMsg,
+                style: GoogleFonts.cairo(fontSize: 14, color: Colors.grey)),
             const SizedBox(height: 20),
-            Text(headerTitle, style: GoogleFonts.cairo(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 60),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+              decoration: BoxDecoration(
+                  color: safetyOrange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20)),
+              child: Text("+$score",
+                  style: GoogleFonts.poppins(
+                      fontSize: 35,
+                      fontWeight: FontWeight.w900, // تم التعديل من black
+                      color: safetyOrange)),
+            ),
+            const SizedBox(height: 25),
             SizedBox(
-              width: 220, height: 60,
+              width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: safetyOrange, 
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))
-                ),
-                onPressed: () { setState(() => gameStarted = true); _startTimer(); },
-                child: Text("يلا بينا", style: GoogleFonts.cairo(fontSize: 20, color: Colors.white, fontWeight: FontWeight.bold)),
+                    backgroundColor: deepTeal,
+                    shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(15)), // تم الإصلاح هنا
+                    padding: const EdgeInsets.all(12)),
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pop(context);
+                },
+                child: Text("العودة للرئيسية",
+                    style: GoogleFonts.cairo(
+                        color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             )
           ],
@@ -291,9 +196,209 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   @override
-  void dispose() { 
-    timer?.cancel(); 
-    _ansController.dispose(); 
-    super.dispose(); 
+  Widget build(BuildContext context) {
+    if (isLoading) {
+      return Scaffold(
+          backgroundColor: deepTeal,
+          body: const Center(
+              child: CircularProgressIndicator(color: Colors.white)));
+    }
+    if (questions.isEmpty) return _buildEmptyView();
+    if (!gameStarted) return _buildStartView();
+
+    var q = questions[currentQuestionIndex];
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFB),
+      appBar: AppBar(
+        backgroundColor: deepTeal,
+        elevation: 0,
+        centerTitle: true,
+        title: Text(widget.categoryTitle,
+            style: GoogleFonts.cairo(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18)),
+        leading: IconButton(
+            icon: const Icon(Icons.close, color: Colors.white),
+            onPressed: () => Navigator.pop(context)),
+      ),
+      body: Column(
+        children: [
+          TweenAnimationBuilder<double>(
+            duration: const Duration(milliseconds: 500),
+            tween: Tween(begin: 0, end: timeLeft / 25),
+            builder: (context, value, _) => LinearProgressIndicator(
+              value: value,
+              backgroundColor: Colors.grey[200],
+              color: value < 0.3 ? Colors.red : safetyOrange,
+              minHeight: 6,
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(25),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _infoBadge("السكور: $score", safetyOrange),
+                      _infoBadge(
+                          "سؤال ${currentQuestionIndex + 1}/${questions.length}",
+                          deepTeal),
+                    ],
+                  ),
+                  const SizedBox(height: 30),
+                  _buildQuestionCard(q['q']),
+                  const SizedBox(height: 40),
+                  _buildOptions(q['options']),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _infoBadge(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+      decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12)),
+      child: Text(text,
+          style: GoogleFonts.cairo(
+              fontWeight: FontWeight.bold, color: color, fontSize: 13)),
+    );
+  }
+
+  Widget _buildQuestionCard(String question) {
+    return Container(
+      padding: const EdgeInsets.all(25),
+      width: double.infinity,
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(25),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 15,
+                offset: const Offset(0, 5))
+          ]),
+      child: Text(question,
+          style: GoogleFonts.cairo(
+              fontSize: 19, fontWeight: FontWeight.bold, color: deepTeal),
+          textAlign: TextAlign.center),
+    );
+  }
+
+  Widget _buildOptions(List<dynamic> options) {
+    return Column(
+      children: options.map((opt) {
+        bool isCorrect =
+            showFeedback && opt == questions[currentQuestionIndex]['a'];
+        bool isWrong = showFeedback &&
+            opt == selectedOption &&
+            opt != questions[currentQuestionIndex]['a'];
+
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          margin: const EdgeInsets.only(bottom: 15),
+          child: InkWell(
+            onTap: () => _handleAnswer(opt),
+            borderRadius: BorderRadius.circular(18),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isCorrect
+                    ? Colors.green.shade500
+                    : (isWrong ? Colors.red.shade500 : Colors.white),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                    color: isCorrect || isWrong
+                        ? Colors.transparent
+                        : Colors.grey.shade200),
+                boxShadow: isCorrect || isWrong
+                    ? [
+                        BoxShadow(
+                            color: (isCorrect ? Colors.green : Colors.red)
+                                .withOpacity(0.3),
+                            blurRadius: 10)
+                      ]
+                    : null,
+              ),
+              child: Text(opt,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.cairo(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: (isCorrect || isWrong) ? Colors.white : deepTeal)),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildStartView() {
+    return Scaffold(
+      backgroundColor: deepTeal,
+      body: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+            gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                colors: [deepTeal, const Color(0xFF0D2A30)])),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.psychology, size: 100, color: Colors.amber),
+            const SizedBox(height: 20),
+            Text(widget.categoryTitle,
+                style: GoogleFonts.cairo(
+                    fontSize: 32,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold)),
+            Text("استعد للاختبار وتجميع النقاط",
+                style: GoogleFonts.cairo(color: Colors.white60)),
+            const SizedBox(height: 60),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: safetyOrange,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 60, vertical: 15)),
+              onPressed: () {
+                setState(() => gameStarted = true);
+                _startTimer();
+              },
+              child: Text("ابدأ التحدي",
+                  style: GoogleFonts.cairo(
+                      fontSize: 20,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold)),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyView() {
+    return Scaffold(
+        backgroundColor: deepTeal,
+        body: Center(
+            child: Text("لا توجد أسئلة حالياً لهذا القسم",
+                style: GoogleFonts.cairo(color: Colors.white))));
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
   }
 }

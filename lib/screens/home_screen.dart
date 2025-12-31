@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'quiz_screen.dart'; 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'quiz_screen.dart';
 import 'master_plan_screen.dart';
-import 'profile_screen.dart'; 
-import 'leaderboard_screen.dart';
-import 'dart:async';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,211 +12,278 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  final ScrollController _scrollController = ScrollController();
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   final Color deepTeal = const Color(0xFF1B4D57);
   final Color safetyOrange = const Color(0xFFE67E22);
-  
-  int _currentIndex = 0;
-  final String userName = FirebaseAuth.instance.currentUser?.displayName?.split(' ')[0] ?? "مريم";
+  final User? user = FirebaseAuth.instance.currentUser;
+
+  late AnimationController _newsController;
+  late Animation<Offset> _newsAnimation;
+
+  final List<String> _newsItems = [
+    "🚀 المعلومة بتفرق.. طور مهاراتك العقارية الآن!",
+    "🏆 مبروك لـ جورج تألقها في دوري العقارات!",
+    "📢 قريباً: تحديثات ضخمة في مناطق النرجس وبيت الوطن!",
+  ];
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _startScrolling());
-  }
+    // سرعة انسيابية مريحة للعين (30 ثانية للدورة الواحدة)
+    _newsController =
+        AnimationController(duration: const Duration(seconds: 30), vsync: this)
+          ..repeat();
 
-  void _startScrolling() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(seconds: 15),
-        curve: Curves.linear,
-      ).then((_) {
-        if (mounted) {
-          _scrollController.jumpTo(0);
-          _startScrolling();
-        }
-      });
-    }
+    _newsAnimation =
+        Tween<Offset>(begin: const Offset(1.0, 0), end: const Offset(-2.5, 0))
+            .animate(_newsController);
   }
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    _newsController.dispose();
     super.dispose();
+  }
+
+  Stream<int> getUserRank() {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .orderBy('points', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      int index = snapshot.docs.indexWhere((doc) => doc.id == user?.uid);
+      return index != -1 ? index + 1 : 0;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    String userName = user?.displayName?.split(' ')[0] ?? "جورج";
+    String fullTickerText = _newsItems.join("      |      ");
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFB),
-      appBar: AppBar(
-        backgroundColor: deepTeal,
-        elevation: 0,
-        centerTitle: true,
-        title: Image.asset(
-          'assets/top_brand.png', 
-          height: 40, 
-          errorBuilder: (c, e, s) => const Icon(Icons.business, color: Colors.white),
-        ),
-      ),
-      bottomNavigationBar: _buildBottomNavBar(),
-      body: Column(
-        children: [
-          _buildMarqueeNews(),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("يا أهلاً بكِ يا $userName ✨", 
-                    style: GoogleFonts.cairo(fontSize: 24, fontWeight: FontWeight.bold, color: deepTeal)),
-                  Text("المعلومة بتفرق في كل صفقة جديدة.. 😉", 
-                    style: GoogleFonts.cairo(fontSize: 14, color: Colors.grey[700])),
-                  
-                  const SizedBox(height: 25),
-                  _buildFeatureCard(),
+      // ملاحظة: تم حذف الـ AppBar من هنا ليعتمد التطبيق على اللوجو الموجود في الـ MainWrapper منعاً للتكرار
+      body: StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(user?.uid)
+              .snapshots(),
+          builder: (context, snapshot) {
+            int userPoints = 0;
+            if (snapshot.hasData && snapshot.data!.exists) {
+              var data = snapshot.data!.data() as Map<String, dynamic>;
+              userPoints = data['points'] ?? 0;
+              userName = data['name'] ?? userName;
+            }
 
-                  // قسم الإحصائيات الجديد لاستغلال المساحة
-                  const SizedBox(height: 25),
-                  Row(
-                    children: [
-                      _buildSmallStatCard("نقاطك", "١,٢٥٠", Icons.stars, Colors.amber),
-                      const SizedBox(width: 12),
-                      _buildSmallStatCard("ترتيبك", "#١٢", Icons.leaderboard, Colors.blueAccent),
-                      const SizedBox(width: 12),
-                      _buildSmallStatCard("المستوى", "خبير", Icons.workspace_premium, Colors.purple),
-                    ],
+            return Column(
+              children: [
+                // 1. شريط الأخبار: ملتصق بالهيدر العلوي تماماً
+                Container(
+                  width: double.infinity,
+                  height: 30,
+                  color: safetyOrange,
+                  child: ClipRect(
+                    child: SlideTransition(
+                      position: _newsAnimation,
+                      child: Center(
+                        child: Text(
+                          fullTickerText,
+                          style: GoogleFonts.cairo(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          softWrap: false,
+                        ),
+                      ),
+                    ),
                   ),
+                ),
 
-                  const SizedBox(height: 30),
-                  _buildGridMenu(),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // الترحيب
+                          Text("يا أهلاً بكِ يا $userName ✨",
+                              style: GoogleFonts.cairo(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                  color: deepTeal)),
+                          Text(
+                              "المعلومة بتفرق.. جاهزة لتحدي جديد يرفع سكورك؟ 🚀",
+                              style: GoogleFonts.cairo(
+                                  fontSize: 14, color: Colors.grey[700])),
+
+                          const SizedBox(height: 25),
+
+                          // كارت معلومة في السريع
+                          _buildQuickInfoCard(),
+
+                          const SizedBox(height: 20),
+
+                          // كارت تحدي اليوم
+                          _buildFeatureCard(),
+
+                          const SizedBox(height: 25),
+
+                          // قسم الإحصائيات (المربعات البيضاء)
+                          Row(
+                            children: [
+                              _buildStatBox("نقاطك", "$userPoints", Icons.stars,
+                                  Colors.amber),
+                              const SizedBox(width: 12),
+                              StreamBuilder<int>(
+                                  stream: getUserRank(),
+                                  builder: (context, rankSnapshot) {
+                                    String rank = rankSnapshot.hasData
+                                        ? "#${rankSnapshot.data}"
+                                        : "...";
+                                    return _buildStatBox(
+                                        "الترتيب",
+                                        rank,
+                                        Icons.bar_chart_rounded,
+                                        Colors.blueAccent);
+                                  }),
+                              const SizedBox(width: 12),
+                              _buildStatBox(
+                                  "المستوى",
+                                  userPoints > 100 ? "خبير" : "مبتدئ",
+                                  Icons.workspace_premium,
+                                  Colors.purple),
+                            ],
+                          ),
+
+                          const SizedBox(height: 30),
+
+                          // كروت الأقسام (تنسيق الصور والأشرطة جهة اليمين)
+                          _buildGridMenu(),
+
+                          const SizedBox(height: 30),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }),
     );
   }
 
-  // شريط الأخبار المتحرك
-  Widget _buildMarqueeNews() {
+  Widget _buildQuickInfoCard() {
     return Container(
-      height: 38, 
-      color: safetyOrange,
-      child: ListView(
-        controller: _scrollController,
-        scrollDirection: Axis.horizontal,
-        physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(color: safetyOrange.withOpacity(0.2), width: 1.5),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 15)
+        ],
+      ),
+      child: Row(
         children: [
-          Center(
-            child: Text(
-              "  📣 قريباً: تحديثات الماستر بلان لحي النرجس وبيت الوطن! 📣   |   🏆 مبروك لـ $userName تألقها في دوري العقارات 🏆   |   🚀 المعلومة بتفرق.. طور مهاراتك الآن! 🚀  ", 
-              style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text("معلومة في السريع",
+                        style: GoogleFonts.cairo(
+                            fontWeight: FontWeight.bold,
+                            color: deepTeal,
+                            fontSize: 17)),
+                    const SizedBox(width: 5),
+                    const Icon(Icons.lightbulb, color: Colors.amber, size: 20),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                    "الاستثمار التجاري الناجح يبدأ من دراسة الـ Footfall (كثافة المشاة) حول المول.",
+                    style: GoogleFonts.cairo(
+                        color: Colors.black87, fontSize: 13, height: 1.5)),
+              ],
             ),
           ),
+          const SizedBox(width: 10),
+          CircleAvatar(
+            backgroundColor: safetyOrange.withOpacity(0.1),
+            radius: 25,
+            child: Icon(Icons.insights, color: safetyOrange),
+          )
         ],
       ),
     );
   }
 
-  // ويجيت الإحصائيات الصغيرة
-  Widget _buildSmallStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatBox(String title, String value, IconData icon, Color color) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 15),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5))],
-          border: Border.all(color: Colors.grey.withOpacity(0.1)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10)
+          ],
         ),
         child: Column(
           children: [
-            Icon(icon, color: color, size: 20),
+            Icon(icon, color: color, size: 22),
             const SizedBox(height: 8),
-            Text(value, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14, color: deepTeal)),
-            Text(title, style: GoogleFonts.cairo(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w600)),
+            Text(value,
+                style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: deepTeal)),
+            Text(title,
+                style: GoogleFonts.cairo(
+                    fontSize: 11,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.bold)),
           ],
         ),
       ),
     );
   }
 
-  // قائمة المسابقات (Grid)
-  Widget _buildGridMenu() {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      mainAxisSpacing: 18,
-      crossAxisSpacing: 18,
-      childAspectRatio: 0.85, 
-      children: [
-        _buildGridCard("دوري النجوم", "🌱 ابدأ رحلتك", Icons.stars_rounded, const Color(0xFF3498DB), 
-          "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=500", 
-          const QuizScreen(categoryTitle: "دوري النجوم")),
-        _buildGridCard("دوري المحترفين", "💪 يا كبير", Icons.workspace_premium_rounded, safetyOrange, 
-          "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=500", 
-          const QuizScreen(categoryTitle: "دوري المحترفين")),
-        _buildGridCard("نشط ذهنك", "🧠 فكر بسرعة", Icons.bolt_rounded, Colors.purpleAccent, 
-          "https://images.unsplash.com/photo-1558403194-611308249627?q=80&w=500", 
-          const QuizScreen(categoryTitle: "نشط ذهنك")),
-        _buildGridCard("الماستر بلان", "🗺️ تحدي الخرائط", Icons.map_rounded, const Color(0xFF2ECC71), 
-          "https://images.unsplash.com/photo-1503387762-592dea58ef23?q=80&w=500", 
-          const MasterPlanScreen()),
-      ],
-    );
-  }
-
-  Widget _buildBottomNavBar() {
-    return Container(
-      decoration: const BoxDecoration(boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 20)]),
-      child: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() => _currentIndex = index);
-          if (index == 1) Navigator.push(context, MaterialPageRoute(builder: (c) => const LeaderboardScreen()));
-          if (index == 2) Navigator.push(context, MaterialPageRoute(builder: (c) => const MasterPlanScreen()));
-          if (index == 3) Navigator.push(context, MaterialPageRoute(builder: (c) => const ProfileScreen()));
-        },
-        selectedItemColor: safetyOrange,
-        unselectedItemColor: deepTeal.withOpacity(0.5),
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_max_rounded), label: 'الرئيسية'),
-          BottomNavigationBarItem(icon: Icon(Icons.emoji_events_rounded), label: 'المتصدرين'),
-          BottomNavigationBarItem(icon: Icon(Icons.map_rounded), label: 'الخرائط'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'حسابي'),
-        ],
-      ),
-    );
-  }
-
   Widget _buildFeatureCard() {
     return Container(
-      width: double.infinity, 
+      width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [deepTeal, deepTeal.withOpacity(0.85)]),
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [BoxShadow(color: deepTeal.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))]
-      ),
+          color: const Color(0xFF2C5F6A),
+          borderRadius: BorderRadius.circular(25),
+          boxShadow: [
+            BoxShadow(
+                color: deepTeal.withOpacity(0.3),
+                blurRadius: 15,
+                offset: const Offset(0, 8))
+          ]),
       child: Row(
         children: [
-          const Icon(Icons.auto_awesome, color: Colors.amber, size: 40),
+          const Icon(Icons.auto_awesome, color: Colors.amber, size: 35),
           const SizedBox(width: 15),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("تحدي اليوم", style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                Text("كن أول من يحل تحدي الماستر بلان الجديد واجمع نقاط الضعف!", 
-                  style: GoogleFonts.cairo(color: Colors.white70, fontSize: 12)),
+                Text("كن أول من يحل تحدي الماستر بلان الجديد",
+                    style: GoogleFonts.cairo(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15)),
+                Text("واجمع نقاط الضعف!",
+                    style:
+                        GoogleFonts.cairo(color: Colors.white70, fontSize: 12)),
               ],
             ),
           ),
@@ -227,50 +292,102 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildGridCard(String title, String sub, IconData icon, Color color, String imageUrl, Widget screen) {
+  Widget _buildGridMenu() {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      mainAxisSpacing: 18,
+      crossAxisSpacing: 18,
+      childAspectRatio: 0.85,
+      children: [
+        _buildGridCard(
+            "دوري النجوم",
+            "✨ Fresh",
+            Colors.blue,
+            "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?q=80&w=500",
+            const QuizScreen(categoryTitle: "دوري النجوم")),
+        _buildGridCard(
+            "دوري المحترفين",
+            "🔥 Pro",
+            Colors.orange,
+            "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=500",
+            const QuizScreen(categoryTitle: "دوري المحترفين")),
+        _buildGridCard(
+            "نشط ذهنك",
+            "🧠 Mind",
+            Colors.purpleAccent,
+            "https://images.unsplash.com/photo-1558403194-611308249627?q=80&w=500",
+            const QuizScreen(categoryTitle: "نشط ذهنك")),
+        _buildGridCard(
+            "الماستر بلان",
+            "🗺️ Maps",
+            Colors.green,
+            "https://images.unsplash.com/photo-1503387762-592dea58ef23?q=80&w=500",
+            const MasterPlanScreen()),
+      ],
+    );
+  }
+
+  Widget _buildGridCard(String title, String badgeText, Color badgeColor,
+      String imageUrl, Widget screen) {
     return InkWell(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => screen)),
-      borderRadius: BorderRadius.circular(25),
+      onTap: () =>
+          Navigator.push(context, MaterialPageRoute(builder: (c) => screen)),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(25),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 8))],
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)
+          ],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(25),
           child: Stack(
             children: [
-              Positioned.fill(child: Image.network(imageUrl, fit: BoxFit.cover)),
+              Positioned.fill(
+                  child: Image.network(imageUrl, fit: BoxFit.cover)),
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
-                      colors: [Colors.black.withOpacity(0.1), Colors.black.withOpacity(0.85)],
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.85)
+                      ],
                     ),
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(15.0),
+              // التعديل المطلوب: البادج والعنوان في أقصى اليمين (Right: 15) تماماً كالصورة
+              Positioned(
+                bottom: 15,
+                right: 15,
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.end, // دفع كل المحتوى لليمين
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: color.withOpacity(0.9), shape: BoxShape.circle),
-                      child: Icon(icon, color: Colors.white, size: 24),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                          color: badgeColor,
+                          borderRadius: BorderRadius.circular(10)),
+                      child: Text(badgeText,
+                          style: GoogleFonts.cairo(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold)),
                     ),
-                    const SizedBox(height: 10),
-                    Text(title, style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                    const SizedBox(height: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
-                      child: Text(sub, style: GoogleFonts.cairo(color: Colors.white.withOpacity(0.9), fontSize: 10)),
-                    ),
+                    const SizedBox(height: 6),
+                    Text(title,
+                        textAlign: TextAlign.right,
+                        style: GoogleFonts.cairo(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16)),
                   ],
                 ),
               ),

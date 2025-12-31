@@ -13,7 +13,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with TickerProviderStateMixin {
   late AnimationController _controller;
   late AnimationController _pulseController;
   late Animation<double> _scaleAnimation;
@@ -30,7 +31,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2000), 
+      duration: const Duration(milliseconds: 1500),
     );
 
     _pulseController = AnimationController(
@@ -38,33 +39,32 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       duration: const Duration(milliseconds: 1200),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.7, end: 1.8).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
+    // الأنيميشن يبدأ من 0.7 ليصل للحجم الطبيعي (1.0) بتأثير الارتداد
+    _scaleAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
     );
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeIn),
     );
 
-    // أنيميشن النبض الهادئ
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.08).animate(
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.03).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
     _controller.forward().then((_) {
-      _pulseController.repeat(reverse: true);
+      if (mounted) _pulseController.repeat(reverse: true);
     });
 
-    if (isUserLoggedIn) {
-      Timer(const Duration(seconds: 4), () {
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (c) => const MainWrapper()),
-          );
-        }
-      });
-    }
+    // الانتقال التلقائي بعد 3 ثوانٍ
+    Timer(const Duration(seconds: 3), () {
+      if (mounted && isUserLoggedIn) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (c) => const MainWrapper()),
+        );
+      }
+    });
   }
 
   @override
@@ -81,79 +81,78 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
     return Scaffold(
       backgroundColor: deepTeal,
-      body: Container(
+      body: SizedBox(
         width: double.infinity,
         height: double.infinity,
-        alignment: Alignment.center,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // اللوجو الضخم (90% من عرض الشاشة)
             ScaleTransition(
               scale: _scaleAnimation,
               child: SvgPicture.asset(
                 'assets/logo.svg',
-                width: MediaQuery.of(context).size.width * 0.6, 
+                width: MediaQuery.of(context).size.width * 0.9,
                 fit: BoxFit.contain,
+                placeholderBuilder: (c) =>
+                    const Icon(Icons.business, size: 120, color: Colors.white),
               ),
             ),
-            
-            if (!isUserLoggedIn) ...[
-              const SizedBox(height: 50),
-              FadeTransition(
-                opacity: _fadeAnimation,
-                child: Column(
-                  children: [
-                    ScaleTransition(
-                      scale: _pulseAnimation,
-                      child: Text(
-                        "المعلومة بتفرق",
-                        style: GoogleFonts.cairo(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900, // تم تغيير black إلى w900 لحل المشكلة
-                          color: safetyOrange,
-                          shadows: [
-                            Shadow(
-                              blurRadius: 8.0,
-                              color: Colors.black.withOpacity(0.3),
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
+
+            // تم تقليل المسافة هنا من 60 إلى 20 لرفع الجملة للأعلى
+            const SizedBox(height: 20),
+
+            FadeTransition(
+              opacity: _fadeAnimation,
+              child: Column(
+                children: [
+                  ScaleTransition(
+                    scale: _pulseAnimation,
+                    child: Text(
+                      "المعلومة بتفرق",
+                      style: GoogleFonts.cairo(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        color: safetyOrange,
                       ),
                     ),
-                    const SizedBox(height: 35),
+                  ),
+
+                  // مسافة تحت النص لتعطي توازن للزرار
+                  const SizedBox(height: 45),
+
+                  if (!isUserLoggedIn)
                     SizedBox(
                       width: 170,
                       height: 55,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: safetyOrange,
-                          elevation: 8,
-                          shadowColor: Colors.black45,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
+                              borderRadius: BorderRadius.circular(30)),
                         ),
                         onPressed: () {
                           Navigator.pushReplacement(
                             context,
-                            MaterialPageRoute(builder: (c) => const LoginScreen()),
+                            MaterialPageRoute(
+                                builder: (c) => const LoginScreen()),
                           );
-                        }, 
+                        },
                         child: Text(
                           "يلا Pro",
                           style: GoogleFonts.cairo(
                             fontSize: 20,
-                            fontWeight: FontWeight.bold,
                             color: Colors.white,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
+                    )
+                  else
+                    const CircularProgressIndicator(color: safetyOrange),
+                ],
               ),
-            ],
+            ),
           ],
         ),
       ),
