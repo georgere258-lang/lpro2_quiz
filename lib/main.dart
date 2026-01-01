@@ -7,7 +7,7 @@ import 'firebase_options.dart';
 // استيراد الشاشات
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
-import 'screens/about_screen.dart'; // الشاشة الجديدة
+import 'screens/about_screen.dart';
 import 'main_wrapper.dart';
 
 void main() async {
@@ -49,7 +49,7 @@ class _RealEstateQuizAppState extends State<RealEstateQuizApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'دوري وحوش العقارات',
+      title: 'أبطال Pro', // تعديل اسم التطبيق في السيستم
       debugShowCheckedModeBanner: false,
 
       // إعدادات دعم اللغات (RTL & LTR)
@@ -82,16 +82,16 @@ class _RealEstateQuizAppState extends State<RealEstateQuizApp> {
       initialRoute: '/',
       routes: {
         '/': (context) => const SplashScreen(),
-        '/login': (context) => const LoginScreen(),
+        '/login': (context) =>
+            const LoginScreen(), // هذا المسار هو مفتاح زر تسجيل الخروج
         '/home': (context) => const MainWrapper(),
-        '/about': (context) =>
-            const AboutScreen(), // تم إضافة المسار الجديد هنا
+        '/about': (context) => const AboutScreen(),
       },
     );
   }
 }
 
-// كلاس النصوص الموحد للترجمة
+// كلاس النصوص الموحد للترجمة (تم تحديث المسميات لأبطال Pro)
 class AppStrings {
   static final Map<String, Map<String, String>> _values = {
     'ar': {
@@ -101,8 +101,8 @@ class AppStrings {
       'profile': 'حسابي',
       'lang': 'English',
       'support': 'الدعم الفني',
-      'about': 'حول التطبيق',
-      'welcome': 'وحش العقارات المتألق',
+      'about': 'حول أبطال Pro', // تعديل المسمى
+      'welcome': 'بطل Pro المتألق', // تعديل المسمى
     },
     'en': {
       'home': 'Home',
@@ -111,8 +111,8 @@ class AppStrings {
       'profile': 'Profile',
       'lang': 'العربية',
       'support': 'Support',
-      'about': 'About Us',
-      'welcome': 'Brilliant Real Estate Beast',
+      'about': 'About Pro Heroes',
+      'welcome': 'Brilliant Pro Hero',
     }
   };
 

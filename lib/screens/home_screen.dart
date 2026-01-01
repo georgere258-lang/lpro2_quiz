@@ -55,21 +55,26 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F7F8),
-      drawer: _buildDrawer(context), // القائمة الجانبية المعدلة
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(user?.uid)
-            .snapshots(),
-        builder: (context, snapshot) {
-          String name = "بطل Pro";
-          if (snapshot.hasData && snapshot.data!.data() != null) {
-            name = (snapshot.data!.data() as Map)['name'] ?? "بطل Pro";
-          }
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(user?.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        String name = "بطل Pro";
+        String role = "user"; // القيمة الافتراضية
 
-          return Directionality(
+        if (snapshot.hasData && snapshot.data!.exists) {
+          var data = snapshot.data!.data() as Map<String, dynamic>;
+          name = data['name'] ?? "بطل Pro";
+          role = data['role'] ?? "user"; // قراءة الصلاحية من Firestore
+        }
+
+        return Scaffold(
+          backgroundColor: const Color(0xFFF4F7F8),
+          // تمرير الصلاحية للـ Drawer
+          drawer: _buildDrawer(context, role),
+          body: Directionality(
             textDirection: TextDirection.rtl,
             child: Column(
               children: [
@@ -105,9 +110,9 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ],
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -160,8 +165,8 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // تعديل القائمة الجانبية بالكامل (أبطال Pro)
-  Widget _buildDrawer(BuildContext context) {
+  // القائمة الجانبية ذكية: تظهر لوحة التحكم فقط للأدمن
+  Widget _buildDrawer(BuildContext context, String role) {
     return Drawer(
       child: Directionality(
         textDirection: TextDirection.rtl,
@@ -174,7 +179,7 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Icon(Icons.stars_rounded, color: safetyOrange, size: 40),
               ),
               accountName: Text(
-                "أبطال Pro", // التعديل المطلوب
+                "أبطال Pro",
                 style: GoogleFonts.cairo(
                     fontWeight: FontWeight.bold, fontSize: 18),
               ),
@@ -185,12 +190,16 @@ class _HomeScreenState extends State<HomeScreen>
                 "حول أبطال Pro",
                 () => Navigator.push(context,
                     MaterialPageRoute(builder: (c) => const AboutScreen()))),
-            _buildDrawerItem(
-                Icons.admin_panel_settings_outlined,
-                "لوحة التحكم (للأدمن)",
-                () => Navigator.push(context,
-                    MaterialPageRoute(builder: (c) => const AdminPanel())),
-                color: safetyOrange),
+
+            // شرط ذكي: إذا كان الدور يحتوي على كلمة admin يظهر الزر
+            if (role.contains("admin"))
+              _buildDrawerItem(
+                  Icons.admin_panel_settings_outlined,
+                  "لوحة التحكم (للأدمن)",
+                  () => Navigator.push(context,
+                      MaterialPageRoute(builder: (c) => const AdminPanel())),
+                  color: safetyOrange),
+
             const Spacer(),
             const Divider(),
             _buildDrawerItem(Icons.logout, "تسجيل الخروج",

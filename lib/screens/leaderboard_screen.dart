@@ -25,7 +25,7 @@ class LeaderboardScreen extends StatelessWidget {
         textDirection: TextDirection.rtl,
         child: Column(
           children: [
-            // هيدر تعريفي بسيط
+            // هيدر تعريفي
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 10),
@@ -38,36 +38,45 @@ class LeaderboardScreen extends StatelessWidget {
             ),
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
+                // الاستماع اللحظي لمجموعة المستخدمين مرتبة حسب النقاط
                 stream: FirebaseFirestore.instance
                     .collection('users')
                     .orderBy('points', descending: true)
                     .limit(20)
                     .snapshots(),
                 builder: (context, snapshot) {
-                  if (!snapshot.hasData) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
+
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return Center(
+                        child: Text("لا يوجد متنافسون حالياً",
+                            style: GoogleFonts.cairo()));
+                  }
+
                   return ListView.builder(
                     itemCount: snapshot.data!.docs.length,
                     padding: const EdgeInsets.all(15),
                     itemBuilder: (context, index) {
                       var userDoc = snapshot.data!.docs[index];
+                      var data = userDoc.data() as Map<String, dynamic>;
+
                       int rank = index + 1;
-                      String name = userDoc['name'] ?? "";
-                      if (name.isEmpty) {
-                        name =
-                            "Pro-${userDoc.id.substring(0, 4).toUpperCase()}";
-                      }
+
+                      // جلب الاسم لحظياً
+                      String name = data['name'] ?? "بطل Pro مجهول";
+                      // جلب رابط الصورة لحظياً
+                      String photoUrl = data['photoUrl'] ?? "";
 
                       bool isTop3 = rank <= 3;
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(15),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(22),
-                          // تمييز أول 3 مراكز بحدود ملونة
                           border: isTop3
                               ? Border.all(
                                   color: _getRankColor(rank).withOpacity(0.5),
@@ -85,8 +94,23 @@ class LeaderboardScreen extends StatelessWidget {
                         ),
                         child: Row(
                           children: [
+                            // ترتيب البطل
                             _buildRankBadge(rank),
-                            const SizedBox(width: 15),
+                            const SizedBox(width: 12),
+
+                            // الصورة الشخصية للبطل (تحدث لحظياً)
+                            CircleAvatar(
+                              radius: 22,
+                              backgroundColor: Colors.grey[200],
+                              backgroundImage: photoUrl.isNotEmpty
+                                  ? NetworkImage(photoUrl)
+                                  : const AssetImage(
+                                          'assets/user_placeholder.png')
+                                      as ImageProvider,
+                            ),
+                            const SizedBox(width: 12),
+
+                            // الاسم واللقب
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -95,7 +119,7 @@ class LeaderboardScreen extends StatelessWidget {
                                     name,
                                     style: GoogleFonts.cairo(
                                       fontWeight: FontWeight.bold,
-                                      fontSize: isTop3 ? 16 : 14,
+                                      fontSize: isTop3 ? 15 : 13,
                                       color: isTop3 ? deepTeal : Colors.black87,
                                     ),
                                   ),
@@ -112,22 +136,24 @@ class LeaderboardScreen extends StatelessWidget {
                                 ],
                               ),
                             ),
+
+                            // النقاط
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 6),
+                                  horizontal: 10, vertical: 5),
                               decoration: BoxDecoration(
                                 color: isTop3
                                     ? _getRankColor(rank).withOpacity(0.1)
                                     : Colors.grey[100],
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                               child: Text(
-                                "${userDoc['points']} ن",
+                                "${data['points'] ?? 0} ن",
                                 style: GoogleFonts.poppins(
                                   color:
                                       isTop3 ? _getRankColor(rank) : deepTeal,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 14,
+                                  fontSize: 13,
                                 ),
                               ),
                             ),
@@ -154,23 +180,16 @@ class LeaderboardScreen extends StatelessWidget {
 
   Widget _buildRankBadge(int rank) {
     if (rank <= 3) {
-      return Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: _getRankColor(rank).withOpacity(0.2),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(Icons.emoji_events_rounded,
-            color: _getRankColor(rank), size: rank == 1 ? 34 : 28),
-      );
+      return Icon(Icons.emoji_events_rounded,
+          color: _getRankColor(rank), size: rank == 1 ? 32 : 26);
     }
-    return CircleAvatar(
-      radius: 16,
-      backgroundColor: Colors.grey[50],
+    return Container(
+      width: 26,
+      alignment: Alignment.center,
       child: Text(
         "$rank",
         style: GoogleFonts.poppins(
-            fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[600]),
+            fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey[400]),
       ),
     );
   }

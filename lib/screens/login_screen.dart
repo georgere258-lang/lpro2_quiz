@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // أضفنا هذا السطر
 import '../main_wrapper.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -16,21 +17,23 @@ class _LoginScreenState extends State<LoginScreen> {
   bool isLoading = false;
   String selectedCountry = "🇪🇬 +20";
   String verificationId = "";
-  
+
   final TextEditingController phoneController = TextEditingController();
-  // تعريف 6 وحدات تحكم لـ 6 أرقام
-  final List<TextEditingController> otpControllers = List.generate(6, (index) => TextEditingController());
-  final List<FocusNode> otpFocusNodes = List.generate(6, (index) => FocusNode());
+  final List<TextEditingController> otpControllers =
+      List.generate(6, (index) => TextEditingController());
+  final List<FocusNode> otpFocusNodes =
+      List.generate(6, (index) => FocusNode());
 
   final Color deepTeal = const Color(0xFF1B4D57);
   final Color safetyOrange = const Color(0xFFE67E22);
 
-  // 1. إرسال الكود للموبايل عبر الفايربيز
   void _sendOtp() async {
     String phone = phoneController.text.trim();
     if (phone.isEmpty || phone.length < 10) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("يرجى إدخال رقم هاتف صحيح"), backgroundColor: Colors.red),
+        const SnackBar(
+            content: Text("يرجى إدخال رقم هاتف صحيح"),
+            backgroundColor: Colors.red),
       );
       return;
     }
@@ -47,7 +50,9 @@ class _LoginScreenState extends State<LoginScreen> {
         verificationFailed: (FirebaseAuthException e) {
           setState(() => isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("خطأ: ${e.message}"), backgroundColor: Colors.red),
+            SnackBar(
+                content: Text("خطأ: ${e.message}"),
+                backgroundColor: Colors.red),
           );
         },
         codeSent: (String verId, int? resendToken) {
@@ -64,12 +69,13 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // 2. التحقق من الـ 6 أرقام المدخلة
   void _verifyOtp() async {
     String otp = otpControllers.map((e) => e.text).join();
     if (otp.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("يرجى إدخال الـ 6 أرقام كاملة"), backgroundColor: Colors.orange),
+        const SnackBar(
+            content: Text("يرجى إدخال الـ 6 أرقام كاملة"),
+            backgroundColor: Colors.orange),
       );
       return;
     }
@@ -86,20 +92,50 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       setState(() => isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("الرمز غير صحيح، حاول مجدداً"), backgroundColor: Colors.red),
+        const SnackBar(
+            content: Text("الرمز غير صحيح، حاول مجدداً"),
+            backgroundColor: Colors.red),
       );
     }
   }
 
-  void _navigateUser() {
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const MainWrapper()));
+  // --- التعديل الجوهري هنا لضمان حفظ البيانات في Firestore ---
+  void _navigateUser() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      // السطر ده بيتأكد إن بيانات البطل (الاسم والرقم) محفوظة في Firestore
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (!userDoc.exists) {
+        // لو البطل جديد أول مرة يسجل، بنحفظ رقمه في خانة 'phone'
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'name': "بطل Pro جديد", // اسم افتراضي لحين تعديله من البروفايل
+          'phone': user.phoneNumber ?? phoneController.text, // حفظ الرقم هنا
+          'points': 0,
+          'role': 'user',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+    }
+
+    if (mounted) {
+      Navigator.pushReplacement(
+          context, MaterialPageRoute(builder: (c) => const MainWrapper()));
+    }
   }
 
   @override
   void dispose() {
     phoneController.dispose();
-    for (var controller in otpControllers) { controller.dispose(); }
-    for (var node in otpFocusNodes) { node.dispose(); }
+    for (var controller in otpControllers) {
+      controller.dispose();
+    }
+    for (var node in otpFocusNodes) {
+      node.dispose();
+    }
     super.dispose();
   }
 
@@ -107,47 +143,59 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: deepTeal,
-      body: isLoading 
-        ? const Center(child: CircularProgressIndicator(color: Colors.white))
-        : SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 30),
-              child: Column(
-                children: [
-                  const SizedBox(height: 80),
-                  SvgPicture.asset('assets/logo.svg', height: 110, 
-                    placeholderBuilder: (c) => const Icon(Icons.business, size: 80, color: Colors.white)),
-                  const SizedBox(height: 12),
-                  Text("المعلومة بتفرق",
-                    style: GoogleFonts.cairo(color: safetyOrange, fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 40),
-                  Text(isOtpStage ? "تأكيد الرمز" : "تسجيل الدخول",
-                    style: GoogleFonts.cairo(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
-                  const SizedBox(height: 40),
-                  Directionality(
-                    textDirection: TextDirection.ltr, 
-                    child: isOtpStage ? _buildOtpInput() : _buildPhoneInput(),
-                  ),
-                  const SizedBox(height: 40),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: safetyOrange,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                      ),
-                      onPressed: isOtpStage ? _verifyOtp : _sendOtp,
-                      child: Text(
-                        isOtpStage ? "تأكيد" : "إرسال الرمز",
-                        style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          : SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 30),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 80),
+                    SvgPicture.asset('assets/logo.svg',
+                        height: 110,
+                        placeholderBuilder: (c) => const Icon(Icons.business,
+                            size: 80, color: Colors.white)),
+                    const SizedBox(height: 12),
+                    Text("المعلومة بتفرق",
+                        style: GoogleFonts.cairo(
+                            color: safetyOrange,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 40),
+                    Text(isOtpStage ? "تأكيد الرمز" : "تسجيل الدخول",
+                        style: GoogleFonts.cairo(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white)),
+                    const SizedBox(height: 40),
+                    Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: isOtpStage ? _buildOtpInput() : _buildPhoneInput(),
+                    ),
+                    const SizedBox(height: 40),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: safetyOrange,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15)),
+                        ),
+                        onPressed: isOtpStage ? _verifyOtp : _sendOtp,
+                        child: Text(
+                          isOtpStage ? "تأكيد" : "إرسال الرمز",
+                          style: GoogleFonts.cairo(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
     );
   }
 
@@ -155,7 +203,8 @@ class _LoginScreenState extends State<LoginScreen> {
     return TextField(
       controller: phoneController,
       keyboardType: TextInputType.number,
-      style: const TextStyle(color: Colors.white, fontSize: 18, letterSpacing: 2),
+      style:
+          const TextStyle(color: Colors.white, fontSize: 18, letterSpacing: 2),
       textAlign: TextAlign.left,
       decoration: InputDecoration(
         hintText: "010XXXXXXXX",
@@ -165,15 +214,19 @@ class _LoginScreenState extends State<LoginScreen> {
           onSelected: (val) => setState(() => selectedCountry = val),
           itemBuilder: (context) => [
             const PopupMenuItem(value: "🇪🇬 +20", child: Text("مصر 🇪🇬")),
-            const PopupMenuItem(value: "🇦🇪 +971", child: Text("الإمارات 🇦🇪")),
-            const PopupMenuItem(value: "🇸🇦 +966", child: Text("السعودية 🇸🇦")),
+            const PopupMenuItem(
+                value: "🇦🇪 +971", child: Text("الإمارات 🇦🇪")),
+            const PopupMenuItem(
+                value: "🇸🇦 +966", child: Text("السعودية 🇸🇦")),
           ],
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(selectedCountry, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                Text(selectedCountry,
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold)),
                 const Icon(Icons.arrow_drop_down, color: Colors.white),
               ],
             ),
@@ -181,7 +234,9 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         filled: true,
         fillColor: Colors.white.withOpacity(0.1),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: BorderSide.none),
       ),
     );
   }
@@ -189,31 +244,38 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildOtpInput() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: List.generate(6, (index) => SizedBox(
-        width: 45,
-        child: TextField(
-          controller: otpControllers[index],
-          focusNode: otpFocusNodes[index],
-          textAlign: TextAlign.center,
-          keyboardType: TextInputType.number,
-          maxLength: 1,
-          onChanged: (val) {
-            if (val.length == 1 && index < 5) {
-              otpFocusNodes[index + 1].requestFocus();
-            }
-            if (val.isEmpty && index > 0) {
-              otpFocusNodes[index - 1].requestFocus();
-            }
-          },
-          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-          decoration: InputDecoration(
-            counterText: "",
-            filled: true,
-            fillColor: Colors.white.withOpacity(0.1),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-          ),
-        ),
-      )),
+      children: List.generate(
+          6,
+          (index) => SizedBox(
+                width: 45,
+                child: TextField(
+                  controller: otpControllers[index],
+                  focusNode: otpFocusNodes[index],
+                  textAlign: TextAlign.center,
+                  keyboardType: TextInputType.number,
+                  maxLength: 1,
+                  onChanged: (val) {
+                    if (val.length == 1 && index < 5) {
+                      otpFocusNodes[index + 1].requestFocus();
+                    }
+                    if (val.isEmpty && index > 0) {
+                      otpFocusNodes[index - 1].requestFocus();
+                    }
+                  },
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold),
+                  decoration: InputDecoration(
+                    counterText: "",
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.1),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none),
+                  ),
+                ),
+              )),
     );
   }
 }
