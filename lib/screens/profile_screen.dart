@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:share_plus/share_plus.dart';
+
+// تأكدي من استيراد هذه الشاشات
 import 'about_screen.dart';
+import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -17,103 +19,73 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final User? user = FirebaseAuth.instance.currentUser;
   final Color deepTeal = const Color(0xFF1B4D57);
 
-  // 1. دالة تسجيل الخروج الاحترافية
+  // 1. تسجيل الخروج
   Future<void> _handleLogout() async {
-    try {
-      bool? confirm = await showDialog(
-        context: context,
-        builder: (c) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text("تسجيل الخروج",
-              style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-          content: Text("هل أنت متأكد أنك تريد مغادرة تطبيق أبطال Pro؟",
-              style: GoogleFonts.cairo()),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(c, false),
-              child:
-                  Text("إلغاء", style: GoogleFonts.cairo(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: () => Navigator.pop(c, true),
-              child:
-                  Text("خروج", style: GoogleFonts.cairo(color: Colors.white)),
-            ),
-          ],
+    bool? confirm = await showDialog(
+      context: context,
+      builder: (c) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          "تسجيل الخروج",
+          style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
         ),
-      );
-
-      if (confirm == true) {
-        await FirebaseAuth.instance.signOut();
-        if (mounted) {
-          Navigator.of(context)
-              .pushNamedAndRemoveUntil('/login', (route) => false);
-        }
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("خطأ أثناء الخروج: $e")));
-    }
-  }
-
-  // 2. دالة دعوة صديق
-  void _inviteFriend() {
-    Share.share(
-      'يا بطل! انضم إلينا في تطبيق أبطال Pro العقاري، وتعلم كل أسرار السوق. حمل التطبيق من هنا: [رابط التطبيق]',
-      subject: 'دعوة للانضمام إلى أبطال Pro',
+        content: Text(
+          "هل أنت متأكد أنك تريد مغادرة تطبيق أبطال Pro؟",
+          style: GoogleFonts.cairo(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text("إلغاء"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(c, true),
+            child: Text("خروج", style: GoogleFonts.cairo(color: Colors.white)),
+          ),
+        ],
+      ),
     );
-  }
 
-  // 3. دالة تغيير الصورة الشخصية
-  Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text("تم اختيار الصورة بنجاح (بانتظار الرفع لـ Storage)")),
-      );
+    if (confirm == true) {
+      await FirebaseAuth.instance.signOut();
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+      }
     }
   }
 
-  // 4. دالة تعديل الاسم
+  // 2. تعديل الاسم
   void _showEditDialog(String currentName) {
     TextEditingController nameEdit = TextEditingController(text: currentName);
     showDialog(
       context: context,
       builder: (c) => AlertDialog(
-        title: Text("تعديل بيانات بطل Pro", style: GoogleFonts.cairo()),
+        title: Text("تعديل الاسم", style: GoogleFonts.cairo()),
         content: TextField(
           controller: nameEdit,
-          decoration: const InputDecoration(labelText: "الاسم الجديد"),
+          decoration: const InputDecoration(hintText: "اكتب اسمك الجديد"),
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(c), child: const Text("إلغاء")),
+            onPressed: () => Navigator.pop(c),
+            child: const Text("إلغاء"),
+          ),
           ElevatedButton(
             onPressed: () async {
               String newName = nameEdit.text.trim();
               if (newName.isNotEmpty) {
+                // تحديث الاسم في Auth
                 await user?.updateDisplayName(newName);
+                // تحديث الاسم في Firestore
                 await FirebaseFirestore.instance
                     .collection('users')
                     .doc(user!.uid)
-                    .set({
-                  'name': newName,
-                  'lastUpdate': FieldValue.serverTimestamp(),
-                }, SetOptions(merge: true));
-
-                if (mounted) {
-                  Navigator.pop(c);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("تم تحديث البيانات بنجاح")));
-                }
+                    .update({'name': newName});
+                if (mounted) Navigator.pop(c);
               }
             },
             child: const Text("حفظ"),
@@ -123,25 +95,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // دالة لاستخراج أول حرف من الاسم
+  String _getInitials(String name) {
+    if (name.isEmpty) return "P";
+    return name.trim().substring(0, 1).toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7F8),
-      appBar: AppBar(
-        // حل مشكلة الشاشة السوداء: التوجيه للرئيسية مباشرة عند الرجوع
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-          onPressed: () {
-            // استبدال الشاشة الحالية بالرئيسية لمنع ظهور شاشة سوداء
-            Navigator.of(context).pushReplacementNamed('/home');
-          },
-        ),
-        title: Text("بروفايل أبطال Pro",
-            style: GoogleFonts.cairo(
-                color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: deepTeal,
-        centerTitle: true,
-      ),
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: StreamBuilder<DocumentSnapshot>(
@@ -150,74 +113,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
               .doc(user?.uid)
               .snapshots(),
           builder: (context, snapshot) {
-            String displayName = user?.displayName ?? "بطل Pro الجديد";
-            String photoUrl = "";
-
-            if (snapshot.hasData && snapshot.data!.exists) {
-              var data = snapshot.data!.data() as Map<String, dynamic>;
-              displayName = data['name'] ?? displayName;
-              photoUrl = data['photoUrl'] ?? "";
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
             }
+
+            var data = snapshot.data?.data() as Map<String, dynamic>?;
+            String displayName = data?['name'] ?? "بطل Pro الجديد";
+            String phoneNumber =
+                data?['phone'] ?? user?.phoneNumber ?? "لا يوجد رقم";
 
             return ListView(
               padding: const EdgeInsets.all(20),
               children: [
+                const SizedBox(height: 50),
                 Center(
                   child: Column(
                     children: [
-                      GestureDetector(
-                        onTap: _pickImage,
-                        child: Stack(
-                          children: [
-                            CircleAvatar(
-                              radius: 55,
-                              backgroundColor: deepTeal,
-                              child: CircleAvatar(
-                                radius: 52,
-                                backgroundColor: Colors.grey[200],
-                                backgroundImage: photoUrl.isEmpty
-                                    ? const AssetImage(
-                                            'assets/user_placeholder.png')
-                                        as ImageProvider
-                                    : NetworkImage(photoUrl),
-                              ),
-                            ),
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: CircleAvatar(
-                                backgroundColor: Colors.orange,
-                                radius: 18,
-                                child: const Icon(Icons.camera_alt,
-                                    size: 18, color: Colors.white),
-                              ),
-                            ),
-                          ],
+                      // عرض أول حرف من الاسم بدلاً من الصورة
+                      CircleAvatar(
+                        radius: 65,
+                        backgroundColor: deepTeal,
+                        child: Text(
+                          _getInitials(displayName),
+                          style: GoogleFonts.cairo(
+                            fontSize: 40,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 15),
-                      Text(displayName,
-                          style: GoogleFonts.cairo(
-                              fontSize: 20, fontWeight: FontWeight.bold)),
-                      Text(user?.email ?? "",
-                          style: const TextStyle(color: Colors.grey)),
+                      Text(
+                        displayName,
+                        style: GoogleFonts.cairo(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: deepTeal,
+                        ),
+                      ),
+                      Text(
+                        phoneNumber,
+                        style: GoogleFonts.poppins(
+                          color: Colors.grey[600],
+                          fontSize: 16,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 30),
-                _buildProfileBtn("تعديل بياناتي", Icons.edit,
-                    () => _showEditDialog(displayName)),
+                const SizedBox(height: 40),
                 _buildProfileBtn(
-                    "دعوة صديق للانضمام", Icons.person_add, _inviteFriend),
-                _buildProfileBtn("حول أبطال Pro", Icons.info_outline, () {
+                  "تعديل الاسم",
+                  Icons.edit_note_rounded,
+                  () => _showEditDialog(displayName),
+                ),
+                _buildProfileBtn(
+                  "دعوة صديق",
+                  Icons.person_add_alt_1_rounded,
+                  () => Share.share("انضم لأبطال Pro!"),
+                ),
+                _buildProfileBtn("حول التطبيق", Icons.info_outline_rounded, () {
                   Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const AboutScreen()));
+                    context,
+                    MaterialPageRoute(builder: (c) => const AboutScreen()),
+                  );
                 }),
-                const Divider(height: 40),
-                _buildProfileBtn("تسجيل الخروج", Icons.logout, _handleLogout,
-                    isExit: true),
+                const Divider(height: 50),
+                _buildProfileBtn(
+                  "تسجيل الخروج",
+                  Icons.logout_rounded,
+                  _handleLogout,
+                  isExit: true,
+                ),
               ],
             );
           },
@@ -226,20 +193,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileBtn(String title, IconData icon, VoidCallback onTap,
-      {bool isExit = false}) {
+  Widget _buildProfileBtn(
+    String title,
+    IconData icon,
+    VoidCallback onTap, {
+    bool isExit = false,
+  }) {
     return Card(
-      elevation: 2,
       margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: ListTile(
         leading: Icon(icon, color: isExit ? Colors.redAccent : deepTeal),
-        title: Text(title,
-            style: GoogleFonts.cairo(
-                fontWeight: FontWeight.w600,
-                color: isExit ? Colors.redAccent : Colors.black)),
-        trailing:
-            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+        title: Text(
+          title,
+          style: GoogleFonts.cairo(
+            fontWeight: FontWeight.w600,
+            color: isExit ? Colors.redAccent : Colors.black87,
+          ),
+        ),
+        trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
         onTap: onTap,
       ),
     );

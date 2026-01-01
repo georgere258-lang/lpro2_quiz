@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-// استيراد الشاشات - تأكدي من صحة المسارات في مشروعك
+
+// استيراد الشاشات - تأكدي أن المسارات صحيحة في مشروعك
 import 'screens/home_screen.dart';
-import 'screens/leaderboard_screen.dart';
 import 'screens/quiz_screen.dart';
 import 'screens/profile_screen.dart';
 
@@ -20,18 +20,19 @@ class _MainWrapperState extends State<MainWrapper> {
   Widget build(BuildContext context) {
     const Color deepTeal = Color(0xFF1B4D57);
 
-    // فحص اللغة مباشرة بدون الاعتماد على كلاسات خارجية مؤقتاً لحل الخطأ
+    // فحص اللغة
     bool isAr = Localizations.localeOf(context).languageCode == 'ar';
 
     // قائمة الشاشات
     final List<Widget> pages = [
       const HomeScreen(),
-      LeaderboardScreen(),
+      const LeaderboardScreen(), // موجودة في ملف home_screen أو منفصل
       const QuizScreen(categoryTitle: "دوري النجوم"),
-      ProfileScreen(),
+      const ProfileScreen(),
     ];
 
     return Scaffold(
+      // تم إعادة الـ AppBar هنا ليظهر في جميع الشاشات بشكل ثابت
       appBar: AppBar(
         backgroundColor: deepTeal,
         elevation: 0,
@@ -39,9 +40,15 @@ class _MainWrapperState extends State<MainWrapper> {
         title: Image.asset(
           'assets/top_brand.png',
           height: 35,
-          // في حال عدم وجود الصورة لا يظهر خطأ بل تظهر أيقونة
-          errorBuilder: (context, error, stackTrace) =>
-              const Icon(Icons.business_center, color: Colors.white),
+          // في حال عدم وجود الصورة يظهر نص الشعار بتنسيق جميل
+          errorBuilder: (context, error, stackTrace) => Text(
+            "أبطال PRO",
+            style: GoogleFonts.cairo(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
         ),
       ),
       body: IndexedStack(
@@ -51,7 +58,11 @@ class _MainWrapperState extends State<MainWrapper> {
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            )
           ],
         ),
         child: BottomNavigationBar(
@@ -62,10 +73,14 @@ class _MainWrapperState extends State<MainWrapper> {
           showUnselectedLabels: true,
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.white,
-          selectedLabelStyle:
-              GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 11),
-          unselectedLabelStyle:
-              GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 11),
+          selectedLabelStyle: GoogleFonts.cairo(
+            fontWeight: FontWeight.w900,
+            fontSize: 11,
+          ),
+          unselectedLabelStyle: GoogleFonts.cairo(
+            fontWeight: FontWeight.bold,
+            fontSize: 11,
+          ),
           items: [
             BottomNavigationBarItem(
               icon: const Icon(Icons.grid_view_outlined),
@@ -75,7 +90,7 @@ class _MainWrapperState extends State<MainWrapper> {
             BottomNavigationBarItem(
               icon: const Icon(Icons.emoji_events_outlined),
               activeIcon: const Icon(Icons.emoji_events),
-              label: isAr ? "الدوري" : "League",
+              label: isAr ? "قاعة الأبطال" : "League",
             ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.rocket_launch_outlined),

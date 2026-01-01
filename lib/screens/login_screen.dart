@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // أضفنا هذا السطر
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../main_wrapper.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -29,6 +29,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _sendOtp() async {
     String phone = phoneController.text.trim();
+    if (phone.startsWith('0')) {
+      phone = phone.substring(1);
+    }
+
     if (phone.isEmpty || phone.length < 10) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -99,25 +103,31 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // --- التعديل الجوهري هنا لضمان حفظ البيانات في Firestore ---
   void _navigateUser() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      // السطر ده بيتأكد إن بيانات البطل (الاسم والرقم) محفوظة في Firestore
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
 
-      if (!userDoc.exists) {
-        // لو البطل جديد أول مرة يسجل، بنحفظ رقمه في خانة 'phone'
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'name': "بطل Pro جديد", // اسم افتراضي لحين تعديله من البروفايل
-          'phone': user.phoneNumber ?? phoneController.text, // حفظ الرقم هنا
-          'points': 0,
-          'role': 'user',
-          'createdAt': FieldValue.serverTimestamp(),
-        });
+        if (!userDoc.exists) {
+          // تم إزالة حقل photoUrl نهائياً لتبسيط البيانات وتوفير التكاليف
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .set({
+            'uid': user.uid,
+            'name': "بطل Pro جديد",
+            'phone': user.phoneNumber ?? phoneController.text,
+            'points': 0,
+            'role': 'user',
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (e) {
+        debugPrint("Error saving user data: $e");
       }
     }
 
@@ -207,7 +217,7 @@ class _LoginScreenState extends State<LoginScreen> {
           const TextStyle(color: Colors.white, fontSize: 18, letterSpacing: 2),
       textAlign: TextAlign.left,
       decoration: InputDecoration(
-        hintText: "010XXXXXXXX",
+        hintText: "10XXXXXXXX",
         hintStyle: const TextStyle(color: Colors.white38, letterSpacing: 0),
         prefixIcon: PopupMenuButton<String>(
           initialValue: selectedCountry,
@@ -253,6 +263,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   focusNode: otpFocusNodes[index],
                   textAlign: TextAlign.center,
                   keyboardType: TextInputType.number,
+                  autofillHints: const [AutofillHints.oneTimeCode],
                   maxLength: 1,
                   onChanged: (val) {
                     if (val.length == 1 && index < 5) {

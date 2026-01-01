@@ -62,17 +62,17 @@ class _HomeScreenState extends State<HomeScreen>
           .snapshots(),
       builder: (context, snapshot) {
         String name = "بطل Pro";
-        String role = "user"; // القيمة الافتراضية
+        String role = "user";
 
         if (snapshot.hasData && snapshot.data!.exists) {
           var data = snapshot.data!.data() as Map<String, dynamic>;
           name = data['name'] ?? "بطل Pro";
-          role = data['role'] ?? "user"; // قراءة الصلاحية من Firestore
+          role = data['role'] ?? "user";
         }
 
         return Scaffold(
           backgroundColor: const Color(0xFFF4F7F8),
-          // تمرير الصلاحية للـ Drawer
+          // تمت إزالة AppBar من هنا لاعتماده في الـ MainWrapper
           drawer: _buildDrawer(context, role),
           body: Directionality(
             textDirection: TextDirection.rtl,
@@ -85,7 +85,8 @@ class _HomeScreenState extends State<HomeScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 30),
+                        const SizedBox(
+                            height: 20), // تقليل المسافة لتناسب الهيدر الثابت
                         _buildHeaderWithMenu(context, name),
                         const SizedBox(height: 25),
                         _buildQuickFact(),
@@ -165,7 +166,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // القائمة الجانبية ذكية: تظهر لوحة التحكم فقط للأدمن
   Widget _buildDrawer(BuildContext context, String role) {
     return Drawer(
       child: Directionality(
@@ -190,8 +190,6 @@ class _HomeScreenState extends State<HomeScreen>
                 "حول أبطال Pro",
                 () => Navigator.push(context,
                     MaterialPageRoute(builder: (c) => const AboutScreen()))),
-
-            // شرط ذكي: إذا كان الدور يحتوي على كلمة admin يظهر الزر
             if (role.contains("admin"))
               _buildDrawerItem(
                   Icons.admin_panel_settings_outlined,
@@ -199,7 +197,6 @@ class _HomeScreenState extends State<HomeScreen>
                   () => Navigator.push(context,
                       MaterialPageRoute(builder: (c) => const AdminPanel())),
                   color: safetyOrange),
-
             const Spacer(),
             const Divider(),
             _buildDrawerItem(Icons.logout, "تسجيل الخروج",
@@ -378,6 +375,128 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ),
       ),
+    );
+  }
+}
+
+class LeaderboardScreen extends StatelessWidget {
+  const LeaderboardScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      // تمت إزالة AppBar هنا أيضاً لأن الهيدر في الـ Wrapper ثابت
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .orderBy('points', descending: true)
+            .limit(20)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData)
+            return const Center(child: CircularProgressIndicator());
+
+          var users = snapshot.data!.docs;
+
+          return Directionality(
+            textDirection: TextDirection.rtl,
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                if (users.length >= 3) _buildPodium(users.take(3).toList()),
+                const Divider(),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: users.length > 3 ? users.length - 3 : 0,
+                    itemBuilder: (context, index) {
+                      var user = users[index + 3];
+                      return _buildLeaderboardTile(user, index + 4);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPodium(List<DocumentSnapshot> topThree) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      color: const Color(0xFFF4F7F8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          _buildPodiumItem(topThree[1], "2", 70, Colors.grey[400]!),
+          _buildPodiumItem(topThree[0], "1", 100, Colors.amber),
+          _buildPodiumItem(topThree[2], "3", 60, Colors.brown[400]!),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPodiumItem(
+      DocumentSnapshot user, String rank, double height, Color color) {
+    var data = user.data() as Map<String, dynamic>;
+    return Column(
+      children: [
+        CircleAvatar(
+          radius: height / 2.5,
+          backgroundColor: color,
+          child: CircleAvatar(
+            radius: (height / 2.5) - 3,
+            backgroundColor: Colors.white,
+            backgroundImage: data['photoUrl'] != null
+                ? NetworkImage(data['photoUrl'])
+                : null,
+            child: data['photoUrl'] == null ? const Icon(Icons.person) : null,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(data['name'] ?? "بطل",
+            style:
+                GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12)),
+        Text("${data['points'] ?? 0} نقطة",
+            style: GoogleFonts.poppins(color: Colors.grey, fontSize: 10)),
+        const SizedBox(height: 10),
+        Container(
+          width: 60,
+          height: height,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+          ),
+          child: Center(
+            child: Text(rank,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold)),
+          ),
+        )
+      ],
+    );
+  }
+
+  Widget _buildLeaderboardTile(DocumentSnapshot user, int rank) {
+    var data = user.data() as Map<String, dynamic>;
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: Colors.grey[200],
+        child: Text("#$rank",
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+      ),
+      title: Text(data['name'] ?? "بطل Pro",
+          style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+      subtitle: Text("${data['points'] ?? 0} نقطة",
+          style: GoogleFonts.poppins(fontSize: 12)),
+      trailing: data['photoUrl'] != null
+          ? CircleAvatar(backgroundImage: NetworkImage(data['photoUrl']))
+          : const Icon(Icons.account_circle, color: Colors.grey),
     );
   }
 }

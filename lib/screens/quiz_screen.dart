@@ -33,7 +33,15 @@ class _QuizScreenState extends State<QuizScreen> {
     "ما تيجي تبص بصه على خريطة التجمع (منطقة النرجس)؟ 🗺️",
     "راجع مشاريع شركة 'إعمار' عشان تقارن الأسعار.. 💰",
     "وقت مراجعة الماستر بلان لبيت الوطن.. المعلومة بتفرق! 🚀",
-    "إيه رأيك تتابع تطورات الأعمال في العاصمة الإدارية؟ 🏙️",
+    "إيه رأيك تتابع تطورات الأعمال في العاصمة الإدارية? 🏙️",
+  ];
+
+  final List<String> _motivationalPhrases = [
+    "أنت الآن في منطقة المربع الذهبي! خذ نفساً عميقاً وأكمل. 🔥",
+    "مستوى أداء 'برو' حقيقي! هل تستطيع الوصول للسؤال التالي؟ 🚀",
+    "تاسك سريع: اشرب ماء وركز، الأسئلة القادمة للمحترفين فقط. 💧",
+    "رائع! نتيجتك الحالية تجعلك بطلاً حقيقياً في السوق. ✨",
+    "التركيز هو مفتاح إغلاق الصفقات.. كمل يا وحش! 💼"
   ];
 
   @override
@@ -99,7 +107,10 @@ class _QuizScreenState extends State<QuizScreen> {
 
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (mounted) {
-        if ((currentQuestionIndex + 1) % 5 == 0 &&
+        int completedCount = currentQuestionIndex + 1;
+
+        // تظهر نافذة الخيارات بعد كل 5 أسئلة
+        if (completedCount % 5 == 0 &&
             currentQuestionIndex != questions.length - 1) {
           _showInterimResult();
         } else {
@@ -110,45 +121,76 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void _showInterimResult() {
-    String msg = score >= 10
-        ? "أداء مذهل يا بطل.. كمل الصدارة!"
-        : "بداية جيدة.. ركز أكتر في الأسئلة الجاية!";
+    String motivationalMsg = (currentQuestionIndex + 1) % 10 == 0
+        ? (_motivationalPhrases..shuffle()).first
+        : (score >= 10
+            ? "أداء مذهل يا بطل.. كمل الصدارة! 🔥"
+            : "بداية جيدة.. ركز أكتر في الأسئلة الجاية! ✨");
 
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (c) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-        title: Text("عاش يا وحش!",
+        title: Text("استراحة محارب ☕",
             textAlign: TextAlign.center,
             style: GoogleFonts.cairo(
                 fontWeight: FontWeight.bold, color: deepTeal)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(msg, textAlign: TextAlign.center, style: GoogleFonts.cairo()),
-            const SizedBox(height: 20),
-            Text("نقاطك: $score",
+            Text("نقاطك الحالية: $score",
                 style: GoogleFonts.poppins(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: safetyOrange)),
+            const SizedBox(height: 15),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                  color: deepTeal.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: deepTeal.withOpacity(0.1))),
+              child: Text(motivationalMsg,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.cairo(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: deepTeal)),
+            ),
           ],
         ),
         actions: [
-          Center(
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: deepTeal,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12))),
-              onPressed: () {
-                Navigator.pop(context);
-                _nextStep();
-              },
-              child: Text("كمل التحدي",
-                  style: GoogleFonts.cairo(color: Colors.white)),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.pop(c);
+                    _saveScoreAndFinish(isExiting: true); // ينسحب
+                  },
+                  child: Text("انسحاب",
+                      style: GoogleFonts.cairo(
+                          color: Colors.grey, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: deepTeal,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12))),
+                  onPressed: () {
+                    Navigator.pop(c);
+                    _nextStep(); // يكمل التحدي
+                  },
+                  child: Text("يكمل",
+                      style: GoogleFonts.cairo(
+                          color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -189,11 +231,15 @@ class _QuizScreenState extends State<QuizScreen> {
         'category_last_played': widget.categoryTitle,
       });
     }
-    if (isExiting) {
-      Navigator.pop(context);
-      Navigator.pop(context);
-    } else {
-      _showFinalResult();
+
+    if (mounted) {
+      if (isExiting) {
+        // إذا اختار انسحاب نخرجه للرئيسية
+        Navigator.pop(context);
+      } else {
+        // إذا أنهى جميع الأسئلة نظهر النتيجة النهائية
+        _showFinalResult();
+      }
     }
   }
 
@@ -213,10 +259,6 @@ class _QuizScreenState extends State<QuizScreen> {
             Text("المهمة تمت بنجاح!",
                 style: GoogleFonts.cairo(
                     fontWeight: FontWeight.bold, fontSize: 20)),
-            const SizedBox(height: 10),
-            Text("لقد أثبتّ أنك بطل Pro حقيقي",
-                textAlign: TextAlign.center,
-                style: GoogleFonts.cairo(color: Colors.grey, fontSize: 14)),
             const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.all(12),
@@ -246,8 +288,8 @@ class _QuizScreenState extends State<QuizScreen> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(15))),
                 onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.pop(context);
+                  Navigator.pop(context); // غلق الديالوج
+                  Navigator.pop(context); // العودة للرئيسية
                 },
                 child: Text("العودة للأبطال",
                     style: GoogleFonts.cairo(
@@ -270,24 +312,11 @@ class _QuizScreenState extends State<QuizScreen> {
     var q = questions[currentQuestionIndex];
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFB),
-      appBar: AppBar(
-          backgroundColor: deepTeal,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: Text("تحدي ${widget.categoryTitle}",
-              style: GoogleFonts.cairo(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: Colors.white)),
-          centerTitle: true,
-          iconTheme: const IconThemeData(color: Colors.white)),
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: Column(
           children: [
+            const SizedBox(height: 10),
             LinearProgressIndicator(
                 value: timeLeft / 25,
                 color: safetyOrange,
@@ -319,7 +348,6 @@ class _QuizScreenState extends State<QuizScreen> {
         ? "يلا يا نجم 🚀"
         : "اتفضل Pro 🔥";
 
-    // إعدادات البادج
     Color badgeColor = widget.categoryTitle == "دوري النجوم"
         ? const Color(0xFF3498DB)
         : const Color(0xFFE67E22);
@@ -337,7 +365,6 @@ class _QuizScreenState extends State<QuizScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // البادج الجديد بتنسيق الكارت وحجم أكبر
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
               decoration: BoxDecoration(
@@ -456,13 +483,6 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Widget _buildEmptyView() {
     return Scaffold(
-        appBar: AppBar(
-            backgroundColor: deepTeal,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
-            ),
-            iconTheme: const IconThemeData(color: Colors.white)),
         body: Center(
             child: Text("البطولة ستبدأ قريباً.. لا توجد أسئلة حالياً",
                 style: GoogleFonts.cairo())));

@@ -11,40 +11,35 @@ dependencies:
   flutter:
     sdk: flutter
   
-  # دعم اللغة العربية والجهات (RTL)
   flutter_localizations:
     sdk: flutter
 
-  # خطوط جوجل الأساسية للهوية (Cairo & Poppins)
+  # الخطوط وتنسيق النصوص
   google_fonts: ^6.1.0
-
-  # أيقونات النظام والأيقونات العقارية
+  
+  # الأيقونات
   cupertino_icons: ^1.0.6
   font_awesome_flutter: ^10.6.0
-
-  # مكتبة تشغيل الشعارات بصيغة SVG
+  
+  # تشغيل ملفات SVG (اللوجو)
   flutter_svg: ^2.0.10
 
-  # منظومة الفايربيز (قواعد البيانات والمصادقة)
+  # منظومة الفايربيز الأساسية (بدون Storage)
   firebase_core: ^2.24.2
   cloud_firestore: ^4.14.0
   firebase_auth: ^4.16.0
 
-  # أدوات إضافية للمشاركة والتعامل مع الصور
+  # أدوات المشاركة والوقت
   share_plus: ^12.0.1
-  image_picker: ^1.2.1
-
-  # المكتبة الناقصة (تمت إضافتها لتعمل صفحة البروفايل بدون أخطاء)
   intl: ^0.20.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
-  # مكتبة توليد الأيقونات
   flutter_launcher_icons: ^0.13.1
 
-# إعدادات أيقونة التطبيق (وحوش العقارات)
+# إعدادات أيقونة التطبيق
 flutter_launcher_icons:
   android: true 
   ios: true
@@ -56,13 +51,9 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
 
-  # تعريف كافة أصول الصور والمجلدات (Assets)
+  # تعريف الملفات الموجودة في مجلد assets
   assets:
-    # الملفات الأساسية في مجلد assets مباشرة
     - assets/logo.svg
     - assets/top_brand.png
     - assets/icon.png
-    
-    # تعريف المجلدات (Folders) بشكل كامل يغطي كل ما بداخلها تلقائياً
     - assets/card_images/
-    - assets/plans/
