@@ -4,8 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math';
 
-// استيراد الشاشات المطلوبة
 import 'quiz_screen.dart';
+import 'about_screen.dart';
+import 'admin_panel.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -55,6 +56,8 @@ class _HomeScreenState extends State<HomeScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7F8),
+      // القائمة الجانبية تظل موجودة برمجياً
+      drawer: _buildDrawer(context),
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('users')
@@ -67,15 +70,16 @@ class _HomeScreenState extends State<HomeScreen>
             textDirection: TextDirection.rtl,
             child: Column(
               children: [
-                _buildUltraSlimTicker(),
+                _buildUltraSlimTicker(), // شريط الأخبار الآن نظيف تماماً
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 25),
-                        _buildHeader(name),
+                        const SizedBox(height: 30),
+                        _buildHeaderWithMenu(
+                            context, name), // الهيدر الجديد بالأيقونة
                         const SizedBox(height: 25),
                         _buildQuickFact(),
                         const SizedBox(height: 15),
@@ -104,6 +108,37 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  // --- الهيدر المطور الذي يحتوي على اسم المستخدم وأيقونة القائمة ---
+  Widget _buildHeaderWithMenu(BuildContext context, String name) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("أهلاً بك يا $name ✨",
+                  style: GoogleFonts.cairo(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: deepTeal)),
+              Text("خطوة جديدة لتعزيز مكانتك كخبير..",
+                  style: GoogleFonts.cairo(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+        // أيقونة فتح الـ About والـ Admin في مكانها الصحيح
+        IconButton(
+          icon: Icon(Icons.menu_open_rounded, color: deepTeal, size: 32),
+          onPressed: () => Scaffold.of(context).openDrawer(),
+        ),
+      ],
+    );
+  }
+
   Widget _buildUltraSlimTicker() {
     return Container(
       height: 28,
@@ -122,22 +157,57 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildHeader(String name) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("أهلاً بك يا $name ✨",
-            style: GoogleFonts.cairo(
-                fontSize: 24, fontWeight: FontWeight.w900, color: deepTeal)),
-        Text("خطوة جديدة اليوم لتعزيز مكانتك كخبير في السوق..",
-            style: GoogleFonts.cairo(
-                fontSize: 13,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w600)),
-      ],
+  // القائمة الجانبية (Drawer) لتنظيم الوصول لـ About و Admin
+  Widget _buildDrawer(BuildContext context) {
+    return Drawer(
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Column(
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(color: deepTeal),
+              child: Center(
+                child: Text("دوري وحوش العقارات",
+                    style: GoogleFonts.cairo(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold)),
+              ),
+            ),
+            ListTile(
+              leading: Icon(Icons.info_outline, color: deepTeal),
+              title: Text("حول البرنامج", style: GoogleFonts.cairo()),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (c) => const AboutScreen()));
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.admin_panel_settings_outlined,
+                  color: safetyOrange),
+              title: Text("لوحة التحكم (للأدمن)", style: GoogleFonts.cairo()),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (c) => const AdminPanel()));
+              },
+            ),
+            const Spacer(),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.redAccent),
+              title: Text("خروج",
+                  style: GoogleFonts.cairo(color: Colors.redAccent)),
+              onTap: () => FirebaseAuth.instance.signOut(),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
     );
   }
 
+  // باقي الدوال (QuickFact, Encouragement, Grid, ImageCard) تظل كما هي
   Widget _buildQuickFact() {
     return Container(
       padding: const EdgeInsets.all(15),
@@ -222,7 +292,7 @@ class _HomeScreenState extends State<HomeScreen>
       crossAxisCount: 2,
       mainAxisSpacing: 15,
       crossAxisSpacing: 15,
-      childAspectRatio: 0.82, // تعديل بسيط ليعطي مساحة أكبر للنص بالأسفل
+      childAspectRatio: 0.82,
       children: [
         _buildImageCard(
             "دوري النجوم", "Fresh ✨", const Color(0xFF3498DB), "stars.png", () {
@@ -284,17 +354,10 @@ class _HomeScreenState extends State<HomeScreen>
             gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withOpacity(0.85)
-                ] // زيادة التظليل قليلاً
-                ),
+                colors: [Colors.transparent, Colors.black.withOpacity(0.85)]),
           ),
-          padding: const EdgeInsets.only(
-              right: 15,
-              left: 15,
-              bottom: 20,
-              top: 15), // زيادة الـ bottom لرفع النص مسافة صغيرة
+          padding:
+              const EdgeInsets.only(right: 15, left: 15, bottom: 20, top: 15),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.end,
@@ -309,8 +372,7 @@ class _HomeScreenState extends State<HomeScreen>
                         fontSize: 9,
                         fontWeight: FontWeight.w900)),
               ),
-              const SizedBox(
-                  height: 12), // زيادة المسافة بين البادج والعنوان كما طلبت
+              const SizedBox(height: 12),
               Text(title,
                   style: GoogleFonts.cairo(
                       color: Colors.white,
