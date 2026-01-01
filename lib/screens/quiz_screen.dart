@@ -28,6 +28,14 @@ class _QuizScreenState extends State<QuizScreen> {
 
   List<Map<String, dynamic>> questions = [];
 
+  final List<String> _dailyWorkTasks = [
+    "إيه رأيك تراجع مشروع 'سوديك' الجديد النهاردة؟ 🏗️",
+    "ما تيجي تبص بصه على خريطة التجمع (منطقة النرجس)؟ 🗺️",
+    "راجع مشاريع شركة 'إعمار' عشان تقارن الأسعار.. 💰",
+    "وقت مراجعة الماستر بلان لبيت الوطن.. المعلومة بتفرق! 🚀",
+    "إيه رأيك تتابع تطورات الأعمال في العاصمة الإدارية؟ 🏙️",
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -55,7 +63,6 @@ class _QuizScreenState extends State<QuizScreen> {
         });
       }
     } catch (e) {
-      debugPrint("خطأ في جلب الأسئلة: $e");
       if (mounted) setState(() => isLoading = false);
     }
   }
@@ -74,31 +81,83 @@ class _QuizScreenState extends State<QuizScreen> {
 
   void _handleAnswer(String selected) {
     if (showFeedback) return;
-
     timer?.cancel();
     bool isCorrect = _normalize(selected) ==
         _normalize(questions[currentQuestionIndex]['a'] ?? "");
 
-    if (isCorrect) {
-      HapticFeedback.mediumImpact();
-    } else {
-      HapticFeedback.heavyImpact();
-    }
-
     setState(() {
       selectedOption = selected;
       showFeedback = true;
-
       if (isCorrect) {
-        int basePoints = (widget.categoryTitle == "دوري النجوم") ? 20 : 10;
-        int speedBonus = (timeLeft > 20) ? 5 : 0;
-        score += basePoints + speedBonus;
+        int pointsToAdd = (widget.categoryTitle == "دوري النجوم") ? 2 : 3;
+        score += pointsToAdd;
+        HapticFeedback.mediumImpact();
+      } else {
+        HapticFeedback.heavyImpact();
       }
     });
 
     Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) _nextStep();
+      if (mounted) {
+        if ((currentQuestionIndex + 1) % 5 == 0) {
+          _showInterimResult();
+        } else {
+          _nextStep();
+        }
+      }
     });
+  }
+
+  void _showInterimResult() {
+    int threshold = (widget.categoryTitle == "دوري النجوم") ? 6 : 9;
+    String msg = score >= threshold
+        ? "برافو عليك يا بطل.. كمل!"
+        : "محتاج تركز أكتر.. حاول في اللي جاي!";
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+        title: Text("عاش يا وحش!",
+            textAlign: TextAlign.center,
+            style: GoogleFonts.cairo(
+                fontWeight: FontWeight.bold, color: deepTeal)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(msg, textAlign: TextAlign.center, style: GoogleFonts.cairo()),
+            const SizedBox(height: 20),
+            Text("نقاطك الحالية: $score",
+                style: GoogleFonts.poppins(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: safetyOrange)),
+          ],
+        ),
+        actionsAlignment: MainAxisAlignment.spaceEvenly,
+        actions: [
+          TextButton(
+            onPressed: () => _saveScoreAndFinish(isExiting: true),
+            child: Text("خروج وحفظ",
+                style: GoogleFonts.cairo(
+                    color: Colors.redAccent, fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: deepTeal,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12))),
+            onPressed: () {
+              Navigator.pop(context);
+              _nextStep();
+            },
+            child: Text("كمل يا بطل",
+                style: GoogleFonts.cairo(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   String _normalize(String text) {
@@ -123,23 +182,32 @@ class _QuizScreenState extends State<QuizScreen> {
     }
   }
 
-  Future<void> _saveScoreAndFinish() async {
+  Future<void> _saveScoreAndFinish({bool isExiting = false}) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null && score > 0) {
+      String field = (widget.categoryTitle == "دوري النجوم")
+          ? 'points_stars'
+          : 'points_pro';
+
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .update({
+        field: FieldValue.increment(score),
         'points': FieldValue.increment(score),
         'lastQuiz': DateTime.now(),
       });
     }
-    _showResult();
+    if (isExiting) {
+      Navigator.pop(context);
+      Navigator.pop(context);
+    } else {
+      _showFinalResult();
+    }
   }
 
-  void _showResult() {
-    String rankMsg =
-        score > 50 ? "وحش عقارات حقيقي! 🦁" : "بداية ممتازة يا بطل ✨";
+  void _showFinalResult() {
+    String randomTask = (_dailyWorkTasks..shuffle()).first;
 
     showDialog(
       context: context,
@@ -149,42 +217,45 @@ class _QuizScreenState extends State<QuizScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.emoji_events, size: 80, color: Colors.amber),
+            const Icon(Icons.check_circle_rounded,
+                size: 80, color: Colors.green),
             const SizedBox(height: 15),
-            Text("تحدي مكتمل",
+            Text("مهمة ناجحة!",
                 style: GoogleFonts.cairo(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 22,
-                    color: deepTeal)),
-            Text(rankMsg,
-                style: GoogleFonts.cairo(fontSize: 14, color: Colors.grey)),
-            const SizedBox(height: 20),
+                    fontWeight: FontWeight.bold, fontSize: 20)),
+            const SizedBox(height: 15),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                  color: safetyOrange.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20)),
-              child: Text("+$score",
-                  style: GoogleFonts.poppins(
-                      fontSize: 35,
-                      fontWeight: FontWeight.w900, // تم التعديل من black
-                      color: safetyOrange)),
+                  color: deepTeal.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(15)),
+              child: Text(randomTask,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.cairo(
+                      color: deepTeal,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13)),
             ),
+            const SizedBox(height: 25),
+            Text("النقاط المكتسبة: $score",
+                style: GoogleFonts.cairo(
+                    fontWeight: FontWeight.w900,
+                    color: safetyOrange,
+                    fontSize: 18)),
             const SizedBox(height: 25),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                     backgroundColor: deepTeal,
+                    padding: const EdgeInsets.all(15),
                     shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(15)), // تم الإصلاح هنا
-                    padding: const EdgeInsets.all(12)),
+                        borderRadius: BorderRadius.circular(15))),
                 onPressed: () {
                   Navigator.pop(context);
                   Navigator.pop(context);
                 },
-                child: Text("العودة للرئيسية",
+                child: Text("تم.. للرئيسية",
                     style: GoogleFonts.cairo(
                         color: Colors.white, fontWeight: FontWeight.bold)),
               ),
@@ -197,189 +268,94 @@ class _QuizScreenState extends State<QuizScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return Scaffold(
-          backgroundColor: deepTeal,
-          body: const Center(
-              child: CircularProgressIndicator(color: Colors.white)));
-    }
+    if (isLoading)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (questions.isEmpty) return _buildEmptyView();
     if (!gameStarted) return _buildStartView();
 
     var q = questions[currentQuestionIndex];
-
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFB),
       appBar: AppBar(
-        backgroundColor: deepTeal,
-        elevation: 0,
-        centerTitle: true,
-        title: Text(widget.categoryTitle,
-            style: GoogleFonts.cairo(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 18)),
-        leading: IconButton(
-            icon: const Icon(Icons.close, color: Colors.white),
-            onPressed: () => Navigator.pop(context)),
-      ),
-      body: Column(
-        children: [
-          TweenAnimationBuilder<double>(
-            duration: const Duration(milliseconds: 500),
-            tween: Tween(begin: 0, end: timeLeft / 25),
-            builder: (context, value, _) => LinearProgressIndicator(
-              value: value,
-              backgroundColor: Colors.grey[200],
-              color: value < 0.3 ? Colors.red : safetyOrange,
-              minHeight: 6,
-            ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(25),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _infoBadge("السكور: $score", safetyOrange),
-                      _infoBadge(
-                          "سؤال ${currentQuestionIndex + 1}/${questions.length}",
-                          deepTeal),
-                    ],
-                  ),
-                  const SizedBox(height: 30),
-                  _buildQuestionCard(q['q']),
-                  const SizedBox(height: 40),
-                  _buildOptions(q['options']),
-                ],
+          backgroundColor: deepTeal,
+          elevation: 0,
+          title: Text(widget.categoryTitle,
+              style:
+                  GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 16)),
+          centerTitle: true),
+      body: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Column(
+          children: [
+            LinearProgressIndicator(
+                value: timeLeft / 25,
+                color: safetyOrange,
+                backgroundColor: Colors.grey[200]),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(25),
+                child: Column(
+                  children: [
+                    _buildQuestionCard(q['q']),
+                    const SizedBox(height: 30),
+                    Expanded(child: _buildOptions(q['options'])),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _infoBadge(String text, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-      decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12)),
-      child: Text(text,
-          style: GoogleFonts.cairo(
-              fontWeight: FontWeight.bold, color: color, fontSize: 13)),
-    );
-  }
-
-  Widget _buildQuestionCard(String question) {
-    return Container(
-      padding: const EdgeInsets.all(25),
-      width: double.infinity,
-      decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 15,
-                offset: const Offset(0, 5))
-          ]),
-      child: Text(question,
-          style: GoogleFonts.cairo(
-              fontSize: 19, fontWeight: FontWeight.bold, color: deepTeal),
-          textAlign: TextAlign.center),
-    );
-  }
-
-  Widget _buildOptions(List<dynamic> options) {
-    return Column(
-      children: options.map((opt) {
-        bool isCorrect =
-            showFeedback && opt == questions[currentQuestionIndex]['a'];
-        bool isWrong = showFeedback &&
-            opt == selectedOption &&
-            opt != questions[currentQuestionIndex]['a'];
-
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          margin: const EdgeInsets.only(bottom: 15),
-          child: InkWell(
-            onTap: () => _handleAnswer(opt),
-            borderRadius: BorderRadius.circular(18),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isCorrect
-                    ? Colors.green.shade500
-                    : (isWrong ? Colors.red.shade500 : Colors.white),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                    color: isCorrect || isWrong
-                        ? Colors.transparent
-                        : Colors.grey.shade200),
-                boxShadow: isCorrect || isWrong
-                    ? [
-                        BoxShadow(
-                            color: (isCorrect ? Colors.green : Colors.red)
-                                .withOpacity(0.3),
-                            blurRadius: 10)
-                      ]
-                    : null,
-              ),
-              child: Text(opt,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.cairo(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: (isCorrect || isWrong) ? Colors.white : deepTeal)),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
+  // التعديل هنا في شاشة البدء (Start View)
   Widget _buildStartView() {
+    String btnText = widget.categoryTitle == "دوري النجوم"
+        ? "يلا يا نجم 🚀"
+        : "اتفضل يا Pro 🔥";
     return Scaffold(
-      backgroundColor: deepTeal,
       body: Container(
         width: double.infinity,
         decoration: BoxDecoration(
-            gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                colors: [deepTeal, const Color(0xFF0D2A30)])),
+            gradient:
+                LinearGradient(colors: [deepTeal, const Color(0xFF0D2A30)])),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.psychology, size: 100, color: Colors.amber),
-            const SizedBox(height: 20),
             Text(widget.categoryTitle,
                 style: GoogleFonts.cairo(
                     fontSize: 32,
                     color: Colors.white,
                     fontWeight: FontWeight.bold)),
-            Text("استعد للاختبار وتجميع النقاط",
-                style: GoogleFonts.cairo(color: Colors.white60)),
-            const SizedBox(height: 60),
+
+            // --- التعديل: زيادة المسافة هنا ---
+            const SizedBox(height: 25),
+
+            Text("المعلومة بتفرق..",
+                style: GoogleFonts.cairo(
+                    fontSize: 18,
+                    color: safetyOrange,
+                    fontWeight: FontWeight.w700)),
+
+            const SizedBox(
+                height: 60), // زيادة المسافة قبل الزر أيضاً لمظهر أفضل
+
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                   backgroundColor: safetyOrange,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20)),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 60, vertical: 15)),
+                      const EdgeInsets.symmetric(horizontal: 50, vertical: 15),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15))),
               onPressed: () {
                 setState(() => gameStarted = true);
                 _startTimer();
               },
-              child: Text("ابدأ التحدي",
+              child: Text(btnText,
                   style: GoogleFonts.cairo(
-                      fontSize: 20,
                       color: Colors.white,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold)),
             )
           ],
@@ -388,12 +364,57 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
+  Widget _buildQuestionCard(String text) {
+    return Container(
+      padding: const EdgeInsets.all(25),
+      width: double.infinity,
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)]),
+      child: Text(text,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.cairo(
+              fontSize: 18, fontWeight: FontWeight.bold, color: deepTeal)),
+    );
+  }
+
+  Widget _buildOptions(List<dynamic> options) {
+    return ListView(
+      children: options.map((opt) {
+        bool isCorrect =
+            showFeedback && opt == questions[currentQuestionIndex]['a'];
+        bool isWrong = showFeedback &&
+            opt == selectedOption &&
+            opt != questions[currentQuestionIndex]['a'];
+        return GestureDetector(
+          onTap: () => _handleAnswer(opt),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            margin: const EdgeInsets.only(bottom: 15),
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+                color: isCorrect
+                    ? Colors.green
+                    : isWrong
+                        ? Colors.red
+                        : Colors.white,
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: Colors.grey.shade300)),
+            child: Text(opt,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.cairo(
+                    color: (isCorrect || isWrong) ? Colors.white : deepTeal,
+                    fontWeight: FontWeight.bold)),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   Widget _buildEmptyView() {
     return Scaffold(
-        backgroundColor: deepTeal,
-        body: Center(
-            child: Text("لا توجد أسئلة حالياً لهذا القسم",
-                style: GoogleFonts.cairo(color: Colors.white))));
+        body: Center(child: Text("لا توجد أسئلة متوفرة حالياً لهذا الدوري")));
   }
 
   @override

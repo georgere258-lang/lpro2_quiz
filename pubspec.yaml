@@ -30,6 +30,10 @@ dependencies:
   cloud_firestore: ^4.14.0
   firebase_auth: ^4.16.0
 
+  # أدوات إضافية للمشاركة والتعامل مع الصور
+  share_plus: ^12.0.1
+  image_picker: ^1.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -37,7 +41,7 @@ dev_dependencies:
   # مكتبة توليد الأيقونات
   flutter_launcher_icons: ^0.13.1
 
-# إعدادات أيقونة التطبيق (وحوش العقارات) - تم التعديل هنا لضمان القبول
+# إعدادات أيقونة التطبيق (وحوش العقارات)
 flutter_launcher_icons:
   android: true 
   ios: true
@@ -51,8 +55,25 @@ flutter:
 
   # تعريف كافة أصول الصور والمجلدات (Assets)
   assets:
-    - assets/logo.svg          # شعار التطبيق
-    - assets/top_brand.png     # شعار الهيدر
-    - assets/icon.png          # أيقونة التطبيق
-    - assets/plans/            # مجلد صور تحدي الماستر بلان
-    - assets/card_images/      # مجلد صور الخلفيات
+    # الملفات الأساسية
+    - assets/logo.svg
+    - assets/top_brand.png
+    - assets/icon.png
+    
+    # مجلد صور الكروت الرئيسية (التي حددناها)
+    - assets/card_images/stars.png
+    - assets/card_images/info.png
+    - assets/card_images/pro.png
+    - assets/card_images/map.png
+    
+    # تعريف المجلدات بشكل كامل لضمان قراءة أي ملفات إضافية بداخلها
+    - assets/plans/
+    - assets/card_images/
+
+  # إعداد الخطوط (في حال رغبتِ باستخدام خطوط محلية بجانب Google Fonts)
+  # fonts:
+  #   - family: Cairo
+  #     fonts:
+  #       - asset: assets/fonts/Cairo-Regular.ttf
+  #       - asset: assets/fonts/Cairo-Bold.ttf
+  #         weight: 700
