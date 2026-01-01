@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math';
 
+// استيراد الشاشات المطلوبة
 import 'quiz_screen.dart';
 import 'about_screen.dart';
 import 'admin_panel.dart';
@@ -38,10 +39,10 @@ class _HomeScreenState extends State<HomeScreen>
   void initState() {
     super.initState();
     _newsController =
-        AnimationController(duration: const Duration(seconds: 15), vsync: this)
+        AnimationController(duration: const Duration(seconds: 18), vsync: this)
           ..repeat();
     _newsAnimation =
-        Tween<Offset>(begin: const Offset(1.5, 0), end: const Offset(-1.5, 0))
+        Tween<Offset>(begin: const Offset(1.2, 0), end: const Offset(-1.2, 0))
             .animate(_newsController);
     currentPrompt = friendlyPrompts[Random().nextInt(friendlyPrompts.length)];
   }
@@ -56,21 +57,23 @@ class _HomeScreenState extends State<HomeScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7F8),
-      // القائمة الجانبية تظل موجودة برمجياً
-      drawer: _buildDrawer(context),
+      drawer: _buildDrawer(context), // القائمة الجانبية المعدلة
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('users')
             .doc(user?.uid)
             .snapshots(),
         builder: (context, snapshot) {
-          String name = (snapshot.data?.data() as Map?)?['name'] ?? "بطل Pro";
+          String name = "بطل Pro";
+          if (snapshot.hasData && snapshot.data!.data() != null) {
+            name = (snapshot.data!.data() as Map)['name'] ?? "بطل Pro";
+          }
 
           return Directionality(
             textDirection: TextDirection.rtl,
             child: Column(
               children: [
-                _buildUltraSlimTicker(), // شريط الأخبار الآن نظيف تماماً
+                _buildUltraSlimTicker(),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -78,8 +81,7 @@ class _HomeScreenState extends State<HomeScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 30),
-                        _buildHeaderWithMenu(
-                            context, name), // الهيدر الجديد بالأيقونة
+                        _buildHeaderWithMenu(context, name),
                         const SizedBox(height: 25),
                         _buildQuickFact(),
                         const SizedBox(height: 15),
@@ -88,10 +90,11 @@ class _HomeScreenState extends State<HomeScreen>
                         Text(
                           "من يملك المعلومة.. يملك القوة",
                           style: GoogleFonts.cairo(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w900,
-                              color: deepTeal,
-                              letterSpacing: 0.5),
+                            fontSize: 19,
+                            fontWeight: FontWeight.w900,
+                            color: deepTeal,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                         const SizedBox(height: 15),
                         _buildPremiumGrid(),
@@ -108,7 +111,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // --- الهيدر المطور الذي يحتوي على اسم المستخدم وأيقونة القائمة ---
   Widget _buildHeaderWithMenu(BuildContext context, String name) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -130,11 +132,12 @@ class _HomeScreenState extends State<HomeScreen>
             ],
           ),
         ),
-        // أيقونة فتح الـ About والـ Admin في مكانها الصحيح
-        IconButton(
-          icon: Icon(Icons.menu_open_rounded, color: deepTeal, size: 32),
-          onPressed: () => Scaffold.of(context).openDrawer(),
-        ),
+        Builder(builder: (context) {
+          return IconButton(
+            icon: Icon(Icons.menu_open_rounded, color: deepTeal, size: 32),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          );
+        }),
       ],
     );
   }
@@ -157,49 +160,42 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // القائمة الجانبية (Drawer) لتنظيم الوصول لـ About و Admin
+  // تعديل القائمة الجانبية بالكامل (أبطال Pro)
   Widget _buildDrawer(BuildContext context) {
     return Drawer(
       child: Directionality(
         textDirection: TextDirection.rtl,
         child: Column(
           children: [
-            DrawerHeader(
+            UserAccountsDrawerHeader(
               decoration: BoxDecoration(color: deepTeal),
-              child: Center(
-                child: Text("دوري وحوش العقارات",
-                    style: GoogleFonts.cairo(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold)),
+              currentAccountPicture: CircleAvatar(
+                backgroundColor: Colors.white,
+                child: Icon(Icons.stars_rounded, color: safetyOrange, size: 40),
               ),
+              accountName: Text(
+                "أبطال Pro", // التعديل المطلوب
+                style: GoogleFonts.cairo(
+                    fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              accountEmail: const Text("نخبة المستشارين العقاريين"),
             ),
-            ListTile(
-              leading: Icon(Icons.info_outline, color: deepTeal),
-              title: Text("حول البرنامج", style: GoogleFonts.cairo()),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (c) => const AboutScreen()));
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.admin_panel_settings_outlined,
-                  color: safetyOrange),
-              title: Text("لوحة التحكم (للأدمن)", style: GoogleFonts.cairo()),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (c) => const AdminPanel()));
-              },
-            ),
+            _buildDrawerItem(
+                Icons.info_outline,
+                "حول أبطال Pro",
+                () => Navigator.push(context,
+                    MaterialPageRoute(builder: (c) => const AboutScreen()))),
+            _buildDrawerItem(
+                Icons.admin_panel_settings_outlined,
+                "لوحة التحكم (للأدمن)",
+                () => Navigator.push(context,
+                    MaterialPageRoute(builder: (c) => const AdminPanel())),
+                color: safetyOrange),
             const Spacer(),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.redAccent),
-              title: Text("خروج",
-                  style: GoogleFonts.cairo(color: Colors.redAccent)),
-              onTap: () => FirebaseAuth.instance.signOut(),
-            ),
+            const Divider(),
+            _buildDrawerItem(Icons.logout, "تسجيل الخروج",
+                () => FirebaseAuth.instance.signOut(),
+                color: Colors.redAccent),
             const SizedBox(height: 20),
           ],
         ),
@@ -207,7 +203,19 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // باقي الدوال (QuickFact, Encouragement, Grid, ImageCard) تظل كما هي
+  Widget _buildDrawerItem(IconData icon, String title, VoidCallback onTap,
+      {Color? color}) {
+    return ListTile(
+      leading: Icon(icon, color: color ?? deepTeal),
+      title: Text(title,
+          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14)),
+      onTap: () {
+        Navigator.pop(context);
+        onTap();
+      },
+    );
+  }
+
   Widget _buildQuickFact() {
     return Container(
       padding: const EdgeInsets.all(15),
@@ -294,47 +302,25 @@ class _HomeScreenState extends State<HomeScreen>
       crossAxisSpacing: 15,
       childAspectRatio: 0.82,
       children: [
-        _buildImageCard(
-            "دوري النجوم", "Fresh ✨", const Color(0xFF3498DB), "stars.png", () {
-          Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (c) =>
-                      const QuizScreen(categoryTitle: "دوري النجوم")));
-        }),
-        _buildImageCard(
-            "دوري المحترفين", "Pro 🔥", const Color(0xFFE67E22), "pro.png", () {
-          Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (c) =>
-                      const QuizScreen(categoryTitle: "دوري المحترفين")));
-        }),
-        _buildImageCard(
-            "المعلومة بتفرق", "Data 💡", const Color(0xFF1ABC9C), "info.png",
-            () {
-          Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (c) =>
-                      const QuizScreen(categoryTitle: "المعلومة بتفرق")));
-        }),
-        _buildImageCard(
-            "الماستر بلان", "Maps 🗺️", const Color(0xFFE74C3C), "map.png", () {
-          Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (c) =>
-                      const QuizScreen(categoryTitle: "الماستر بلان")));
-        }),
+        _buildImageCard("دوري النجوم", "Fresh ✨", const Color(0xFF3498DB),
+            "stars.png", "دوري النجوم"),
+        _buildImageCard("دوري المحترفين", "Pro 🔥", const Color(0xFFE67E22),
+            "pro.png", "دوري المحترفين"),
+        _buildImageCard("المعلومة بتفرق", "Data 💡", const Color(0xFF1ABC9C),
+            "info.png", "المعلومة بتفرق"),
+        _buildImageCard("الماستر بلان", "Maps 🗺️", const Color(0xFFE74C3C),
+            "map.png", "الماستر بلان"),
       ],
     );
   }
 
   Widget _buildImageCard(String title, String badge, Color color,
-      String imageName, VoidCallback onTap) {
+      String imageName, String category) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (c) => QuizScreen(categoryTitle: category))),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(22),

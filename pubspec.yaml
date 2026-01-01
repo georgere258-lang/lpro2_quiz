@@ -34,6 +34,9 @@ dependencies:
   share_plus: ^12.0.1
   image_picker: ^1.2.1
 
+  # المكتبة الناقصة (تمت إضافتها لتعمل صفحة البروفايل بدون أخطاء)
+  intl: ^0.20.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -55,25 +58,11 @@ flutter:
 
   # تعريف كافة أصول الصور والمجلدات (Assets)
   assets:
-    # الملفات الأساسية
+    # الملفات الأساسية في مجلد assets مباشرة
     - assets/logo.svg
     - assets/top_brand.png
     - assets/icon.png
     
-    # مجلد صور الكروت الرئيسية (التي حددناها)
-    - assets/card_images/stars.png
-    - assets/card_images/info.png
-    - assets/card_images/pro.png
-    - assets/card_images/map.png
-    
-    # تعريف المجلدات بشكل كامل لضمان قراءة أي ملفات إضافية بداخلها
-    - assets/plans/
+    # تعريف المجلدات (Folders) بشكل كامل يغطي كل ما بداخلها تلقائياً
     - assets/card_images/
-
-  # إعداد الخطوط (في حال رغبتِ باستخدام خطوط محلية بجانب Google Fonts)
-  # fonts:
-  #   - family: Cairo
-  #     fonts:
-  #       - asset: assets/fonts/Cairo-Regular.ttf
-  #       - asset: assets/fonts/Cairo-Bold.ttf
-  #         weight: 700
+    - assets/plans/

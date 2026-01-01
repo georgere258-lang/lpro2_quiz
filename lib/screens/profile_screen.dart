@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'chat_support_screen.dart';
+import 'package:share_plus/share_plus.dart';
+import 'about_screen.dart'; // استيراد شاشة حول لتعمل الأزرار
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -15,228 +15,165 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final User? user = FirebaseAuth.instance.currentUser;
-  final TextEditingController _nameController = TextEditingController();
   final Color deepTeal = const Color(0xFF1B4D57);
 
-  // دالة جلب الترتيب
-  Stream<int> getUserRank() {
-    return FirebaseFirestore.instance
-        .collection('users')
-        .orderBy('points', descending: true)
-        .snapshots()
-        .map((snap) {
-      int index = snap.docs.indexWhere((doc) => doc.id == user?.uid);
-      return index != -1 ? index + 1 : 0;
-    });
+  // 1. دالة دعوة صديق
+  void _inviteFriend() {
+    Share.share(
+      'يا بطل! انضم إلينا في تطبيق أبطال Pro العقاري، وتعلم كل أسرار السوق. حمل التطبيق من هنا: [رابط التطبيق]',
+      subject: 'دعوة للانضمام إلى أبطال Pro',
+    );
   }
 
-  // دالة تعديل الاسم
-  Future<void> _updateName(String currentName) async {
-    _nameController.text = currentName;
+  // 2. دالة تغيير الصورة الشخصية
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text("تم اختيار الصورة بنجاح (بانتظار الرفع لـ Storage)")),
+      );
+    }
+  }
+
+  // 3. دالة تعديل الاسم والبيانات
+  void _showEditDialog() {
+    TextEditingController nameEdit =
+        TextEditingController(text: user?.displayName ?? "بطل Pro");
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text("تعديل الاسم",
-            textAlign: TextAlign.center,
-            style: GoogleFonts.cairo(
-                fontWeight: FontWeight.bold, color: deepTeal)),
+      builder: (c) => AlertDialog(
+        title: Text("تعديل بيانات بطل Pro", style: GoogleFonts.cairo()),
         content: TextField(
-          controller: _nameController,
-          textAlign: TextAlign.center,
-          decoration: const InputDecoration(
-              hintText: "الاسم الجديد", border: OutlineInputBorder()),
+          controller: nameEdit,
+          decoration: const InputDecoration(labelText: "الاسم الجديد"),
         ),
-        actionsAlignment: MainAxisAlignment.spaceEvenly,
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child:
-                  Text("إلغاء", style: GoogleFonts.cairo(color: Colors.grey))),
+              onPressed: () => Navigator.pop(c), child: const Text("إلغاء")),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: deepTeal),
             onPressed: () async {
-              if (_nameController.text.trim().isNotEmpty) {
-                await FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(user?.uid)
-                    .update({'name': _nameController.text.trim()});
-                if (mounted) Navigator.pop(context);
-              }
+              // تحديث الاسم في Firebase Auth
+              await user?.updateDisplayName(nameEdit.text);
+              // تحديث الاسم في Firestore
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user!.uid)
+                  .set({
+                'name': nameEdit.text,
+              }, SetOptions(merge: true));
+
+              Navigator.pop(c);
+              setState(() {});
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("تم تحديث البيانات بنجاح")),
+              );
             },
-            child: const Text("حفظ", style: TextStyle(color: Colors.white)),
+            child: const Text("حفظ"),
           ),
         ],
       ),
     );
   }
 
-  // دالة اختيار الصورة
-  Future<void> _pickImage() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text("جاري رفع الصورة...")));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFB),
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(user?.uid)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData)
-            return const Center(child: CircularProgressIndicator());
-          var data = snapshot.data!.data() as Map<String, dynamic>?;
-          String name =
-              data?['name'] ?? "Pro-${user?.uid.substring(0, 4).toUpperCase()}";
-
-          return Directionality(
-            textDirection: TextDirection.rtl,
-            child: SingleChildScrollView(
+      backgroundColor: const Color(0xFFF4F7F8),
+      appBar: AppBar(
+        title: Text("بروفايل أبطال Pro",
+            style: GoogleFonts.cairo(
+                color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: deepTeal,
+        centerTitle: true,
+      ),
+      body: Directionality(
+        textDirection: TextDirection.rtl,
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            // قسم الصورة والاسم
+            Center(
               child: Column(
                 children: [
-                  // الهيدر مع الكاميرا
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.only(top: 60, bottom: 40),
-                    decoration: BoxDecoration(
-                        color: deepTeal,
-                        borderRadius: const BorderRadius.only(
-                            bottomLeft: Radius.circular(40),
-                            bottomRight: Radius.circular(40))),
-                    child: Column(children: [
-                      Stack(alignment: Alignment.bottomRight, children: [
-                        const CircleAvatar(
-                            radius: 55,
-                            backgroundColor: Colors.white,
-                            child: Icon(Icons.person,
-                                size: 60, color: Color(0xFF1B4D57))),
-                        GestureDetector(
-                          onTap: _pickImage,
-                          child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: const BoxDecoration(
-                                  color: Colors.orange, shape: BoxShape.circle),
-                              child: const Icon(Icons.camera_alt,
-                                  color: Colors.white, size: 20)),
-                        )
-                      ]),
-                      const SizedBox(height: 15),
-                      Text(name,
-                          style: GoogleFonts.cairo(
-                              fontSize: 22,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold)),
-                    ]),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
+                  GestureDetector(
+                    onTap: _pickImage,
+                    child: Stack(
                       children: [
-                        // الإحصائيات (النجوم، المحترفين، الترتيب)
-                        StreamBuilder<int>(
-                          stream: getUserRank(),
-                          builder: (context, rSnap) => Row(children: [
-                            _buildStatItem(
-                                "دوري النجوم",
-                                "${data?['points_stars'] ?? 0}",
-                                Icons.stars,
-                                Colors.blue),
-                            const SizedBox(width: 10),
-                            _buildStatItem(
-                                "المحترفين",
-                                "${data?['points_pro'] ?? 0}",
-                                Icons.workspace_premium,
-                                Colors.orange),
-                            const SizedBox(width: 10),
-                            _buildStatItem("ترتيبك", "#${rSnap.data ?? '..'}",
-                                Icons.leaderboard, Colors.teal),
-                          ]),
+                        CircleAvatar(
+                          radius: 55,
+                          backgroundColor: deepTeal,
+                          child: const CircleAvatar(
+                            radius: 52,
+                            backgroundImage: AssetImage(
+                                'assets/user_placeholder.png'), // تأكدي من وجود الصورة في Assets
+                          ),
                         ),
-                        const SizedBox(height: 30),
-
-                        // الأزرار التفاعلية
-                        _buildBtn("تعديل الاسم والبيانات", Icons.edit_rounded,
-                            () => _updateName(name)),
-
-                        _buildBtn(
-                            "دعوة زميل للمنافسة", Icons.person_add_rounded, () {
-                          Share.share(
-                              "يا بطل! حمل تطبيق برو العقاري ونافسني في المعلومات. رابط التطبيق: [Link]");
-                        }),
-
-                        _buildBtn(
-                            "مركز المساعدة والتواصل",
-                            Icons.support_agent_rounded,
-                            () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (c) =>
-                                        const ChatSupportScreen()))),
-
-                        const SizedBox(height: 30),
-
-                        TextButton.icon(
-                            onPressed: () => FirebaseAuth.instance.signOut(),
-                            icon: const Icon(Icons.logout, color: Colors.red),
-                            label: Text("تسجيل الخروج",
-                                style: GoogleFonts.cairo(
-                                    color: Colors.red,
-                                    fontWeight: FontWeight.bold))),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: CircleAvatar(
+                            backgroundColor: Colors.orange,
+                            radius: 18,
+                            child: const Icon(Icons.camera_alt,
+                                size: 18, color: Colors.white),
+                          ),
+                        ),
                       ],
                     ),
-                  )
+                  ),
+                  const SizedBox(height: 15),
+                  Text(user?.displayName ?? "بطل Pro الجديد",
+                      style: GoogleFonts.cairo(
+                          fontSize: 20, fontWeight: FontWeight.bold)),
+                  Text(user?.email ?? "",
+                      style: const TextStyle(color: Colors.grey)),
                 ],
               ),
             ),
-          );
-        },
+            const SizedBox(height: 30),
+
+            // الأزرار الوظيفية
+            _buildProfileBtn("تعديل بياناتي", Icons.edit, _showEditDialog),
+
+            _buildProfileBtn(
+                "دعوة صديق للانضمام", Icons.person_add, _inviteFriend),
+
+            _buildProfileBtn("حول أبطال Pro", Icons.info_outline, () {
+              // تفعيل التنقل لشاشة حول
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AboutScreen()),
+              );
+            }),
+
+            const Divider(height: 40),
+
+            _buildProfileBtn("تسجيل الخروج", Icons.logout, () async {
+              await FirebaseAuth.instance.signOut();
+              // العودة لشاشة تسجيل الدخول
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            }),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildStatItem(String t, String v, IconData i, Color c) {
-    return Expanded(
-        child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 15),
-            decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                      color: Colors.black.withOpacity(0.04), blurRadius: 10)
-                ]),
-            child: Column(children: [
-              Icon(i, color: c, size: 26),
-              const SizedBox(height: 5),
-              Text(v,
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold)),
-              Text(t,
-                  style: GoogleFonts.cairo(fontSize: 10, color: Colors.grey))
-            ])));
-  }
-
-  Widget _buildBtn(String t, IconData i, VoidCallback o) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(15)),
+  Widget _buildProfileBtn(String title, IconData icon, VoidCallback onTap) {
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        leading: Icon(i, color: deepTeal),
-        title: Text(t,
-            style:
-                GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.bold)),
+        leading: Icon(icon, color: deepTeal),
+        title:
+            Text(title, style: GoogleFonts.cairo(fontWeight: FontWeight.w600)),
         trailing:
-            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-        onTap: o,
+            const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+        onTap: onTap,
       ),
     );
   }
