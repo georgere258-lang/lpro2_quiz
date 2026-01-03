@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math';
+import 'dart:ui';
 
-// استيراد الشاشات المطلوبة
 import 'quiz_screen.dart';
-import 'about_screen.dart';
-import 'admin_panel.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,21 +16,12 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   final Color deepTeal = const Color(0xFF1B4D57);
+  final Color lightTeal = const Color(0xFF4FA8A8);
   final Color safetyOrange = const Color(0xFFE67E22);
   final User? user = FirebaseAuth.instance.currentUser;
 
   late AnimationController _newsController;
   late Animation<Offset> _newsAnimation;
-
-  final List<String> friendlyPrompts = [
-    "لو فيك دماغ، بص بصة على خريطة 'بيت الوطن' وقارنها بمدينتي.. المعلومة دي سلاحك الجاي! 🏗️",
-    "إيه رأيك تراجع مشروعين النهاردة؟ بجد هيفرقوا جداً في طريقتك وأنت بتشرح للعميل. ✨",
-    "لو فضيت شوية، ألقي نظرة على تطورات العاصمة.. فيها فرص لو عرفتها هتسبق الكل! 🚀",
-    "بيني وبينك.. مراجعة 'الماستر بلان' النهاردة هتخليك وحش في الميتنج الجاي! 💪",
-    "لو جالك مزاج، شوف الفرق بين أسعار التجمع وزايد النهاردة.. خليك دايماً سابق بخطوة. 🗺️",
-  ];
-
-  late String currentPrompt;
 
   @override
   void initState() {
@@ -44,7 +32,6 @@ class _HomeScreenState extends State<HomeScreen>
     _newsAnimation =
         Tween<Offset>(begin: const Offset(1.2, 0), end: const Offset(-1.2, 0))
             .animate(_newsController);
-    currentPrompt = friendlyPrompts[Random().nextInt(friendlyPrompts.length)];
   }
 
   @override
@@ -53,450 +40,467 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
+  String getDisplayName() {
+    if (user?.displayName != null && user!.displayName!.isNotEmpty) {
+      return user!.displayName!;
+    }
+    return "Pro-${user?.uid.substring(0, 4).toUpperCase() ?? "GOGO"}";
+  }
+
+  // دالة لجلب معلومة اليوم المتغيرة تلقائياً
+  String getDailyFact() {
+    int day = DateTime.now().weekday;
+    switch (day) {
+      case DateTime.sunday:
+        return "العقار هو الملاذ الآمن تاريخياً ضد التضخم. استمر في ثقلك المعرفي، واليوم حاول تحليل أثر الفائدة على قرارات الشراء لعملائك.. أنت تستحق القمة!";
+      case DateTime.monday:
+        return "المستشار العقاري الناجح لا يبيع وحدات، بل يبيع مستقبلاً آمناً بناءً على أرقام دقيقة. خليك شغوف وراجع اليوم مشروعين في التجمع بالتفصيل.. القادم أجمل!";
+      case DateTime.tuesday:
+        return "العلاقة مع العميل تبدأ بعد البيع وليس قبله. كن مخلصاً في نصيحتك، واليوم تواصل مع عميل سابق للاطمئنان على استثماره.. التطور يبدأ بخطوة!";
+      case DateTime.wednesday:
+        return "الموقع ثم الموقع ثم الموقع.. قاعدة الذهب. كن مرجعاً لعملائك، واليوم ارسم خريطة ذهنية لأهم 5 مناطق واعدة في العاصمة الإدارية.. أنت مبدع!";
+      case DateTime.thursday:
+        return "التفاوض ليس حرباً بل بحث عن حلول مشتركة. نمّ مهاراتك دائماً، واليوم اقرأ عن تقنيات الإقناع الحديثة وطبقها في أول مكالمة.. نجاحك مضمون!";
+      case DateTime.friday:
+        return "الاستراحة جزء من التدريب، لكن العقل المبدع لا يتوقف. استرخِ اليوم، لكن فكر في هدف واحد كبير تريد تحقيقه الأسبوع القادم.. طموحك لا حدود له!";
+      default:
+        return "المعلومة هي العملة الأغلى في سوق العقارات. استمر في التعلم، واليوم ابحث عن إحصائيات العرض والطلب في منطقة زايد الجديدة.. مجهودك سيصنع الفارق!";
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('users')
-          .doc(user?.uid)
-          .snapshots(),
-      builder: (context, snapshot) {
-        String name = "بطل Pro";
-        String role = "user";
-
-        if (snapshot.hasData && snapshot.data!.exists) {
-          var data = snapshot.data!.data() as Map<String, dynamic>;
-          name = data['name'] ?? "بطل Pro";
-          role = data['role'] ?? "user";
-        }
-
-        return Scaffold(
-          backgroundColor: const Color(0xFFF4F7F8),
-          // تمت إزالة AppBar من هنا لاعتماده في الـ MainWrapper
-          drawer: _buildDrawer(context, role),
-          body: Directionality(
-            textDirection: TextDirection.rtl,
-            child: Column(
-              children: [
-                _buildUltraSlimTicker(),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(
-                            height: 20), // تقليل المسافة لتناسب الهيدر الثابت
-                        _buildHeaderWithMenu(context, name),
-                        const SizedBox(height: 25),
-                        _buildQuickFact(),
-                        const SizedBox(height: 15),
-                        _buildFriendlyEncouragement(),
-                        const SizedBox(height: 35),
-                        Text(
-                          "من يملك المعلومة.. يملك القوة",
-                          style: GoogleFonts.cairo(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w900,
-                            color: deepTeal,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 15),
-                        _buildPremiumGrid(),
-                        const SizedBox(height: 30),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildHeaderWithMenu(BuildContext context, String name) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text("أهلاً بك يا $name ✨",
-                  style: GoogleFonts.cairo(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: deepTeal)),
-              Text("خطوة جديدة لتعزيز مكانتك كخبير..",
-                  style: GoogleFonts.cairo(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ),
-        Builder(builder: (context) {
-          return IconButton(
-            icon: Icon(Icons.menu_open_rounded, color: deepTeal, size: 32),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          );
-        }),
-      ],
-    );
-  }
-
-  Widget _buildUltraSlimTicker() {
-    return Container(
-      height: 28,
-      width: double.infinity,
-      color: safetyOrange,
-      child: SlideTransition(
-        position: _newsAnimation,
-        child: Center(
-          child: Text(
-            "⚡ آخر تحديثات السوق: ارتفاع الطلب على التجمع الخامس.. معلومة تهمك!",
-            style: GoogleFonts.cairo(
-                color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDrawer(BuildContext context, String role) {
-    return Drawer(
-      child: Directionality(
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F7F8),
+      body: Directionality(
         textDirection: TextDirection.rtl,
         child: Column(
           children: [
-            UserAccountsDrawerHeader(
-              decoration: BoxDecoration(color: deepTeal),
-              currentAccountPicture: CircleAvatar(
-                backgroundColor: Colors.white,
-                child: Icon(Icons.stars_rounded, color: safetyOrange, size: 40),
+            _buildUltraSlimTicker(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 20),
+                    _buildCleanHeader(),
+                    const SizedBox(height: 25),
+                    _buildGlassQuickFact(), // الكارت الزجاجي بالمعلومة المتغيرة
+                    const SizedBox(height: 25),
+                    Center(
+                      child: Text("من يملك المعلومة.. يملك القوة",
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.cairo(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: deepTeal)),
+                    ),
+                    const SizedBox(height: 15),
+                    _buildLProGrid(),
+                    const SizedBox(height: 20),
+                    _buildFriendlyEncouragement(),
+                    const SizedBox(height: 30),
+                  ],
+                ),
               ),
-              accountName: Text(
-                "أبطال Pro",
-                style: GoogleFonts.cairo(
-                    fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              accountEmail: const Text("نخبة المستشارين العقاريين"),
             ),
-            _buildDrawerItem(
-                Icons.info_outline,
-                "حول أبطال Pro",
-                () => Navigator.push(context,
-                    MaterialPageRoute(builder: (c) => const AboutScreen()))),
-            if (role.contains("admin"))
-              _buildDrawerItem(
-                  Icons.admin_panel_settings_outlined,
-                  "لوحة التحكم (للأدمن)",
-                  () => Navigator.push(context,
-                      MaterialPageRoute(builder: (c) => const AdminPanel())),
-                  color: safetyOrange),
-            const Spacer(),
-            const Divider(),
-            _buildDrawerItem(Icons.logout, "تسجيل الخروج",
-                () => FirebaseAuth.instance.signOut(),
-                color: Colors.redAccent),
-            const SizedBox(height: 20),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDrawerItem(IconData icon, String title, VoidCallback onTap,
-      {Color? color}) {
-    return ListTile(
-      leading: Icon(icon, color: color ?? deepTeal),
-      title: Text(title,
-          style: GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 14)),
-      onTap: () {
-        Navigator.pop(context);
-        onTap();
-      },
-    );
-  }
-
-  Widget _buildQuickFact() {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: Colors.grey.withOpacity(0.15))),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.auto_awesome, color: Colors.orange, size: 20),
-              const SizedBox(width: 8),
-              Text("معلومة في السريع",
-                  style: GoogleFonts.cairo(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      color: safetyOrange)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-              "المستشار العقاري الناجح لا يبيع وحدات، بل يبيع 'مستقبلاً آمناً' بناءً على أرقام دقيقة.",
-              style: GoogleFonts.cairo(
-                  fontSize: 12,
-                  color: Colors.black87,
-                  height: 1.5,
-                  fontWeight: FontWeight.w500)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFriendlyEncouragement() {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-          gradient: LinearGradient(
-              colors: [deepTeal, const Color(0xFF2C5F6A)],
-              begin: Alignment.topRight,
-              end: Alignment.bottomLeft),
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-                color: deepTeal.withOpacity(0.3),
-                blurRadius: 15,
-                offset: const Offset(0, 8))
-          ]),
-      child: Row(
-        children: [
-          const Icon(Icons.forum_outlined, color: Colors.amber, size: 28),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("بيني وبينك.. ✨",
-                    style: GoogleFonts.cairo(
-                        color: Colors.white70,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                Text(currentPrompt,
-                    style: GoogleFonts.cairo(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        height: 1.4)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPremiumGrid() {
+  Widget _buildLProGrid() {
     return GridView.count(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
       mainAxisSpacing: 15,
       crossAxisSpacing: 15,
-      childAspectRatio: 0.82,
+      childAspectRatio: 1.1,
       children: [
-        _buildImageCard("دوري النجوم", "Fresh ✨", const Color(0xFF3498DB),
-            "stars.png", "دوري النجوم"),
-        _buildImageCard("دوري المحترفين", "Pro 🔥", const Color(0xFFE67E22),
-            "pro.png", "دوري المحترفين"),
-        _buildImageCard("المعلومة بتفرق", "Data 💡", const Color(0xFF1ABC9C),
-            "info.png", "المعلومة بتفرق"),
-        _buildImageCard("الماستر بلان", "Maps 🗺️", const Color(0xFFE74C3C),
-            "map.png", "الماستر بلان"),
+        _buildPremiumAnimatedCard(
+            "دوري النجوم",
+            "Fresh ✨",
+            const Color(0xFF3498DB),
+            CustomPaint(
+                size: const Size(55, 60),
+                painter: PremiumTrophyPainter(safetyOrange)),
+            "دوري النجوم",
+            true),
+        _buildPremiumAnimatedCard(
+            "دوري المحترفين",
+            "Pro 🔥",
+            safetyOrange,
+            CustomPaint(
+                size: const Size(55, 70),
+                painter: PremiumMedalPainter(safetyOrange)),
+            "دوري المحترفين",
+            true),
+        _buildPremiumAnimatedCard(
+            "المعلومة بتفرق",
+            "",
+            Colors.transparent,
+            CustomPaint(
+                size: const Size(70, 70),
+                painter: PaperAndPenPainter(lightTeal, safetyOrange)),
+            "المعلومة بتفرق",
+            false),
+        _buildPremiumAnimatedCard(
+            "افهم عميلك",
+            "",
+            Colors.transparent,
+            CustomPaint(
+                size: const Size(55, 55),
+                painter: DeepHollowQuestionPainter(lightTeal, safetyOrange)),
+            "افهم عميلك",
+            false),
       ],
     );
   }
 
-  Widget _buildImageCard(String title, String badge, Color color,
-      String imageName, String category) {
-    return GestureDetector(
+  Widget _buildPremiumAnimatedCard(String title, String badge, Color badgeColor,
+      Widget icon, String category, bool showBadge) {
+    return _AnimatedPremiumCard(
       onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
               builder: (c) => QuizScreen(categoryTitle: category))),
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          image: DecorationImage(
-              image: AssetImage("assets/card_images/$imageName"),
-              fit: BoxFit.cover),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 8,
-                offset: const Offset(0, 4))
-          ],
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Colors.black.withOpacity(0.85)]),
-          ),
-          padding:
-              const EdgeInsets.only(right: 15, left: 15, bottom: 20, top: 15),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                    color: color, borderRadius: BorderRadius.circular(8)),
-                child: Text(badge,
-                    style: GoogleFonts.cairo(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w900)),
+      child: Stack(
+        children: [
+          if (showBadge)
+            Positioned(
+              top: 8,
+              right: -25,
+              child: Transform.rotate(
+                angle: 0.5,
+                child: Container(
+                  width: 120,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(color: badgeColor, boxShadow: [
+                    const BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 4,
+                        offset: Offset(0, 2))
+                  ]),
+                  child: Center(
+                      child: Text(badge,
+                          style: GoogleFonts.cairo(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900))),
+                ),
               ),
-              const SizedBox(height: 12),
-              Text(title,
+            ),
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                icon,
+                const SizedBox(height: 12),
+                Text(title,
+                    style: GoogleFonts.cairo(
+                        color: deepTeal,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCleanHeader() =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text("أهلاً بك، ${getDisplayName()} ✨",
+            style: GoogleFonts.cairo(
+                fontSize: 22, fontWeight: FontWeight.w900, color: deepTeal)),
+        Row(children: [
+          _mottoText("تعلم مستمر"),
+          _arrowIcon(),
+          _mottoText("تطور كبير"),
+          _arrowIcon(),
+          _mottoText("نجاح اكيد"),
+          const SizedBox(width: 4),
+          const Text("💪", style: TextStyle(fontSize: 14))
+        ]),
+      ]);
+
+  Widget _mottoText(String text) => Text(text,
+      style: GoogleFonts.cairo(
+          fontSize: 12, color: safetyOrange, fontWeight: FontWeight.w800));
+  Widget _arrowIcon() => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Transform.flip(
+          flipX: true,
+          child: Icon(Icons.play_arrow_rounded, color: lightTeal, size: 18)));
+  Widget _buildUltraSlimTicker() => Container(
+      height: 28,
+      width: double.infinity,
+      color: safetyOrange,
+      child: Center(
+          child: SlideTransition(
+              position: _newsAnimation,
+              child: Text(
+                  "⚡ آخر تحديثات السوق: ارتفاع الطلب على التجمع الخامس.. معلومة تهمك!",
                   style: GoogleFonts.cairo(
                       color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      height: 1.1)),
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold)))));
+
+  Widget _buildGlassQuickFact() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(15),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.7),
+            borderRadius: BorderRadius.circular(15),
+            border:
+                Border.all(color: safetyOrange.withOpacity(0.2), width: 1.5),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Icon(Icons.lightbulb_outline, color: deepTeal, size: 20),
+                const SizedBox(width: 8),
+                Text("معلومة في السريع",
+                    style: GoogleFonts.cairo(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                        color: deepTeal))
+              ]),
+              const SizedBox(height: 8),
+              Text(getDailyFact(), // جلب معلومة اليوم
+                  style: GoogleFonts.cairo(
+                      fontSize: 12,
+                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
+                      height: 1.5))
             ],
           ),
         ),
       ),
     );
   }
+
+  Widget _buildFriendlyEncouragement() => Container(
+      padding: const EdgeInsets.symmetric(vertical: 25, horizontal: 15),
+      color: Colors.transparent,
+      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        _engWord("Success"), // تعديل أول حرف كابيتال
+        _orangeArrow(),
+        _engWord("Growth"), // تعديل أول حرف كابيتال
+        _orangeArrow(),
+        _engWord("Learn") // تعديل أول حرف كابيتال
+      ]));
+
+  Widget _engWord(String text) => Text(text,
+      style: GoogleFonts.cairo(
+          color: lightTeal, fontSize: 16, fontWeight: FontWeight.w900));
+  Widget _orangeArrow() => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Icon(Icons.play_arrow_rounded, color: safetyOrange, size: 22));
 }
 
-class LeaderboardScreen extends StatelessWidget {
-  const LeaderboardScreen({super.key});
+class _AnimatedPremiumCard extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  const _AnimatedPremiumCard({required this.child, required this.onTap});
+  @override
+  State<_AnimatedPremiumCard> createState() => _AnimatedPremiumCardState();
+}
 
+class _AnimatedPremiumCardState extends State<_AnimatedPremiumCard> {
+  double _scale = 1.0;
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      // تمت إزالة AppBar هنا أيضاً لأن الهيدر في الـ Wrapper ثابت
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users')
-            .orderBy('points', descending: true)
-            .limit(20)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData)
-            return const Center(child: CircularProgressIndicator());
-
-          var users = snapshot.data!.docs;
-
-          return Directionality(
-            textDirection: TextDirection.rtl,
-            child: Column(
-              children: [
-                const SizedBox(height: 10),
-                if (users.length >= 3) _buildPodium(users.take(3).toList()),
-                const Divider(),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: users.length > 3 ? users.length - 3 : 0,
-                    itemBuilder: (context, index) {
-                      var user = users[index + 3];
-                      return _buildLeaderboardTile(user, index + 4);
-                    },
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildPodium(List<DocumentSnapshot> topThree) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      color: const Color(0xFFF4F7F8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          _buildPodiumItem(topThree[1], "2", 70, Colors.grey[400]!),
-          _buildPodiumItem(topThree[0], "1", 100, Colors.amber),
-          _buildPodiumItem(topThree[2], "3", 60, Colors.brown[400]!),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPodiumItem(
-      DocumentSnapshot user, String rank, double height, Color color) {
-    var data = user.data() as Map<String, dynamic>;
-    return Column(
-      children: [
-        CircleAvatar(
-          radius: height / 2.5,
-          backgroundColor: color,
-          child: CircleAvatar(
-            radius: (height / 2.5) - 3,
-            backgroundColor: Colors.white,
-            backgroundImage: data['photoUrl'] != null
-                ? NetworkImage(data['photoUrl'])
-                : null,
-            child: data['photoUrl'] == null ? const Icon(Icons.person) : null,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(data['name'] ?? "بطل",
-            style:
-                GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 12)),
-        Text("${data['points'] ?? 0} نقطة",
-            style: GoogleFonts.poppins(color: Colors.grey, fontSize: 10)),
-        const SizedBox(height: 10),
-        Container(
-          width: 60,
-          height: height,
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _scale = 1.02),
+      onTapUp: (_) => setState(() => _scale = 1.0),
+      onTapCancel: () => setState(() => _scale = 1.0),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _scale,
+        duration: const Duration(milliseconds: 150),
+        child: Container(
           decoration: BoxDecoration(
-            color: color,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6))
+            ],
           ),
-          child: Center(
-            child: Text(rank,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold)),
-          ),
-        )
-      ],
+          child: widget.child,
+        ),
+      ),
     );
+  }
+}
+
+class PremiumTrophyPainter extends CustomPainter {
+  final Color orange;
+  PremiumTrophyPainter(this.orange);
+  @override
+  void paint(Canvas canvas, Size size) {
+    double w = size.width;
+    double h = size.height;
+    final paint = Paint()
+      ..color = const Color(0xFF388E8E)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2;
+    final orangePaint = Paint()
+      ..color = orange.withOpacity(0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+
+    Path cup = Path()
+      ..moveTo(w * 0.3, h * 0.18)
+      ..lineTo(w * 0.7, h * 0.18)
+      ..quadraticBezierTo(w * 0.7, h * 0.45, w * 0.5, h * 0.55)
+      ..quadraticBezierTo(w * 0.3, h * 0.45, w * 0.3, h * 0.18);
+    canvas.drawPath(cup, paint);
+    canvas.drawLine(
+        Offset(w * 0.45, h * 0.22), Offset(w * 0.52, h * 0.4), orangePaint);
+    canvas.drawLine(
+        Offset(w * 0.52, h * 0.22), Offset(w * 0.58, h * 0.35), orangePaint);
+    canvas.drawArc(Rect.fromLTWH(w * 0.18, h * 0.2, w * 0.15, h * 0.15), 1.5,
+        3.14, false, paint);
+    canvas.drawArc(Rect.fromLTWH(w * 0.67, h * 0.2, w * 0.15, h * 0.15), -1.5,
+        3.14, false, paint);
+    canvas.drawLine(
+        Offset(w * 0.5, h * 0.55), Offset(w * 0.5, h * 0.65), paint);
+    canvas.drawRect(
+        Rect.fromCenter(
+            center: Offset(w * 0.5, h * 0.7),
+            width: w * 0.35,
+            height: h * 0.08),
+        paint);
   }
 
-  Widget _buildLeaderboardTile(DocumentSnapshot user, int rank) {
-    var data = user.data() as Map<String, dynamic>;
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: Colors.grey[200],
-        child: Text("#$rank",
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-      ),
-      title: Text(data['name'] ?? "بطل Pro",
-          style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-      subtitle: Text("${data['points'] ?? 0} نقطة",
-          style: GoogleFonts.poppins(fontSize: 12)),
-      trailing: data['photoUrl'] != null
-          ? CircleAvatar(backgroundImage: NetworkImage(data['photoUrl']))
-          : const Icon(Icons.account_circle, color: Colors.grey),
-    );
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class PremiumMedalPainter extends CustomPainter {
+  final Color orange;
+  PremiumMedalPainter(this.orange);
+  @override
+  void paint(Canvas canvas, Size size) {
+    double w = size.width;
+    double h = size.height;
+    final paint = Paint()
+      ..color = const Color(0xFF388E8E)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    final orangePaint = Paint()
+      ..color = orange.withOpacity(0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    Rect rect = Rect.fromLTWH(w * 0.4, 0, w * 0.2, h * 0.4);
+    canvas.drawRect(rect, paint);
+    canvas.drawLine(
+        Offset(w * 0.42, h * 0.1), Offset(w * 0.5, h * 0.3), orangePaint);
+    canvas.drawLine(
+        Offset(w * 0.5, h * 0.1), Offset(w * 0.58, h * 0.3), orangePaint);
+
+    canvas.drawCircle(Offset(w * 0.5, h * 0.65), w * 0.25, paint);
+    canvas.drawCircle(Offset(w * 0.5, h * 0.65), w * 0.15, paint);
   }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class DeepHollowQuestionPainter extends CustomPainter {
+  final Color themeColor;
+  final Color dotColor;
+  DeepHollowQuestionPainter(this.themeColor, this.dotColor);
+  @override
+  void paint(Canvas canvas, Size size) {
+    double w = size.width;
+    double h = size.height;
+    final paint = Paint()
+      ..color = themeColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8;
+
+    // رسم علامة استفهام بخطين متباعدين لعمق أكبر (Deep Hollow)
+    Path pathOuter = Path()
+      ..moveTo(w * 0.3, h * 0.35)
+      ..quadraticBezierTo(w * 0.35, h * 0.1, w * 0.65, h * 0.2)
+      ..quadraticBezierTo(w * 0.75, h * 0.45, w * 0.55, h * 0.5)
+      ..lineTo(w * 0.55, h * 0.6);
+
+    Path pathInner = Path()
+      ..moveTo(w * 0.4, h * 0.35)
+      ..quadraticBezierTo(w * 0.45, h * 0.18, w * 0.6, h * 0.25)
+      ..quadraticBezierTo(w * 0.65, h * 0.4, w * 0.45, h * 0.5)
+      ..lineTo(w * 0.45, h * 0.6);
+
+    canvas.drawPath(pathOuter, paint);
+    canvas.drawPath(pathInner, paint);
+
+    canvas.drawCircle(
+        Offset(w * 0.5, h * 0.75), 4.5, Paint()..color = dotColor);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class PaperAndPenPainter extends CustomPainter {
+  final Color themeColor;
+  final Color orangeLine;
+  PaperAndPenPainter(this.themeColor, this.orangeLine);
+  @override
+  void paint(Canvas canvas, Size size) {
+    final double w = size.width;
+    final double h = size.height;
+    final paint = Paint()
+      ..color = themeColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0;
+    final linePaint = Paint()
+      ..color = orangeLine.withOpacity(0.4)
+      ..strokeWidth = 1.2;
+
+    Rect paperRect = Rect.fromCenter(
+        center: Offset(w * 0.38, h * 0.5), width: w * 0.4, height: h * 0.6);
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(paperRect, const Radius.circular(4)), paint);
+
+    for (int i = 1; i <= 3; i++) {
+      double y = paperRect.top + (paperRect.height * 0.25 * i);
+      canvas.drawLine(Offset(paperRect.left + 5, y),
+          Offset(paperRect.right - 5, y), linePaint);
+    }
+
+    double penX = w * 0.75;
+    double penYStart = h * 0.25;
+    double penYEnd = h * 0.6;
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            Rect.fromLTWH(penX, penYStart, w * 0.08, penYEnd - penYStart),
+            const Radius.circular(2)),
+        paint);
+    Path nib = Path()
+      ..moveTo(penX, penYEnd)
+      ..lineTo(penX + w * 0.04, penYEnd + h * 0.08)
+      ..lineTo(penX + w * 0.08, penYEnd)
+      ..close();
+    canvas.drawPath(nib, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

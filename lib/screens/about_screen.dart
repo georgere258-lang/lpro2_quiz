@@ -14,11 +14,8 @@ class AboutScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: deepTeal,
         elevation: 0,
-        title: Text(
-          "حول أبطال Pro",
-          style: GoogleFonts.cairo(
-              fontWeight: FontWeight.bold, color: Colors.white),
-        ),
+        // تم مسح الجملة فقط من هنا وترك المكان فارغاً
+        title: const Text(""),
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -28,7 +25,7 @@ class AboutScreen extends StatelessWidget {
           padding: const EdgeInsets.all(25),
           child: Column(
             children: [
-              // شعار البرنامج
+              // شعار البرنامج (تم إرجاعه كما كان تماماً)
               Center(
                 child: Container(
                   height: 120,
@@ -38,9 +35,10 @@ class AboutScreen extends StatelessWidget {
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                          color: deepTeal.withOpacity(0.3),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10))
+                        color: deepTeal.withOpacity(0.3),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      )
                     ],
                   ),
                   child: Padding(
@@ -58,7 +56,7 @@ class AboutScreen extends StatelessWidget {
               ),
               const SizedBox(height: 30),
 
-              // العنوان الرئيسي (تم استبداله بجملة المعلومة بتفرق كما طلبتي)
+              // العنوان الرئيسي
               Text(
                 "المعلومة بتفرق",
                 style: GoogleFonts.cairo(
@@ -71,11 +69,14 @@ class AboutScreen extends StatelessWidget {
               Text(
                 "من يملك المعلومة يملك القوة",
                 style: GoogleFonts.cairo(
-                    fontSize: 15, fontWeight: FontWeight.bold, color: deepTeal),
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: deepTeal,
+                ),
               ),
               const SizedBox(height: 40),
 
-              // رؤيتنا (تم حذف أبطال برو من العنوان)
+              // رؤيتنا
               _buildAboutCard(
                 "رؤيتنا",
                 "نهدف إلى خلق مجتمع من نخبة المستشارين العقاريين (أبطال Pro). نحن نؤمن أن السوق العقاري يعتمد على المعلومة الصادقة والذكاء في التنفيذ، ودورنا هو تمكينك لتكون البطل في مجالك.",
@@ -83,7 +84,7 @@ class AboutScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // الإصدار (تم حذف أبطال برو من العنوان)
+              // الإصدار
               _buildAboutCard(
                 "الإصدار",
                 "نسخة بريميوم 1.0.0\nمخصص للنخبة العقارية 2026",
@@ -115,9 +116,10 @@ class AboutScreen extends StatelessWidget {
         border: Border.all(color: Colors.grey.withOpacity(0.1)),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 10,
-              offset: const Offset(0, 4))
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
         ],
       ),
       child: Row(

@@ -6,39 +6,47 @@ class LeaderboardScreen extends StatelessWidget {
   const LeaderboardScreen({super.key});
 
   final Color deepTeal = const Color(0xFF1B4D57);
+  final Color safetyOrange = const Color(0xFFE67E22);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFB),
-      appBar: AppBar(
-        backgroundColor: deepTeal,
-        elevation: 0,
-        title: Text(
-          "أبطال Pro 🏆",
-          style: GoogleFonts.cairo(
-              fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        centerTitle: true,
-      ),
+      backgroundColor: const Color(0xFFF4F7F8), // نفس خلفية الهوم الموحدة
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: Column(
           children: [
-            // هيدر تعريفي
+            // هيدر تعريفي بسيط وأنيق
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              color: deepTeal,
-              child: Text(
-                "قائمة صفوة العقاريين الأكثر تميزاً",
-                textAlign: TextAlign.center,
-                style: GoogleFonts.cairo(color: Colors.white70, fontSize: 12),
+              padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+              decoration: BoxDecoration(
+                color: deepTeal,
+                borderRadius:
+                    const BorderRadius.vertical(bottom: Radius.circular(20)),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    "لوحة الصدارة للخبراء 🏆",
+                    style: GoogleFonts.cairo(
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      fontSize: 18,
+                    ),
+                  ),
+                  Text(
+                    "صفوة المستشارين العقاريين الأكثر تميزاً",
+                    style: GoogleFonts.cairo(
+                      color: Colors.white70,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
             ),
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                // الاستماع اللحظي لمجموعة المستخدمين مرتبة حسب النقاط
                 stream: FirebaseFirestore.instance
                     .collection('users')
                     .orderBy('points', descending: true)
@@ -51,8 +59,11 @@ class LeaderboardScreen extends StatelessWidget {
 
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                     return Center(
-                        child: Text("لا يوجد متنافسون حالياً",
-                            style: GoogleFonts.cairo()));
+                      child: Text(
+                        "لا يوجد متنافسون حالياً",
+                        style: GoogleFonts.cairo(color: deepTeal),
+                      ),
+                    );
                   }
 
                   return ListView.builder(
@@ -61,14 +72,9 @@ class LeaderboardScreen extends StatelessWidget {
                     itemBuilder: (context, index) {
                       var userDoc = snapshot.data!.docs[index];
                       var data = userDoc.data() as Map<String, dynamic>;
-
                       int rank = index + 1;
-
-                      // جلب الاسم لحظياً
-                      String name = data['name'] ?? "بطل Pro مجهول";
-                      // جلب رابط الصورة لحظياً
+                      String name = data['name'] ?? "خبير مجهول";
                       String photoUrl = data['photoUrl'] ?? "";
-
                       bool isTop3 = rank <= 3;
 
                       return Container(
@@ -77,40 +83,36 @@ class LeaderboardScreen extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(22),
-                          border: isTop3
-                              ? Border.all(
-                                  color: _getRankColor(rank).withOpacity(0.5),
-                                  width: 1.5)
-                              : Border.all(color: Colors.transparent),
                           boxShadow: [
                             BoxShadow(
                               color: isTop3
-                                  ? _getRankColor(rank).withOpacity(0.1)
+                                  ? _getRankColor(rank).withOpacity(0.15)
                                   : Colors.black.withOpacity(0.04),
-                              blurRadius: 12,
-                              offset: const Offset(0, 6),
+                              blurRadius: 15,
+                              offset: const Offset(0, 8),
                             )
                           ],
+                          border: isTop3
+                              ? Border.all(
+                                  color: _getRankColor(rank).withOpacity(0.3),
+                                  width: 1.5)
+                              : null,
                         ),
                         child: Row(
                           children: [
-                            // ترتيب البطل
                             _buildRankBadge(rank),
                             const SizedBox(width: 12),
-
-                            // الصورة الشخصية للبطل (تحدث لحظياً)
                             CircleAvatar(
-                              radius: 22,
-                              backgroundColor: Colors.grey[200],
+                              radius: 25,
+                              backgroundColor: Colors.grey[100],
                               backgroundImage: photoUrl.isNotEmpty
                                   ? NetworkImage(photoUrl)
-                                  : const AssetImage(
-                                          'assets/user_placeholder.png')
-                                      as ImageProvider,
+                                  : null,
+                              child: photoUrl.isEmpty
+                                  ? Icon(Icons.person, color: deepTeal)
+                                  : null,
                             ),
                             const SizedBox(width: 12),
-
-                            // الاسم واللقب
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -118,40 +120,36 @@ class LeaderboardScreen extends StatelessWidget {
                                   Text(
                                     name,
                                     style: GoogleFonts.cairo(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: isTop3 ? 15 : 13,
-                                      color: isTop3 ? deepTeal : Colors.black87,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: isTop3 ? 15 : 14,
+                                      color: deepTeal,
                                     ),
                                   ),
                                   if (isTop3)
                                     Text(
                                       rank == 1
-                                          ? "خبير الصدارة 🥇"
-                                          : "بطل متميز ✨",
+                                          ? "متصدر الترتيب 🥇"
+                                          : "خبير متميز ✨",
                                       style: GoogleFonts.cairo(
                                           fontSize: 10,
-                                          color: _getRankColor(rank),
+                                          color: safetyOrange,
                                           fontWeight: FontWeight.bold),
                                     ),
                                 ],
                               ),
                             ),
-
-                            // النقاط
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 5),
+                                  horizontal: 12, vertical: 6),
                               decoration: BoxDecoration(
-                                color: isTop3
-                                    ? _getRankColor(rank).withOpacity(0.1)
-                                    : Colors.grey[100],
-                                borderRadius: BorderRadius.circular(10),
+                                color:
+                                    isTop3 ? deepTeal : const Color(0xFFF0F4F5),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
                                 "${data['points'] ?? 0} ن",
                                 style: GoogleFonts.poppins(
-                                  color:
-                                      isTop3 ? _getRankColor(rank) : deepTeal,
+                                  color: isTop3 ? Colors.white : deepTeal,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
                                 ),
@@ -173,23 +171,23 @@ class LeaderboardScreen extends StatelessWidget {
 
   Color _getRankColor(int rank) {
     if (rank == 1) return const Color(0xFFFFD700); // ذهبي
-    if (rank == 2) return const Color(0xFFC0C0C0); // فضي
-    if (rank == 3) return const Color(0xFFCD7F32); // برونزي
+    if (rank == 2) return const Color(0xFF95A5A6); // فضي مائل للزرقة
+    if (rank == 3) return const Color(0xFFD35400); // برونزي عميق
     return Colors.grey;
   }
 
   Widget _buildRankBadge(int rank) {
     if (rank <= 3) {
-      return Icon(Icons.emoji_events_rounded,
-          color: _getRankColor(rank), size: rank == 1 ? 32 : 26);
+      return Icon(Icons.workspace_premium_rounded,
+          color: _getRankColor(rank), size: rank == 1 ? 32 : 28);
     }
     return Container(
-      width: 26,
+      width: 30,
       alignment: Alignment.center,
       child: Text(
-        "$rank",
+        "#$rank",
         style: GoogleFonts.poppins(
-            fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey[400]),
+            fontSize: 14, fontWeight: FontWeight.w800, color: Colors.grey[400]),
       ),
     );
   }

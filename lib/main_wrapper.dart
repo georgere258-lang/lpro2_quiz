@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// استيراد الشاشات - تأكدي أن المسارات صحيحة في مشروعك
+// تم تعديل المسارات هنا لتشمل مجلد screens/
 import 'screens/home_screen.dart';
+import 'screens/leaderboard_screen.dart';
 import 'screens/quiz_screen.dart';
 import 'screens/profile_screen.dart';
 
@@ -19,20 +20,17 @@ class _MainWrapperState extends State<MainWrapper> {
   @override
   Widget build(BuildContext context) {
     const Color deepTeal = Color(0xFF1B4D57);
-
-    // فحص اللغة
     bool isAr = Localizations.localeOf(context).languageCode == 'ar';
 
     // قائمة الشاشات
     final List<Widget> pages = [
       const HomeScreen(),
-      const LeaderboardScreen(), // موجودة في ملف home_screen أو منفصل
+      const LeaderboardScreen(),
       const QuizScreen(categoryTitle: "دوري النجوم"),
       const ProfileScreen(),
     ];
 
     return Scaffold(
-      // تم إعادة الـ AppBar هنا ليظهر في جميع الشاشات بشكل ثابت
       appBar: AppBar(
         backgroundColor: deepTeal,
         elevation: 0,
@@ -40,13 +38,13 @@ class _MainWrapperState extends State<MainWrapper> {
         title: Image.asset(
           'assets/top_brand.png',
           height: 35,
-          // في حال عدم وجود الصورة يظهر نص الشعار بتنسيق جميل
           errorBuilder: (context, error, stackTrace) => Text(
-            "أبطال PRO",
+            "LPro",
             style: GoogleFonts.cairo(
               color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              fontSize: 20,
+              letterSpacing: 1.2,
             ),
           ),
         ),
@@ -59,9 +57,9 @@ class _MainWrapperState extends State<MainWrapper> {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -2),
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 15,
+              offset: const Offset(0, -4),
             )
           ],
         ),
@@ -90,7 +88,7 @@ class _MainWrapperState extends State<MainWrapper> {
             BottomNavigationBarItem(
               icon: const Icon(Icons.emoji_events_outlined),
               activeIcon: const Icon(Icons.emoji_events),
-              label: isAr ? "قاعة الأبطال" : "League",
+              label: isAr ? "لوحة الخبراء" : "League",
             ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.rocket_launch_outlined),
