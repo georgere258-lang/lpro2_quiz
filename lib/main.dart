@@ -4,17 +4,18 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
-// استيراد الشاشات
+// استيراد الشاشات الأساسية
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/about_screen.dart';
+import 'screens/admin_panel.dart';
 import 'main_wrapper.dart';
 
 void main() async {
-  // تأمين ربط أدوات فلاتر قبل التشغيل
+  // التأكد من تهيئة أدوات Flutter قبل بدء التطبيق
   WidgetsFlutterBinding.ensureInitialized();
 
-  // تهيئة الفايربيز
+  // تهيئة Firebase بناءً على خيارات المنصة (Android/iOS)
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -25,7 +26,7 @@ void main() async {
 class RealEstateQuizApp extends StatefulWidget {
   const RealEstateQuizApp({super.key});
 
-  // دالة لتغيير اللغة من أي مكان في التطبيق
+  // دالة تغيير اللغة من أي مكان في التطبيق
   static void setLocale(BuildContext context, Locale newLocale) {
     _RealEstateQuizAppState? state =
         context.findAncestorStateOfType<_RealEstateQuizAppState>();
@@ -37,7 +38,7 @@ class RealEstateQuizApp extends StatefulWidget {
 }
 
 class _RealEstateQuizAppState extends State<RealEstateQuizApp> {
-  // اللغة الافتراضية هي العربية
+  // اللغة الافتراضية للتطبيق هي العربية
   Locale _locale = const Locale('ar', 'EG');
 
   void changeLanguage(Locale locale) {
@@ -48,76 +49,64 @@ class _RealEstateQuizAppState extends State<RealEstateQuizApp> {
 
   @override
   Widget build(BuildContext context) {
+    // الألوان الرئيسية للهوية البصرية
+    const Color deepTeal = Color(0xFF1B4D57);
+    const Color safetyOrange = Color(0xFFE67E22);
+
     return MaterialApp(
-      title: 'أبطال Pro', // تعديل اسم التطبيق في السيستم
+      title: 'أبطال Pro',
       debugShowCheckedModeBanner: false,
 
-      // إعدادات دعم اللغات (RTL & LTR)
+      // إعدادات اللغات والترجمة
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [
-        Locale('ar', 'EG'),
-        Locale('en', 'US'),
-      ],
+      supportedLocales: const [Locale('ar', 'EG'), Locale('en', 'US')],
       locale: _locale,
 
-      // الهوية البصرية الموحدة (Premium Theme)
+      // إعدادات التصميم الموحد (Theming)
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1B4D57), // اللون البترولي الأساسي
-          primary: const Color(0xFF1B4D57),
-          secondary: const Color(0xFFE67E22), // اللون البرتقالي للتميز
+          seedColor: deepTeal,
+          primary: deepTeal,
+          secondary: safetyOrange,
+          surface: Colors.white,
         ),
+
+        // إعدادات الخلفية العامة
         scaffoldBackgroundColor: const Color(0xFFF4F7F8),
 
-        // تطبيق خط Cairo عالمياً لضمان الفخامة
-        textTheme: GoogleFonts.cairoTextTheme(Theme.of(context).textTheme),
+        // تطبيق خط Cairo الفخم على كل نصوص التطبيق
+        textTheme:
+            GoogleFonts.cairoTextTheme(Theme.of(context).textTheme).apply(
+          bodyColor: deepTeal,
+          displayColor: deepTeal,
+        ),
+
+        // تحسين تصميم الأزرار بشكل افتراضي
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: deepTeal,
+            foregroundColor: Colors.white,
+            textStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
       ),
 
-      // نظام المسارات (Navigation Routes)
+      // إدارة التنقل (Routing System)
       initialRoute: '/',
       routes: {
         '/': (context) => const SplashScreen(),
-        '/login': (context) =>
-            const LoginScreen(), // هذا المسار هو مفتاح زر تسجيل الخروج
+        '/login': (context) => const LoginScreen(),
         '/home': (context) => const MainWrapper(),
         '/about': (context) => const AboutScreen(),
+        '/admin': (context) => const AdminPanel(),
       },
     );
-  }
-}
-
-// كلاس النصوص الموحد للترجمة (تم تحديث المسميات لأبطال Pro)
-class AppStrings {
-  static final Map<String, Map<String, String>> _values = {
-    'ar': {
-      'home': 'الرئيسية',
-      'maps': 'الماستر بلان',
-      'league': 'الدوري',
-      'profile': 'حسابي',
-      'lang': 'English',
-      'support': 'الدعم الفني',
-      'about': 'حول أبطال Pro', // تعديل المسمى
-      'welcome': 'بطل Pro المتألق', // تعديل المسمى
-    },
-    'en': {
-      'home': 'Home',
-      'maps': 'Master Plan',
-      'league': 'League',
-      'profile': 'Profile',
-      'lang': 'العربية',
-      'support': 'Support',
-      'about': 'About Pro Heroes',
-      'welcome': 'Brilliant Pro Hero',
-    }
-  };
-
-  static String get(BuildContext context, String key) {
-    String code = Localizations.localeOf(context).languageCode;
-    return _values[code]?[key] ?? key;
   }
 }
