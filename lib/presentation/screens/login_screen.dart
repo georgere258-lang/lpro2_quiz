@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 // تصحيح المسارات للوصول للثوابت والغلاف الرئيسي
 import '../../core/constants/app_colors.dart';
@@ -23,13 +24,24 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final TextEditingController phoneController = TextEditingController();
 
-  // نظام الـ 6 خانات
   final List<TextEditingController> otpControllers =
       List.generate(6, (index) => TextEditingController());
   final List<FocusNode> otpFocusNodes =
       List.generate(6, (index) => FocusNode());
 
-  // دالة إرسال الرمز (OTP)
+  void _activateNotifications(String uid) async {
+    try {
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+      await messaging.subscribeToTopic('all_users');
+      await messaging.subscribeToTopic(uid);
+      if (uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
+        await messaging.subscribeToTopic('admin_notifications');
+      }
+    } catch (e) {
+      debugPrint("Notification Activation Error: $e");
+    }
+  }
+
   void _sendOtp() async {
     String phone = phoneController.text.trim();
     if (phone.startsWith('0')) {
@@ -69,7 +81,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // دالة تأكيد الرمز
   void _verifyOtp() async {
     String otp = otpControllers.map((e) => e.text).join();
     if (otp.length < 6) {
@@ -92,10 +103,11 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // الربط التشغيلي وحفظ البيانات
   void _navigateUser() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
+      _activateNotifications(user.uid);
+
       try {
         final userDoc = await FirebaseFirestore.instance
             .collection('users')
@@ -103,7 +115,6 @@ class _LoginScreenState extends State<LoginScreen> {
             .get();
 
         if (!userDoc.exists) {
-          // إنشاء حساب جديد مع تصفير النقاط والرتبة الافتراضية
           await FirebaseFirestore.instance
               .collection('users')
               .doc(user.uid)
@@ -192,29 +203,49 @@ class _LoginScreenState extends State<LoginScreen> {
                             isOtpStage ? _buildOtpInput() : _buildPhoneInput(),
                       ),
                       const SizedBox(height: 40),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 55,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.secondaryOrange,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15)),
+
+                      // --- الحل النهائي لمشكلة توسيط النص في المربع البرتقالي ---
+                      Center(
+                        child: SizedBox(
+                          width: 150,
+                          height: 50,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.secondaryOrange,
+                              elevation: 0,
+                              padding:
+                                  EdgeInsets.zero, // إلغاء أي بادينج افتراضي
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15)),
+                            ),
+                            onPressed: isOtpStage ? _verifyOtp : _sendOtp,
+                            child: Container(
+                              alignment:
+                                  Alignment.center, // إجبار التوسط الحسابي
+                              child: Text(
+                                isOtpStage ? "تأكيد" : "إرسال",
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.cairo(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    height:
+                                        1.0, // إلغاء المسافات العمودية الافتراضية
+                                    fontSize: 18),
+                              ),
+                            ),
                           ),
-                          onPressed: isOtpStage ? _verifyOtp : _sendOtp,
-                          child: Text(
-                              isOtpStage ? "تأكيد والدخول" : "إرسال رمز التحقق",
-                              style: GoogleFonts.cairo(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18)),
                         ),
                       ),
+
                       if (isOtpStage)
-                        TextButton(
-                          onPressed: () => setState(() => isOtpStage = false),
-                          child: Text("تعديل رقم الهاتف؟",
-                              style: GoogleFonts.cairo(color: Colors.white60)),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 15),
+                          child: TextButton(
+                            onPressed: () => setState(() => isOtpStage = false),
+                            child: Text("تعديل رقم الهاتف؟",
+                                style:
+                                    GoogleFonts.cairo(color: Colors.white60)),
+                          ),
                         )
                     ],
                   ),
@@ -258,7 +289,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.1),
+        fillColor: Colors.white.withValues(alpha: 0.1),
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(15),
             borderSide: BorderSide.none),
@@ -268,33 +299,51 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildOtpInput() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(
         6,
-        (index) => SizedBox(
+        (index) => Container(
           width: 45,
-          child: TextField(
-            controller: otpControllers[index],
-            focusNode: otpFocusNodes[index],
-            textAlign: TextAlign.center,
-            keyboardType: TextInputType.number,
-            maxLength: 1,
-            onChanged: (val) {
-              if (val.length == 1 && index < 5)
-                otpFocusNodes[index + 1].requestFocus();
-              if (val.isEmpty && index > 0)
-                otpFocusNodes[index - 1].requestFocus();
-            },
-            style: const TextStyle(
-                color: Colors.black, fontSize: 22, fontWeight: FontWeight.bold),
-            decoration: InputDecoration(
-              counterText: "",
-              filled: true,
-              fillColor: Colors.white,
-              contentPadding: EdgeInsets.zero,
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none),
+          height: 55,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: ColorScheme.fromSwatch()
+                  .copyWith(primary: Colors.transparent),
+            ),
+            child: TextField(
+              controller: otpControllers[index],
+              focusNode: otpFocusNodes[index],
+              textAlign: TextAlign.center,
+              keyboardType: TextInputType.number,
+              maxLength: 1,
+              showCursor: false,
+              onChanged: (val) {
+                if (val.length == 1 && index < 5) {
+                  otpFocusNodes[index + 1].requestFocus();
+                }
+                if (val.isEmpty && index > 0) {
+                  otpFocusNodes[index - 1].requestFocus();
+                }
+              },
+              style: GoogleFonts.poppins(
+                  color: Colors.black,
+                  fontSize: 22,
+                  height: 1.0,
+                  fontWeight: FontWeight.bold),
+              decoration: const InputDecoration(
+                counterText: "",
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+                focusedBorder: InputBorder.none,
+                enabledBorder: InputBorder.none,
+              ),
             ),
           ),
         ),

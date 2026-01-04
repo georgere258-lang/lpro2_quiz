@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:googleapis_auth/auth_io.dart' as auth;
 
 // استيراد الثوابت المركزية
 import '../../core/constants/app_colors.dart';
@@ -25,12 +28,57 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
     super.dispose();
   }
 
+  // --- دالة إرسال الإشعار للمديرة ---
+  Future<void> _sendNotificationToAdmin(
+      String userName, String messageText) async {
+    auth.AutoRefreshingAuthClient? client;
+    try {
+      final jsonString =
+          await rootBundle.loadString('assets/service_account.json');
+      final Map<String, dynamic> jsonMap = jsonDecode(jsonString);
+      final String projectName = jsonMap['project_id'];
+      final accountCredentials =
+          auth.ServiceAccountCredentials.fromJson(jsonMap);
+      final scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
+
+      client = await auth.clientViaServiceAccount(accountCredentials, scopes);
+      final String url =
+          'https://fcm.googleapis.com/v1/projects/$projectName/messages:send';
+
+      await client.post(
+        Uri.parse(url),
+        body: jsonEncode({
+          'message': {
+            'topic':
+                'admin_notifications', // سنفترض أنكِ مشتركة في هذا التوبيك كمديرة
+            'notification': {
+              'title': 'رسالة دعم جديدة 💬',
+              'body': 'من $userName: $messageText'
+            },
+            'android': {
+              'notification': {
+                'channel_id': 'lpro_notifications',
+                'priority': 'high',
+              },
+            },
+          }
+        }),
+      );
+    } catch (e) {
+      debugPrint("FCM Error to Admin: $e");
+    } finally {
+      client?.close();
+    }
+  }
+
   void _send() async {
-    if (_msgController.text.trim().isEmpty || user == null || _isSending)
+    if (_msgController.text.trim().isEmpty || user == null || _isSending) {
       return;
+    }
 
     setState(() => _isSending = true);
     String txt = _msgController.text.trim();
+    String uName = user!.displayName ?? "عضو L Pro";
     _msgController.clear();
 
     try {
@@ -52,10 +100,13 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
           .set({
         'lastMessage': txt,
         'lastUpdate': FieldValue.serverTimestamp(),
-        'userName': user!.displayName ?? "عضو L Pro",
+        'userName': uName,
         'userId': user!.uid,
         'unreadByAdmin': true,
       }, SetOptions(merge: true));
+
+      // 3. إرسال الإشعار للمديرة
+      _sendNotificationToAdmin(uName, txt);
     } catch (e) {
       debugPrint("Error sending message: $e");
     } finally {
@@ -92,9 +143,7 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-
                 var docs = snapshot.data?.docs ?? [];
-
                 return ListView.builder(
                   reverse: true,
                   padding:
@@ -107,7 +156,6 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
                           false,
                           null);
                     }
-
                     var d = docs[i].data() as Map<String, dynamic>;
                     bool isMe = d['senderId'] == user?.uid;
                     return _buildChatBubble(
@@ -125,7 +173,6 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
 
   Widget _buildChatBubble(String text, bool isMe, Timestamp? ts) {
     String time = ts != null ? DateFormat('hh:mm a').format(ts.toDate()) : "";
-
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Column(
@@ -149,7 +196,7 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
                 BoxShadow(
                     color: Colors.black.withOpacity(0.04),
                     blurRadius: 8,
-                    offset: const Offset(0, 3)),
+                    offset: const Offset(0, 3))
               ],
             ),
             child: Text(

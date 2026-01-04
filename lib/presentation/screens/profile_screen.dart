@@ -13,7 +13,10 @@ import 'login_screen.dart';
 import 'admin_panel.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  // إضافة الوظيفة المطلوبة لفتح شاشة الدعم من الـ MainWrapper
+  final VoidCallback? onSupportPressed;
+
+  const ProfileScreen({super.key, this.onSupportPressed});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -27,7 +30,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final Color safetyOrange = AppColors.secondaryOrange;
   final Color lightTeal = const Color(0xFF4FA8A8);
 
-  // قائمة الأيقونات التي يمكن للمستخدم اختيارها كصورة شخصية (Avatars)
   final List<IconData> avatars = [
     Icons.person_pin,
     Icons.face_retouching_natural,
@@ -37,7 +39,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Icons.account_circle,
   ];
 
-  // دالة تحديد اللقب التحفيزي بناءً على إجمالي النقاط
   String _getMotivationalRank(int points) {
     if (points >= 1500) return "مستشار L Pro العالمي 👑";
     if (points >= 1000) return "خبير L Pro المتميز 🔥";
@@ -46,7 +47,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return "عضو جديد 🌱";
   }
 
-  // دالة اختيار الصورة الشخصية الافتراضية
   void _showAvatarPicker() {
     showModalBottomSheet(
       context: context,
@@ -68,7 +68,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               itemCount: avatars.length,
               itemBuilder: (ctx, i) => InkWell(
                 onTap: () async {
-                  // هنا يمكنك حفظ رقم الأيقونة مستقبلاً، حالياً سنقوم بتحديث واجهة المستخدم
                   await FirebaseFirestore.instance
                       .collection('users')
                       .doc(user!.uid)
@@ -234,6 +233,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Icons.share_outlined,
                     () => Share.share(
                         "انضم لتحدي L Pro وطور مهاراتك العقارية! 🚀")),
+
+                // --- إضافة زر الدعم الفني هنا ---
+                _buildProfileBtn(
+                    "الدعم الفني المباشر",
+                    Icons.headset_mic_outlined,
+                    widget.onSupportPressed ?? () {},
+                    iconColor: Colors.blueAccent),
+
                 _buildProfileBtn("حول التطبيق", Icons.info_outline_rounded, () {
                   Navigator.push(context,
                       MaterialPageRoute(builder: (c) => const AboutScreen()));

@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:googleapis_auth/auth_io.dart' as auth;
 
-// استيراد الثوابت المركزية لتوحيد الهوية البصرية
+// استيراد الثوابت المركزية
 import '../../core/constants/app_colors.dart';
 
 class AdminReplyScreen extends StatefulWidget {
@@ -22,7 +25,7 @@ class AdminReplyScreen extends StatefulWidget {
 class _AdminReplyScreenState extends State<AdminReplyScreen> {
   final TextEditingController _replyController = TextEditingController();
   final Color deepTeal = AppColors.primaryDeepTeal;
-  bool _isSending = false; // لمنع الإرسال المتعدد
+  bool _isSending = false;
 
   @override
   void initState() {
@@ -32,9 +35,54 @@ class _AdminReplyScreenState extends State<AdminReplyScreen> {
 
   @override
   void dispose() {
-    // خطوة هندسية هامة لمنع تسريب الذاكرة
     _replyController.dispose();
     super.dispose();
+  }
+
+  // --- دالة إرسال إشعار للمستخدم الفردي ---
+  Future<void> _sendNotificationToUser(
+      String targetUserId, String replyText) async {
+    auth.AutoRefreshingAuthClient? client;
+    try {
+      final jsonString =
+          await rootBundle.loadString('assets/service_account.json');
+      final Map<String, dynamic> jsonMap = jsonDecode(jsonString);
+      final String projectName = jsonMap['project_id'];
+      final accountCredentials =
+          auth.ServiceAccountCredentials.fromJson(jsonMap);
+      final scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
+
+      client = await auth.clientViaServiceAccount(accountCredentials, scopes);
+      final String url =
+          'https://fcm.googleapis.com/v1/projects/$projectName/messages:send';
+
+      // سنرسل الإشعار عبر "Topic" خاص بالـ UID الخاص بالمستخدم لضمان وصولها له وحده
+      await client.post(
+        Uri.parse(url),
+        body: jsonEncode({
+          'message': {
+            'topic':
+                targetUserId, // المستخدم يشترك تلقائياً في توبيك يحمل الـ UID الخاص به
+            'notification': {
+              'title': 'رد جديد من الإدارة ✉️',
+              'body': replyText
+            },
+            'android': {
+              'notification': {
+                'channel_id': 'lpro_notifications',
+                'priority': 'high',
+                'sound': 'default',
+              },
+            },
+          }
+        }),
+      );
+      debugPrint("Reply Notification Sent to User: $targetUserId");
+    } catch (e) {
+      debugPrint("FCM Reply Error: $e");
+    } finally {
+      client?.close();
+    }
   }
 
   void _markAsRead() async {
@@ -67,7 +115,7 @@ class _AdminReplyScreenState extends State<AdminReplyScreen> {
         'timestamp': FieldValue.serverTimestamp(),
       });
 
-      // 2. تحديث المستند الرئيسي (Metadata)
+      // 2. تحديث المستند الرئيسي
       await FirebaseFirestore.instance
           .collection('support_chats')
           .doc(widget.userId)
@@ -76,6 +124,9 @@ class _AdminReplyScreenState extends State<AdminReplyScreen> {
         'lastUpdate': FieldValue.serverTimestamp(),
         'unreadByAdmin': false,
       });
+
+      // 3. إرسال الإشعار للمستخدم
+      await _sendNotificationToUser(widget.userId, replyText);
     } catch (e) {
       _showErrorSnackBar("فشل إرسال الرد، حاول مجدداً");
     } finally {
@@ -137,8 +188,8 @@ class _AdminReplyScreenState extends State<AdminReplyScreen> {
                   itemCount: docs.length,
                   itemBuilder: (context, index) {
                     var data = docs[index].data() as Map<String, dynamic>;
-                    bool isAdmin = data['senderId'] == 'admin';
-                    return _buildChatBubble(data['text'] ?? "", isAdmin);
+                    bool isAdminMsg = data['senderId'] == 'admin';
+                    return _buildChatBubble(data['text'] ?? "", isAdminMsg);
                   },
                 );
               },
@@ -150,35 +201,33 @@ class _AdminReplyScreenState extends State<AdminReplyScreen> {
     );
   }
 
-  Widget _buildChatBubble(String text, bool isAdmin) {
+  Widget _buildChatBubble(String text, bool isAdminMsg) {
     return Align(
-      alignment: isAdmin ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: isAdminMsg ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 6),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
-        ),
+        constraints:
+            BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
         decoration: BoxDecoration(
-          color: isAdmin ? deepTeal : Colors.white,
+          color: isAdminMsg ? deepTeal : Colors.white,
           borderRadius: BorderRadius.only(
             topRight: const Radius.circular(18),
             topLeft: const Radius.circular(18),
-            bottomLeft: isAdmin ? const Radius.circular(18) : Radius.zero,
-            bottomRight: isAdmin ? Radius.zero : const Radius.circular(18),
+            bottomLeft: isAdminMsg ? const Radius.circular(18) : Radius.zero,
+            bottomRight: isAdminMsg ? Radius.zero : const Radius.circular(18),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 3)),
           ],
         ),
         child: Text(
           text,
           style: GoogleFonts.cairo(
-            color: isAdmin ? Colors.white : Colors.black87,
+            color: isAdminMsg ? Colors.white : Colors.black87,
             fontSize: 13,
             height: 1.5,
           ),
@@ -199,10 +248,9 @@ class _AdminReplyScreenState extends State<AdminReplyScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 15,
-            offset: const Offset(0, -5),
-          ),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 15,
+              offset: const Offset(0, -5))
         ],
       ),
       child: Row(

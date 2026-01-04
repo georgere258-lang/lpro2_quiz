@@ -3,12 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // أضفنا استيراد FirebaseAuth
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-// استيراد الملفات الضرورية
+// المسارات البرمجية الخاصة بمشروعك
 import 'package:lpro2_quiz/firebase_options.dart';
 import 'package:lpro2_quiz/core/theme/app_theme.dart';
+import 'package:lpro2_quiz/core/utils/sound_manager.dart';
 import 'package:lpro2_quiz/presentation/screens/splash_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/login_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/complete_profile_screen.dart';
@@ -16,13 +18,11 @@ import 'package:lpro2_quiz/presentation/screens/main_wrapper.dart';
 import 'package:lpro2_quiz/presentation/screens/about_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/admin_panel.dart';
 
-// 1. معالج الرسائل في الخلفية (يعمل حتى لو التطبيق مغلق)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 }
 
-// 2. إعداد قناة الإشعارات لنظام أندرويد (High Importance لظهور الإشعار فوراً)
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
   'lpro_notifications',
   'L Pro Notifications',
@@ -37,44 +37,65 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    // تهيئة Firebase الأساسية
     await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform);
 
-    // تسجيل معالج الخلفية
+    SoundManager.init();
+
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    // تهيئة الإشعارات المحلية
+    // إعداد الإشعارات المحلية
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const InitializationSettings initializationSettings =
+        InitializationSettings(android: initializationSettingsAndroid);
+
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
     await flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
 
-    // طلب إذن نظام الأندرويد لإظهار الإشعارات
+    // طلب الصلاحيات
     await Permission.notification.request();
 
     FirebaseMessaging messaging = FirebaseMessaging.instance;
 
-    // الاشتراك في قناة الإرسال الجماعي (التي نستخدمها من لوحة التحكم)
+    // 1. الاشتراك في القناة العامة للأخبار
     await messaging.subscribeToTopic('all_users');
 
-    // طلب صلاحيات الـ Alerts و الـ Sounds
-    await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    // 2. تحديث التوافق: الاشتراك التلقائي للمستخدم في قناته الخاصة وللإدارة
+    _subscribeToNotificationTopics();
+
+    await messaging.requestPermission(alert: true, badge: true, sound: true);
   } catch (e) {
     debugPrint("Initialization Error: $e");
   }
 
-  // تثبيت اتجاه الشاشة ليكون رأسي دائماً
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
   runApp(const LProApp());
+}
+
+// --- دالة الاشتراك في مواضيع الإشعارات ---
+void _subscribeToNotificationTopics() {
+  FirebaseAuth.instance.authStateChanges().listen((User? user) {
+    if (user != null) {
+      // اشتراك المستخدم في قناة تحمل الـ UID الخاص به لاستقبال ردود الدعم
+      FirebaseMessaging.instance.subscribeToTopic(user.uid);
+
+      // إذا كان هذا المستخدم هو أنتِ (المديرة)، يتم اشتراكه في قناة تنبيهات الإدارة
+      if (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
+        FirebaseMessaging.instance.subscribeToTopic('admin_notifications');
+        debugPrint("Admin Subscribed to Admin Notifications Topic ✅");
+      }
+      debugPrint("User Subscribed to Personal Topic: ${user.uid} ✅");
+    }
+  });
 }
 
 class LProApp extends StatefulWidget {
@@ -103,7 +124,6 @@ class _LProAppState extends State<LProApp> {
   }
 
   void _setupInteractedMessages() {
-    // استقبال الإشعارات والتطبيق مفتوح في الـ Foreground
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       RemoteNotification? notification = message.notification;
       AndroidNotification? android = message.notification?.android;
@@ -119,26 +139,23 @@ class _LProAppState extends State<LProApp> {
               channel.name,
               channelDescription: channel.description,
               icon: '@mipmap/ic_launcher',
+              importance: Importance.max,
+              priority: Priority.high,
             ),
           ),
         );
       }
     });
 
-    // التعامل مع فتح التطبيق من خلال إشعار وهو مغلق تماماً
     FirebaseMessaging.instance.getInitialMessage().then((message) {
-      if (message != null) {
-        _handleMessageNavigation(message);
-      }
+      if (message != null) _handleMessageNavigation(message);
     });
 
-    // التعامل مع فتح التطبيق من خلال إشعار وهو في الخلفية (Background)
     FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageNavigation);
   }
 
   void _handleMessageNavigation(RemoteMessage message) {
-    debugPrint("Notification Clicked: ${message.data}");
-    // ملاحظة لمريم: هنا يمكنك مستقبلاً إضافة كود التوجيه لصفحة معينة بناءً على الـ data
+    // يمكنك هنا إضافة كود للتوجيه لصفحة الدعم إذا كان الإشعار يحتوي على داتا معينة
   }
 
   @override

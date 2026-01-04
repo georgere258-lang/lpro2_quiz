@@ -1,16 +1,13 @@
-import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
-// تم حذف سطر http غير المستخدم وحل مشكلة projectId
 import 'package:googleapis_auth/auth_io.dart' as auth;
 import 'package:flutter/services.dart' show rootBundle;
 
-import '../../core/constants/app_colors.dart';
-import 'admin_messages_list.dart';
+// استيراد الثوابت والصفحات
+import 'package:lpro2_quiz/core/constants/app_colors.dart';
+import 'package:lpro2_quiz/presentation/screens/admin_messages_list.dart';
 
 class AdminPanel extends StatefulWidget {
   const AdminPanel({super.key});
@@ -38,8 +35,7 @@ class _AdminPanelState extends State<AdminPanel> {
             indicatorColor: AppColors.secondaryOrange,
             indicatorWeight: 3,
             labelColor: Colors.white,
-            unselectedLabelColor:
-                Colors.white.withValues(alpha: 0.6), // حل مشكلة withOpacity
+            unselectedLabelColor: Colors.white.withAlpha(150),
             labelStyle:
                 GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
             tabs: const [
@@ -65,34 +61,27 @@ class _AdminPanelState extends State<AdminPanel> {
   }
 }
 
-// --- دالة إرسال الإشعارات المركزية (تصحيح خطأ projectId) ---
+// --- دالة إرسال الإشعارات (تعمل مجاناً) ---
 Future<void> _sendNotification(String title, String body) async {
+  auth.AutoRefreshingAuthClient? client;
   try {
     final jsonString =
         await rootBundle.loadString('assets/service_account.json');
     final Map<String, dynamic> jsonMap = jsonDecode(jsonString);
-
-    // حل مشكلة projectId: نقرأها مباشرة من الخريطة (Map)
     final String projectName = jsonMap['project_id'];
-
     final accountCredentials = auth.ServiceAccountCredentials.fromJson(jsonMap);
     final scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
 
-    final client =
-        await auth.clientViaServiceAccount(accountCredentials, scopes);
-
+    client = await auth.clientViaServiceAccount(accountCredentials, scopes);
     final String url =
         'https://fcm.googleapis.com/v1/projects/$projectName/messages:send';
 
-    final response = await client.post(
+    await client.post(
       Uri.parse(url),
       body: jsonEncode({
         'message': {
           'topic': 'all_users',
-          'notification': {
-            'title': title,
-            'body': body,
-          },
+          'notification': {'title': title, 'body': body},
           'android': {
             'notification': {
               'channel_id': 'lpro_notifications',
@@ -102,19 +91,14 @@ Future<void> _sendNotification(String title, String body) async {
         }
       }),
     );
-
-    if (response.statusCode == 200) {
-      debugPrint("Notification Sent Successfully! ✅");
-    } else {
-      debugPrint("FCM Error: ${response.body}");
-    }
-    client.close();
   } catch (e) {
-    debugPrint("Network Error: $e");
+    debugPrint("FCM Error: $e");
+  } finally {
+    client?.close();
   }
 }
 
-// --- 1. إدارة الأعضاء (حل مشكلة curly braces) ---
+// --- 1. إدارة الأعضاء ---
 class UserManager extends StatefulWidget {
   const UserManager({super.key});
   @override
@@ -131,7 +115,10 @@ class _UserManagerState extends State<UserManager> {
             "بحث بالاسم أو الرقم...", (v) => setState(() => query = v)),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('users').snapshots(),
+            stream: FirebaseFirestore.instance
+                .collection('users')
+                .limit(100)
+                .snapshots(),
             builder: (context, snapshot) {
               if (!snapshot.hasData) {
                 return const Center(child: CircularProgressIndicator());
@@ -156,7 +143,7 @@ class _UserManagerState extends State<UserManager> {
                       title: Text(userData['name'] ?? "بدون اسم",
                           style:
                               GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-                      subtitle: Text(userData['phone'] ?? "بدون رقم هاتفي"),
+                      subtitle: Text(userData['phone'] ?? "بدون رقم"),
                       trailing: IconButton(
                         icon: Icon(Icons.block,
                             color: isBlocked ? Colors.red : Colors.grey),
@@ -194,7 +181,6 @@ class _UserManagerState extends State<UserManager> {
             _infoRow("الهاتف:", data['phone'] ?? "غير متوفر"),
             _infoRow("إجمالي النقاط:", "${data['points'] ?? 0}"),
             _infoRow("نقاط النجوم:", "${data['starsPoints'] ?? 0}"),
-            _infoRow("نقاط المحترفين:", "${data['proPoints'] ?? 0}"),
           ],
         ),
       ),
@@ -242,36 +228,35 @@ class NewsManager extends StatelessWidget {
   void _showAddNews(BuildContext context) {
     TextEditingController c = TextEditingController();
     showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-              title: Text("إضافة خبر", style: GoogleFonts.cairo()),
-              content: TextField(
-                  controller: c,
-                  decoration: const InputDecoration(hintText: "نص الخبر")),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text("إلغاء")),
-                ElevatedButton(
-                    onPressed: () async {
-                      if (c.text.isNotEmpty) {
-                        await FirebaseFirestore.instance
-                            .collection('news')
-                            .add({
-                          'content': c.text,
-                          'createdAt': FieldValue.serverTimestamp()
-                        });
-                        _sendNotification("خبر عاجل ⚡", c.text);
-                        if (context.mounted) Navigator.pop(ctx);
-                      }
-                    },
-                    child: const Text("إضافة وإرسال إشعار"))
-              ],
-            ));
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text("إضافة خبر", style: GoogleFonts.cairo()),
+        content: TextField(
+            controller: c,
+            decoration: const InputDecoration(hintText: "نص الخبر")),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text("إلغاء")),
+          ElevatedButton(
+            onPressed: () async {
+              if (c.text.isNotEmpty) {
+                await FirebaseFirestore.instance.collection('news').add({
+                  'content': c.text,
+                  'createdAt': FieldValue.serverTimestamp()
+                });
+                _sendNotification("خبر عاجل ⚡", c.text);
+                if (context.mounted) Navigator.pop(ctx);
+              }
+            },
+            child: const Text("إرسال"),
+          )
+        ],
+      ),
+    );
   }
 }
 
-// --- 3. إدارة الأسئلة ---
+// --- 3. إدارة الأسئلة (تم التعديل لتخطي الـ Storage) ---
 class QuizManager extends StatefulWidget {
   const QuizManager({super.key});
   @override
@@ -280,13 +265,6 @@ class QuizManager extends StatefulWidget {
 
 class _QuizManagerState extends State<QuizManager> {
   String query = "";
-  File? _quizImage;
-
-  Future<void> _pickQuizImage(StateSetter setModalState) async {
-    final picked = await ImagePicker()
-        .pickImage(source: ImageSource.gallery, imageQuality: 70);
-    if (picked != null) setModalState(() => _quizImage = File(picked.path));
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -335,10 +313,10 @@ class _QuizManagerState extends State<QuizManager> {
 
   void _showQuizForm() {
     final qC = TextEditingController();
+    final imgC = TextEditingController(); // حقل رابط الصورة
     final optC = List.generate(4, (i) => TextEditingController());
     int correct = 0;
     String cat = "دوري النجوم";
-    bool uploading = false;
 
     showModalBottomSheet(
       context: context,
@@ -354,20 +332,15 @@ class _QuizManagerState extends State<QuizManager> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text("إضافة سؤال للتحدي",
+                Text("إضافة سؤال (عن طريق الرابط)",
                     style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-                GestureDetector(
-                  onTap: () => _pickQuizImage(setModalState),
-                  child: Container(
-                    height: 120,
-                    width: double.infinity,
-                    margin: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(10)),
-                    child: _quizImage != null
-                        ? Image.file(_quizImage!, fit: BoxFit.cover)
-                        : const Icon(Icons.add_a_photo, size: 40),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: imgC,
+                  decoration: const InputDecoration(
+                    labelText: "رابط الصورة (اختياري)",
+                    hintText: "انسخ رابط الصورة من ImgBB أو جوجل",
+                    prefixIcon: Icon(Icons.link),
                   ),
                 ),
                 DropdownButton<String>(
@@ -397,40 +370,25 @@ class _QuizManagerState extends State<QuizManager> {
                         ])),
                 const SizedBox(height: 20),
                 ElevatedButton(
-                  onPressed: uploading
-                      ? null
-                      : () async {
-                          if (qC.text.isEmpty) return;
-                          setModalState(() => uploading = true);
-                          String url = "";
-                          if (_quizImage != null) {
-                            var ref = FirebaseStorage.instance.ref().child(
-                                'quizzes/${DateTime.now().millisecondsSinceEpoch}.jpg');
-                            await ref.putFile(_quizImage!);
-                            url = await ref.getDownloadURL();
-                          }
-                          await FirebaseFirestore.instance
-                              .collection('quizzes')
-                              .add({
-                            'question': qC.text,
-                            'options': optC.map((e) => e.text).toList(),
-                            'correctAnswer': correct,
-                            'category': cat,
-                            'imageUrl': url
-                          });
-                          _sendNotification("تحدي جديد 🏆",
-                              "تم إضافة سؤال جديد في $cat.. ادخل وجاوب!");
-                          if (context.mounted) Navigator.pop(context);
-                          setState(() => _quizImage = null);
-                        },
+                  onPressed: () async {
+                    if (qC.text.isEmpty) return;
+                    await FirebaseFirestore.instance.collection('quizzes').add({
+                      'question': qC.text,
+                      'options': optC.map((e) => e.text).toList(),
+                      'correctAnswer': correct,
+                      'category': cat,
+                      'imageUrl': imgC.text // حفظ الرابط مباشرة
+                    });
+                    _sendNotification(
+                        "تحدي جديد 🏆", "تم إضافة سؤال جديد في $cat");
+                    if (context.mounted) Navigator.pop(context);
+                  },
                   style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryDeepTeal),
-                  child: uploading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text("حفظ وإرسال تنبيه",
-                          style: TextStyle(color: Colors.white)),
+                  child: const Text("حفظ ونشر",
+                      style: TextStyle(color: Colors.white)),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -442,55 +400,53 @@ class _QuizManagerState extends State<QuizManager> {
   void _showBulkUpload(BuildContext context) {
     TextEditingController bulk = TextEditingController();
     showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-              title: Text("رفع مجمع", style: GoogleFonts.cairo()),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                      "التنسيق: سؤال#خيار1,خيار2,خيار3,خيار4#رقم_الاجابة"),
-                  const SizedBox(height: 10),
-                  TextField(
-                      controller: bulk,
-                      maxLines: 5,
-                      decoration:
-                          const InputDecoration(border: OutlineInputBorder())),
-                ],
-              ),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text("إلغاء")),
-                ElevatedButton(
-                    onPressed: () async {
-                      for (var line in bulk.text.split('\n')) {
-                        if (line.contains('#')) {
-                          var p = line.split('#');
-                          if (p.length >= 3) {
-                            await FirebaseFirestore.instance
-                                .collection('quizzes')
-                                .add({
-                              'question': p[0],
-                              'options': p[1].split(','),
-                              'correctAnswer': int.parse(p[2].trim()),
-                              'category': "دوري النجوم",
-                              'imageUrl': ""
-                            });
-                          }
-                        }
-                      }
-                      _sendNotification("تحديث الدوري 🚀",
-                          "تم إضافة مجموعة أسئلة جديدة.. الترتيب قد يتغير!");
-                      if (context.mounted) Navigator.pop(ctx);
-                    },
-                    child: const Text("رفع الكل وإخطار المستخدمين"))
-              ],
-            ));
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text("رفع مجمع", style: GoogleFonts.cairo()),
+        content: TextField(
+          controller: bulk,
+          maxLines: 5,
+          decoration: const InputDecoration(
+              hintText: "سؤال#خيار1,خيار2,خيار3,خيار4#رقم_الاجابة#رابط_الصورة",
+              border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text("إلغاء")),
+          ElevatedButton(
+            onPressed: () async {
+              final batch = FirebaseFirestore.instance.batch();
+              final lines = bulk.text.split('\n');
+              for (var line in lines) {
+                if (line.contains('#')) {
+                  var p = line.split('#');
+                  if (p.length >= 3) {
+                    var ref =
+                        FirebaseFirestore.instance.collection('quizzes').doc();
+                    batch.set(ref, {
+                      'question': p[0],
+                      'options': p[1].split(','),
+                      'correctAnswer': int.parse(p[2].trim()),
+                      'category': "دوري النجوم",
+                      'imageUrl': p.length > 3 ? p[3].trim() : ""
+                    });
+                  }
+                }
+              }
+              await batch.commit();
+              _sendNotification(
+                  "تحديث الدوري 🚀", "تم إضافة مجموعة أسئلة جديدة");
+              if (context.mounted) Navigator.pop(ctx);
+            },
+            child: const Text("رفع الكل"),
+          )
+        ],
+      ),
+    );
   }
 }
 
-// --- 4. إدارة المواضيع ---
+// --- 4. إدارة المواضيع (تخطي الـ Storage) ---
 class TopicManager extends StatefulWidget {
   const TopicManager({super.key});
   @override
@@ -499,20 +455,12 @@ class TopicManager extends StatefulWidget {
 
 class _TopicManagerState extends State<TopicManager> {
   String query = "";
-  File? _topicImage;
-
-  Future<void> _pickTopicImage(StateSetter setModalState) async {
-    final picked = await ImagePicker()
-        .pickImage(source: ImageSource.gallery, imageQuality: 70);
-    if (picked != null) setModalState(() => _topicImage = File(picked.path));
-  }
-
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _buildActionBtn(
-            context, "إضافة موضوع جديد", Icons.article, () => _showTopicForm()),
+        _buildActionBtn(context, "إضافة موضوع برابط صورة", Icons.article,
+            () => _showTopicForm()),
         _buildSearchField(
             "بحث في المواضيع...", (v) => setState(() => query = v)),
         Expanded(
@@ -544,90 +492,54 @@ class _TopicManagerState extends State<TopicManager> {
   void _showTopicForm() {
     final tC = TextEditingController();
     final cC = TextEditingController();
+    final imgC = TextEditingController();
     String cat = "المعلومة بتفرق";
-    bool uploading = false;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (c) => StatefulBuilder(
-        builder: (context, setModalState) => Padding(
-          padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-              left: 20,
-              right: 20,
-              top: 20),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text("إضافة موضوع تعليمي",
-                    style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-                GestureDetector(
-                  onTap: () => _pickTopicImage(setModalState),
-                  child: Container(
-                    height: 150,
-                    width: double.infinity,
-                    margin: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(10)),
-                    child: _topicImage != null
-                        ? Image.file(_topicImage!, fit: BoxFit.cover)
-                        : const Icon(Icons.add_a_photo, size: 50),
-                  ),
-                ),
-                DropdownButton<String>(
-                  value: cat,
-                  isExpanded: true,
-                  items: ["المعلومة بتفرق", "إعرف عميلك"]
-                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                      .toList(),
-                  onChanged: (v) => setModalState(() => cat = v!),
-                ),
-                TextField(
-                    controller: tC,
-                    decoration: const InputDecoration(labelText: "العنوان")),
-                TextField(
-                    controller: cC,
-                    maxLines: 5,
-                    decoration: const InputDecoration(labelText: "المحتوى")),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: uploading
-                      ? null
-                      : () async {
-                          if (tC.text.isEmpty) return;
-                          setModalState(() => uploading = true);
-                          String url = "";
-                          if (_topicImage != null) {
-                            var ref = FirebaseStorage.instance.ref().child(
-                                'topics/${DateTime.now().millisecondsSinceEpoch}.jpg');
-                            await ref.putFile(_topicImage!);
-                            url = await ref.getDownloadURL();
-                          }
-                          await FirebaseFirestore.instance
-                              .collection('topics')
-                              .add({
-                            'title': tC.text,
-                            'content': cC.text,
-                            'category': cat,
-                            'imageUrl': url
-                          });
-                          _sendNotification("موضوع يهمك 📚", tC.text);
-                          if (context.mounted) Navigator.pop(context);
-                          setState(() => _topicImage = null);
-                        },
-                  style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryDeepTeal),
-                  child: uploading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text("حفظ ونشر إشعار",
-                          style: TextStyle(color: Colors.white)),
-                ),
-                const SizedBox(height: 10),
-              ],
-            ),
+      builder: (c) => Padding(
+        padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 20,
+            right: 20,
+            top: 20),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text("إضافة موضوع تعليمي",
+                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+              TextField(
+                  controller: imgC,
+                  decoration:
+                      const InputDecoration(labelText: "رابط صورة الموضوع")),
+              TextField(
+                  controller: tC,
+                  decoration: const InputDecoration(labelText: "العنوان")),
+              TextField(
+                  controller: cC,
+                  maxLines: 5,
+                  decoration: const InputDecoration(labelText: "المحتوى")),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () async {
+                  if (tC.text.isEmpty) return;
+                  await FirebaseFirestore.instance.collection('topics').add({
+                    'title': tC.text,
+                    'content': cC.text,
+                    'category': cat,
+                    'imageUrl': imgC.text
+                  });
+                  _sendNotification("موضوع يهمك 📚", tC.text);
+                  if (context.mounted) Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryDeepTeal),
+                child: const Text("حفظ", style: TextStyle(color: Colors.white)),
+              ),
+              const SizedBox(height: 20),
+            ],
           ),
         ),
       ),
@@ -640,17 +552,17 @@ Widget _buildSearchField(String hint, Function(String) onChange) {
   return Padding(
     padding: const EdgeInsets.all(12),
     child: TextField(
-        onChanged: onChange,
-        decoration: InputDecoration(
-            hintText: hint,
-            prefixIcon: const Icon(Icons.search),
-            filled: true,
-            fillColor: Colors.white,
-            contentPadding:
-                const EdgeInsets.symmetric(vertical: 0, horizontal: 15),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(15),
-                borderSide: BorderSide.none))),
+      onChanged: onChange,
+      decoration: InputDecoration(
+        hintText: hint,
+        prefixIcon: const Icon(Icons.search),
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: BorderSide.none),
+      ),
+    ),
   );
 }
 
@@ -665,27 +577,25 @@ Widget _buildActionBtn(
           style: GoogleFonts.cairo(
               fontWeight: FontWeight.bold, color: Colors.white, fontSize: 12)),
       style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryDeepTeal,
-          minimumSize: const Size(double.infinity, 45),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+        backgroundColor: AppColors.primaryDeepTeal,
+        minimumSize: const Size(double.infinity, 45),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
     ),
   );
 }
 
 Widget _buildListTile(String title, String sub, VoidCallback onDel) {
   return Card(
-    elevation: 0,
     margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 4),
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
     child: ListTile(
       title: Text(title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-      subtitle: Text(sub, style: const TextStyle(fontSize: 12)),
+          style: const TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text(sub),
       trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+          icon: const Icon(Icons.delete_outline, color: Colors.red),
           onPressed: onDel),
     ),
   );

@@ -16,7 +16,17 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final List<String> _rankingFields = ['points', 'starsPoints', 'proPoints'];
-  final Color turquoiseCyan = const Color(0xFF00CED1); // اللون الفيروزي المعتمد
+  final Color turquoiseCyan = const Color(0xFF00CED1);
+
+  // قائمة الأيقونات المطابقة لما في البروفايل لعرضها في لوحة الصدارة
+  final List<IconData> avatars = [
+    Icons.person_pin,
+    Icons.face_retouching_natural,
+    Icons.sentiment_very_satisfied,
+    Icons.workspace_premium,
+    Icons.stars_rounded,
+    Icons.account_circle,
+  ];
 
   @override
   void initState() {
@@ -37,16 +47,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       appBar: AppBar(
         backgroundColor: AppColors.primaryDeepTeal,
         elevation: 0,
-        toolbarHeight: 2, // مساحة طفيفة جداً للفصل
+        toolbarHeight: 5,
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
           tabAlignment: TabAlignment.center,
           indicatorColor: AppColors.secondaryOrange,
-          indicatorWeight: 3,
+          indicatorWeight: 4,
           labelColor: Colors.white,
-          unselectedLabelColor:
-              Colors.white.withValues(alpha: 0.5), // تحديث: withValues
+          unselectedLabelColor: Colors.white.withValues(alpha: 0.5),
           labelStyle:
               GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
           tabs: const [
@@ -114,7 +123,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   Widget _buildPodiumHeader(
       List<QueryDocumentSnapshot> topThree, String field) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(15, 20, 15, 30),
+      padding: const EdgeInsets.fromLTRB(10, 20, 10, 30),
       decoration: const BoxDecoration(
         color: AppColors.primaryDeepTeal,
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(45)),
@@ -126,9 +135,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (topThree.length >= 2) _buildPodiumItem(topThree[1], 2, 75, field),
-          if (topThree.isNotEmpty) _buildPodiumItem(topThree[0], 1, 100, field),
-          if (topThree.length >= 3) _buildPodiumItem(topThree[2], 3, 70, field),
+          if (topThree.length >= 2) _buildPodiumItem(topThree[1], 2, 70, field),
+          if (topThree.isNotEmpty) _buildPodiumItem(topThree[0], 1, 95, field),
+          if (topThree.length >= 3) _buildPodiumItem(topThree[2], 3, 65, field),
         ],
       ),
     );
@@ -138,10 +147,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       QueryDocumentSnapshot doc, int rank, double size, String field) {
     var data = doc.data() as Map<String, dynamic>;
     Color medalColor = rank == 1
-        ? const Color(0xFFFFD700) // ذهبي
-        : (rank == 2
-            ? const Color(0xFFE0E0E0) // فضي
-            : const Color(0xFFCD7F32)); // برونزي
+        ? const Color(0xFFFFD700)
+        : (rank == 2 ? const Color(0xFFE0E0E0) : const Color(0xFFCD7F32));
+
+    int avatarIdx = data['avatarIndex'] ?? 0;
 
     return Column(
       children: [
@@ -156,65 +165,55 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                       Border.all(color: medalColor, width: rank == 1 ? 4 : 2)),
               child: CircleAvatar(
                 radius: size / 2,
-                backgroundImage:
-                    (data['photoUrl'] != null && data['photoUrl'] != "")
-                        ? NetworkImage(data['photoUrl'])
-                        : null,
                 backgroundColor: Colors.white.withValues(alpha: 0.1),
-                child: (data['photoUrl'] == null || data['photoUrl'] == "")
-                    ? Icon(Icons.person, color: Colors.white, size: size * 0.5)
-                    : null,
+                child: Icon(
+                  avatars[avatarIdx < avatars.length ? avatarIdx : 0],
+                  color: Colors.white,
+                  size: size * 0.6,
+                ),
               ),
             ),
             Positioned(
               top: 0,
               child: CircleAvatar(
-                  radius: 14,
+                  radius: 13,
                   backgroundColor: medalColor,
                   child: Text("$rank",
                       style: const TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
-                          fontSize: 13))),
+                          fontSize: 12))),
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         Text(data['name']?.split(' ')[0] ?? "عضو",
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.cairo(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
-                fontSize: 13)),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CustomPaint(
-                size: const Size(8, 8),
-                painter: SolidTrianglePainter(turquoiseCyan)),
-            const SizedBox(width: 4),
-            Text("${data[field] ?? 0} ن",
-                style: GoogleFonts.poppins(
-                    color: medalColor,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 15)),
-          ],
-        ),
+                fontSize: 12)),
+        Text("${data[field] ?? 0} ن",
+            style: GoogleFonts.poppins(
+                color: medalColor, fontWeight: FontWeight.w900, fontSize: 14)),
       ],
     );
   }
 
   Widget _buildUserTile(int rank, Map<String, dynamic> data, String field) {
+    int avatarIdx = data['avatarIndex'] ?? 0;
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04), // تحديث: withValues
-              blurRadius: 15,
-              offset: const Offset(0, 4))
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 2))
         ],
       ),
       child: Row(
@@ -225,60 +224,39 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                 style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w900,
                     color: Colors.grey[400],
-                    fontSize: 16)),
+                    fontSize: 15)),
           ),
           CircleAvatar(
-            radius: 22,
-            backgroundImage:
-                (data['photoUrl'] != null && data['photoUrl'] != "")
-                    ? NetworkImage(data['photoUrl'])
-                    : null,
+            radius: 20,
             backgroundColor: const Color(0xFFF0F4F5),
-            child: (data['photoUrl'] == null || data['photoUrl'] == "")
-                ? const Icon(Icons.person,
-                    color: AppColors.primaryDeepTeal, size: 22)
-                : null,
+            child: Icon(
+              avatars[avatarIdx < avatars.length ? avatarIdx : 0],
+              color: AppColors.primaryDeepTeal,
+              size: 20,
+            ),
           ),
-          const SizedBox(width: 15),
+          const SizedBox(width: 12),
           Expanded(
               child: Text(data['name'] ?? "عضو L Pro",
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.cairo(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                      fontSize: 13,
                       color: AppColors.primaryDeepTeal))),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
                 color: const Color(0xFFF0F4F5),
-                borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(10)),
             child: Text("${data[field] ?? 0} ن",
                 style: GoogleFonts.poppins(
                     fontWeight: FontWeight.w900,
                     color: AppColors.primaryDeepTeal,
-                    fontSize: 13)),
+                    fontSize: 12)),
           ),
         ],
       ),
     );
   }
-}
-
-class SolidTrianglePainter extends CustomPainter {
-  final Color color;
-  SolidTrianglePainter(this.color);
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    final path = Path();
-    path.moveTo(size.width, 0);
-    path.lineTo(0, size.height / 2);
-    path.lineTo(size.width, size.height);
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

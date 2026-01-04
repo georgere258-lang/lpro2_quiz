@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'admin_reply_screen.dart';
 import 'package:intl/intl.dart';
+
+// استيراد الثوابت والصفحات حسب الهيكل المعتمد
+import 'package:lpro2_quiz/core/constants/app_colors.dart';
+import 'package:lpro2_quiz/presentation/screens/admin_reply_screen.dart';
 
 class AdminMessagesList extends StatelessWidget {
   const AdminMessagesList({super.key});
 
   @override
   Widget build(BuildContext context) {
-    const Color deepTeal = Color(0xFF1B4D57);
-    const Color safetyOrange = Color(0xFFE67E22);
+    // الاعتماد على الألوان المركزية
+    const Color deepTeal = AppColors.primaryDeepTeal;
+    const Color safetyOrange = AppColors.secondaryOrange;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7F8),
+      backgroundColor: AppColors.scaffoldBackground,
       appBar: AppBar(
-        // تم التعديل هنا: حذف كلمة الأبطال
         title: Text(
           "صندوق الرسائل",
           style: GoogleFonts.cairo(
@@ -27,13 +30,13 @@ class AdminMessagesList extends StatelessWidget {
         backgroundColor: deepTeal,
         centerTitle: true,
         elevation: 0,
-        // إضافة أيقونة العودة بلون أبيض لضمان الوضوح
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('support_chats')
             .orderBy('lastUpdate', descending: true)
+            .limit(50) // تحسين جوهري: جلب أحدث 50 محادثة فقط لسرعة الأداء
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -70,7 +73,7 @@ class AdminMessagesList extends StatelessWidget {
               final String name = data['userName'] ?? "مستشار عقاري";
               final bool isUnread = data['unreadByAdmin'] ?? false;
 
-              // تنسيق الوقت بشكل آمن
+              // تنسيق الوقت بشكل آمن واحترافي
               String formattedTime = "";
               if (data['lastUpdate'] != null) {
                 DateTime dt = (data['lastUpdate'] as Timestamp).toDate();
@@ -84,7 +87,7 @@ class AdminMessagesList extends StatelessWidget {
                   borderRadius: BorderRadius.circular(15),
                   side: isUnread
                       ? BorderSide(
-                          color: safetyOrange.withOpacity(0.5),
+                          color: safetyOrange.withValues(alpha: 0.5),
                           width: 1,
                         )
                       : BorderSide.none,
@@ -97,7 +100,7 @@ class AdminMessagesList extends StatelessWidget {
                   leading: Stack(
                     children: [
                       CircleAvatar(
-                        backgroundColor: deepTeal.withOpacity(0.1),
+                        backgroundColor: deepTeal.withValues(alpha: 0.1),
                         child: const Icon(Icons.person, color: deepTeal),
                       ),
                       if (isUnread)
@@ -119,13 +122,16 @@ class AdminMessagesList extends StatelessWidget {
                   title: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        name,
-                        style: GoogleFonts.cairo(
-                          fontWeight:
-                              isUnread ? FontWeight.w900 : FontWeight.bold,
-                          color: deepTeal,
-                          fontSize: 15,
+                      Expanded(
+                        child: Text(
+                          name,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.cairo(
+                            fontWeight:
+                                isUnread ? FontWeight.w900 : FontWeight.bold,
+                            color: deepTeal,
+                            fontSize: 15,
+                          ),
                         ),
                       ),
                       Text(
@@ -151,7 +157,7 @@ class AdminMessagesList extends StatelessWidget {
                   trailing: Icon(
                     Icons.arrow_forward_ios,
                     size: 14,
-                    color: deepTeal.withOpacity(0.3),
+                    color: deepTeal.withValues(alpha: 0.3),
                   ),
                   onTap: () {
                     Navigator.push(

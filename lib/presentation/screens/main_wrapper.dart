@@ -20,20 +20,27 @@ class MainWrapper extends StatefulWidget {
 class _MainWrapperState extends State<MainWrapper> {
   int _currentIndex = 0;
 
-  // قائمة الشاشات - تم الحفاظ عليها كثوابت لتحسين الأداء
-  final List<Widget> _pages = [
-    const HomeScreen(),
-    const LeaderboardScreen(),
-    const ChatSupportScreen(),
-    const ProfileScreen(),
-  ];
+  // القائمة تحتوي على الشاشات الأربعة، شاشة الدعم في الفهرس رقم 3
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = [
+      const HomeScreen(),
+      const LeaderboardScreen(),
+      // نمرر وظيفة تغيير التبويب لصفحة البروفايل لكي تتمكن من فتح الدعم
+      ProfileScreen(onSupportPressed: () {
+        setState(() => _currentIndex = 3);
+      }),
+      const ChatSupportScreen(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
-    // تحديد اللغة لضبط العناوين
     bool isAr = Localizations.localeOf(context).languageCode == 'ar';
 
-    // وظيفة لتحديد عنوان الـ AppBar بناءً على القسم الحالي
     Widget getAppBarTitle() {
       if (_currentIndex == 0) {
         return Image.asset(
@@ -50,12 +57,11 @@ class _MainWrapperState extends State<MainWrapper> {
         );
       }
 
-      // مسميات العناوين المتوافقة مع الهوية الجديدة
       List<String> titles = [
         "",
         isAr ? "دوري المتصدرين" : "Leaderboard",
-        isAr ? "الدعم الفني المباشر" : "Live Support",
-        isAr ? "ملفي الشخصي" : "My Profile"
+        isAr ? "ملفي الشخصي" : "My Profile",
+        isAr ? "الدعم الفني المباشر" : "Support",
       ];
 
       return Text(
@@ -74,9 +80,8 @@ class _MainWrapperState extends State<MainWrapper> {
         backgroundColor: AppColors.primaryDeepTeal,
         elevation: 0,
         centerTitle: true,
-        automaticallyImplyLeading: false, // منع سهم الرجوع التلقائي
+        automaticallyImplyLeading: false,
         title: getAppBarTitle(),
-        // إظهار زر العودة للرئيسية في التبويبات الأخرى
         leading: _currentIndex != 0
             ? IconButton(
                 icon: const Icon(
@@ -88,18 +93,14 @@ class _MainWrapperState extends State<MainWrapper> {
               )
             : null,
       ),
-
-      // IndexedStack يحافظ على حالة الشاشات (State) لمنع إعادة التحميل
       body: IndexedStack(
         index: _currentIndex,
         children: _pages,
       ),
-
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              // تم التعديل هنا للنسخة الأحدث من فلاتر لمنع الخطأ الأحمر
               color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 15,
               offset: const Offset(0, -4),
@@ -107,21 +108,17 @@ class _MainWrapperState extends State<MainWrapper> {
           ],
         ),
         child: BottomNavigationBar(
-          currentIndex: _currentIndex,
+          currentIndex: _currentIndex >= 3 ? 2 : _currentIndex,
           onTap: (i) => setState(() => _currentIndex = i),
           selectedItemColor: AppColors.secondaryOrange,
           unselectedItemColor: Colors.grey[400],
           showUnselectedLabels: true,
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.white,
-          selectedLabelStyle: GoogleFonts.cairo(
-            fontWeight: FontWeight.w900,
-            fontSize: 11,
-          ),
-          unselectedLabelStyle: GoogleFonts.cairo(
-            fontWeight: FontWeight.bold,
-            fontSize: 11,
-          ),
+          selectedLabelStyle:
+              GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 11),
+          unselectedLabelStyle:
+              GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 11),
           items: [
             BottomNavigationBarItem(
               icon: const Icon(Icons.grid_view_outlined),
@@ -132,11 +129,6 @@ class _MainWrapperState extends State<MainWrapper> {
               icon: const Icon(Icons.emoji_events_outlined),
               activeIcon: const Icon(Icons.emoji_events),
               label: isAr ? "الترتيب" : "Rank",
-            ),
-            BottomNavigationBarItem(
-              icon: const Icon(Icons.chat_bubble_outline),
-              activeIcon: const Icon(Icons.chat_bubble),
-              label: isAr ? "دعم" : "Support",
             ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.person_outline),

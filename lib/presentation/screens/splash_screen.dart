@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 // تصحيح المسارات للوصول للثوابت
@@ -33,11 +34,12 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
 
-    // التحقق من حالة المستخدم
+    // تفعيل الإشعارات والاشتراك في القنوات فور الفتح
+    _initNotifications();
+
     final user = FirebaseAuth.instance.currentUser;
     isUserLoggedIn = (user != null);
 
-    // إعداد الإنيميشن
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -60,12 +62,10 @@ class _SplashScreenState extends State<SplashScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    // تشغيل الإنيميشن
     _controller.forward().then((_) {
       if (mounted) _pulseController.repeat(reverse: true);
     });
 
-    // التنقل التلقائي فقط إذا كان المستخدم مسجلاً دخوله
     _navigationTimer = Timer(const Duration(seconds: 3), () {
       if (mounted && isUserLoggedIn) {
         Navigator.pushReplacement(
@@ -74,6 +74,23 @@ class _SplashScreenState extends State<SplashScreen>
         );
       }
     });
+  }
+
+  void _initNotifications() async {
+    try {
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+      await messaging.subscribeToTopic('all_users');
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await messaging.subscribeToTopic(user.uid);
+        if (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
+          await messaging.subscribeToTopic('admin_notifications');
+        }
+      }
+    } catch (e) {
+      debugPrint("FCM Error: $e");
+    }
   }
 
   @override
@@ -88,26 +105,22 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primaryDeepTeal,
-      body: SizedBox(
-        width: double.infinity,
-        height: double.infinity,
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // اللوجو (مع الحفاظ على الأنيميشن والمقاسات)
+            // اللوجو بنسب ثابتة
             ScaleTransition(
               scale: _scaleAnimation,
               child: SvgPicture.asset(
                 'assets/logo.svg',
-                width: MediaQuery.of(context).size.width * 0.9,
+                width: MediaQuery.of(context).size.width * 0.8,
                 fit: BoxFit.contain,
                 placeholderBuilder: (c) =>
-                    const Icon(Icons.business, size: 120, color: Colors.white),
+                    const Icon(Icons.business, size: 100, color: Colors.white),
               ),
             ),
-
-            const SizedBox(height: 20),
-
+            const SizedBox(height: 15),
             FadeTransition(
               opacity: _fadeAnimation,
               child: Column(
@@ -117,26 +130,24 @@ class _SplashScreenState extends State<SplashScreen>
                     child: Text(
                       "المعلومة بتفرق",
                       style: GoogleFonts.cairo(
-                        fontSize: 26,
+                        fontSize: 24,
                         fontWeight: FontWeight.w900,
                         color: AppColors.secondaryOrange,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 45),
-
-                  // إذا لم يكن مسجلاً يظهر زر "يلا Pro"
+                  const SizedBox(height: 35),
                   if (!isUserLoggedIn)
                     SizedBox(
-                      width: 170,
-                      height: 55,
+                      width: 160,
+                      height: 50, // تم ضبط الارتفاع ليكون متناسقاً
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.secondaryOrange,
-                          padding: EdgeInsets
-                              .zero, // إزالة الحواف الداخلية لضمان التوسط
+                          elevation: 0,
+                          padding: EdgeInsets.zero,
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30)),
+                              borderRadius: BorderRadius.circular(25)),
                         ),
                         onPressed: () {
                           Navigator.pushReplacement(
@@ -145,17 +156,14 @@ class _SplashScreenState extends State<SplashScreen>
                                 builder: (c) => const LoginScreen()),
                           );
                         },
-                        child: Center(
-                          // توسيط النص تماماً
-                          child: Text(
-                            "يلا Pro",
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.cairo(
-                              fontSize: 20,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              height: 1.1, // لضبط التوسط الرأسي للنص العربي
-                            ),
+                        child: Text(
+                          "يلا Pro",
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.cairo(
+                            fontSize: 18,
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            height: 1.2, // لتوسيط النص العربي رأسياً
                           ),
                         ),
                       ),
