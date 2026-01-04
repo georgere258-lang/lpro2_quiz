@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // أضفنا استيراد FirebaseAuth
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -40,6 +40,7 @@ void main() async {
     await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform);
 
+    // تهيئة مدير الصوت
     SoundManager.init();
 
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -57,7 +58,7 @@ void main() async {
             AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
 
-    // طلب الصلاحيات
+    // طلب صلاحيات الإشعارات
     await Permission.notification.request();
 
     FirebaseMessaging messaging = FirebaseMessaging.instance;
@@ -65,7 +66,7 @@ void main() async {
     // 1. الاشتراك في القناة العامة للأخبار
     await messaging.subscribeToTopic('all_users');
 
-    // 2. تحديث التوافق: الاشتراك التلقائي للمستخدم في قناته الخاصة وللإدارة
+    // 2. تحديث التوافق: الاشتراك التلقائي في قنوات الدعم والإدارة
     _subscribeToNotificationTopics();
 
     await messaging.requestPermission(alert: true, badge: true, sound: true);
@@ -73,6 +74,7 @@ void main() async {
     debugPrint("Initialization Error: $e");
   }
 
+  // تثبيت وضع الشاشة الطولي (Portrait)
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -81,14 +83,14 @@ void main() async {
   runApp(const LProApp());
 }
 
-// --- دالة الاشتراك في مواضيع الإشعارات ---
+// --- دالة الاشتراك التلقائي في مواضيع الإشعارات ---
 void _subscribeToNotificationTopics() {
   FirebaseAuth.instance.authStateChanges().listen((User? user) {
     if (user != null) {
       // اشتراك المستخدم في قناة تحمل الـ UID الخاص به لاستقبال ردود الدعم
       FirebaseMessaging.instance.subscribeToTopic(user.uid);
 
-      // إذا كان هذا المستخدم هو أنتِ (المديرة)، يتم اشتراكه في قناة تنبيهات الإدارة
+      // اشتراك الإدارة في قناة تنبيهات الإدارة
       if (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
         FirebaseMessaging.instance.subscribeToTopic('admin_notifications');
         debugPrint("Admin Subscribed to Admin Notifications Topic ✅");
@@ -101,6 +103,7 @@ void _subscribeToNotificationTopics() {
 class LProApp extends StatefulWidget {
   const LProApp({super.key});
 
+  // دالة لتغيير اللغة من أي مكان في التطبيق
   static void setLocale(BuildContext context, Locale newLocale) {
     _LProAppState? state = context.findAncestorStateOfType<_LProAppState>();
     state?.changeLanguage(newLocale);
@@ -111,6 +114,7 @@ class LProApp extends StatefulWidget {
 }
 
 class _LProAppState extends State<LProApp> {
+  // ضبط اللغة العربية كخيار افتراضي عند فتح التطبيق
   Locale _locale = const Locale('ar', 'EG');
 
   void changeLanguage(Locale locale) {
@@ -155,7 +159,7 @@ class _LProAppState extends State<LProApp> {
   }
 
   void _handleMessageNavigation(RemoteMessage message) {
-    // يمكنك هنا إضافة كود للتوجيه لصفحة الدعم إذا كان الإشعار يحتوي على داتا معينة
+    // كود التوجيه عند النقر على الإشعار مستقبلاً
   }
 
   @override
@@ -163,13 +167,17 @@ class _LProAppState extends State<LProApp> {
     return MaterialApp(
       title: 'L Pro Quiz',
       debugShowCheckedModeBanner: false,
+      // دعم اللغة والاتجاه
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [Locale('ar', 'EG'), Locale('en', 'US')],
-      locale: _locale,
+      supportedLocales: const [
+        Locale('ar', 'EG'),
+        Locale('en', 'US'),
+      ],
+      locale: _locale, // استخدام اللغة العربية افتراضياً
       theme: LproTheme.lightTheme,
       initialRoute: '/',
       routes: {
