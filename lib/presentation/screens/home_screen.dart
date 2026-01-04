@@ -31,7 +31,6 @@ class _HomeScreenState extends State<HomeScreen>
     _newsController =
         AnimationController(duration: const Duration(seconds: 35), vsync: this)
           ..repeat();
-
     _newsAnimation = Tween<Offset>(
       begin: const Offset(1.8, 0),
       end: const Offset(-2.8, 0),
@@ -72,8 +71,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 color: deepTeal))),
                     const SizedBox(height: 15),
                     _buildLProGrid(),
-                    const SizedBox(
-                        height: 45), // زيادة المسافة قبل الجملة السفلية
+                    const SizedBox(height: 50),
                     _buildModernEncouragement(),
                     const SizedBox(height: 40),
                   ],
@@ -93,7 +91,6 @@ class _HomeScreenState extends State<HomeScreen>
         String arMotto = "⚡ تعلم مستمر.. تطور كبير.. نجاح اكيد 💪";
         String enMotto = "⚡ LEARN.. GROWTH.. SUCCESS 🚀";
         List<String> combinedList = [];
-
         if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
           var newsItems =
               snapshot.data!.docs.map((doc) => "⚡ ${doc['content']}").toList();
@@ -109,7 +106,6 @@ class _HomeScreenState extends State<HomeScreen>
         } else {
           combinedList = [arMotto, enMotto];
         }
-
         return Container(
           height: 32,
           width: double.infinity,
@@ -118,14 +114,12 @@ class _HomeScreenState extends State<HomeScreen>
           child: ClipRect(
             child: SlideTransition(
               position: _newsAnimation,
-              child: Text(
-                combinedList.join("      "),
-                style: GoogleFonts.cairo(
-                    color: Colors.white,
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.bold),
-                softWrap: false,
-              ),
+              child: Text(combinedList.join("      "),
+                  style: GoogleFonts.cairo(
+                      color: Colors.white,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.bold),
+                  softWrap: false),
             ),
           ),
         );
@@ -154,9 +148,9 @@ class _HomeScreenState extends State<HomeScreen>
             Row(
               children: [
                 _miniMotto("تعلم مستمر"),
-                _cyanArrowToLeft(), // السهم الفيروزي لليسار
+                _customHandDrawnArrow(), // سهم مرسوم يدوياً لليسار
                 _miniMotto("تطور كبير"),
-                _cyanArrowToLeft(), // السهم الفيروزي لليسار
+                _customHandDrawnArrow(), // سهم مرسوم يدوياً لليسار
                 _miniMotto("نجاح اكيد"),
                 const Text(" 💪", style: TextStyle(fontSize: 14)),
               ],
@@ -171,10 +165,16 @@ class _HomeScreenState extends State<HomeScreen>
       style: GoogleFonts.cairo(
           fontSize: 12, color: safetyOrange, fontWeight: FontWeight.w800));
 
-  // --- السهم المعدل: يشير للشمال (اليسار) وبحجم واضح ---
-  Widget _cyanArrowToLeft() => Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: Icon(Icons.arrow_left_rounded, color: turquoiseCyan, size: 28));
+  // --- السهم الفيروزي المصمت المرسوم برمجياً لضمان الشكل المطلق ---
+  Widget _customHandDrawnArrow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      child: CustomPaint(
+        size: const Size(10, 10),
+        painter: SolidTrianglePainter(turquoiseCyan),
+      ),
+    );
+  }
 
   Widget _buildLProGrid() {
     return GridView.count(
@@ -230,7 +230,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // --- البادج المعدل: مائل بوضوح، خط أكبر، ورأس الزاوية ظاهر فوقه ---
   Widget _buildPremiumCard(String title, String badge, Color badgeColor,
       Widget icon, String category, bool showBadge,
       {required bool isQuiz, bool isMasterPlan = false}) {
@@ -245,9 +244,9 @@ class _HomeScreenState extends State<HomeScreen>
         clipBehavior: Clip.none,
         children: [
           Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+              child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
                 icon,
                 const SizedBox(height: 12),
                 Text(title,
@@ -255,37 +254,29 @@ class _HomeScreenState extends State<HomeScreen>
                         color: deepTeal,
                         fontSize: 13,
                         fontWeight: FontWeight.w900))
-              ],
-            ),
-          ),
+              ])),
           if (showBadge)
             Positioned(
-              top: 14, // تحريك الموضع ليناسب الميلان
-              right: -16,
+              top: 14,
+              right: -17,
               child: Transform.rotate(
-                angle: 0.55, // ضبط زاوية الميلان لتكون احترافية
+                angle: 0.55,
                 child: Container(
-                  width: 100, // عرض مناسب للبادج
+                  width: 100,
                   padding: const EdgeInsets.symmetric(vertical: 4),
-                  decoration: BoxDecoration(
-                    color: badgeColor,
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 4,
-                          offset: const Offset(0, 2))
-                    ],
-                  ),
+                  decoration: BoxDecoration(color: badgeColor, boxShadow: [
+                    BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 4,
+                        offset: const Offset(0, 2))
+                  ]),
                   child: Center(
-                    child: Text(
-                      badge,
-                      style: GoogleFonts.cairo(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5),
-                    ),
-                  ),
+                      child: Text(badge,
+                          style: GoogleFonts.cairo(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5))),
                 ),
               ),
             ),
@@ -294,23 +285,26 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // --- الجملة الإنجليزية: مرفوعة قليلاً ومكبرة للوضوح ---
   Widget _buildModernEncouragement() =>
       Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         _engWord("Learn"),
-        _cyanPlayArrow(),
+        _customHandDrawnArrowEn(),
         _engWord("Growth"),
-        _cyanPlayArrow(),
+        _customHandDrawnArrowEn(),
         _engWord("Success")
       ]);
-
   Widget _engWord(String text) => Text(text,
       style: GoogleFonts.cairo(
           color: lightTeal, fontSize: 15, fontWeight: FontWeight.w900));
 
-  Widget _cyanPlayArrow() => Padding(
+  Widget _customHandDrawnArrowEn() {
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
-      child: Icon(Icons.play_arrow_rounded, color: turquoiseCyan, size: 22));
+      child: CustomPaint(
+          size: const Size(12, 12),
+          painter: SolidTrianglePainter(turquoiseCyan, isLeft: false)),
+    );
+  }
 
   Widget _buildGlassQuickFact() {
     return ClipRRect(
@@ -363,6 +357,34 @@ class _HomeScreenState extends State<HomeScreen>
   }
 }
 
+// --- كلاس رسم السهم (المثلث) بدقة ---
+class SolidTrianglePainter extends CustomPainter {
+  final Color color;
+  final bool isLeft;
+  SolidTrianglePainter(this.color, {this.isLeft = true});
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final path = Path();
+    if (isLeft) {
+      path.moveTo(size.width, 0);
+      path.lineTo(0, size.height / 2);
+      path.lineTo(size.width, size.height);
+    } else {
+      path.moveTo(0, 0);
+      path.lineTo(size.width, size.height / 2);
+      path.lineTo(0, size.height);
+    }
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 class _AnimatedPremiumCard extends StatefulWidget {
   final Widget child;
   final VoidCallback onTap;
@@ -384,7 +406,6 @@ class _AnimatedPremiumCardState extends State<_AnimatedPremiumCard> {
           scale: _scale,
           duration: const Duration(milliseconds: 100),
           child: Container(
-              // Clip.antiAlias هو السر لجعل رأس الزاوية يقطع البادج المائل بشكل أنيق
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                   color: Colors.white,
@@ -400,7 +421,7 @@ class _AnimatedPremiumCardState extends State<_AnimatedPremiumCard> {
   }
 }
 
-// Painters - تبقى كما هي بدون تغيير لسلامة الأيقونات
+// الرسامين Painters - تبقى بدون تغيير
 class PremiumTrophyPainter extends CustomPainter {
   final Color orange;
   PremiumTrophyPainter(this.orange);
