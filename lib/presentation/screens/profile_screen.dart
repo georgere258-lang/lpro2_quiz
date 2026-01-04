@@ -27,6 +27,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final Color safetyOrange = AppColors.secondaryOrange;
   final Color lightTeal = const Color(0xFF4FA8A8);
 
+  // قائمة الأيقونات التي يمكن للمستخدم اختيارها كصورة شخصية (Avatars)
+  final List<IconData> avatars = [
+    Icons.person_pin,
+    Icons.face_retouching_natural,
+    Icons.sentiment_very_satisfied,
+    Icons.workspace_premium,
+    Icons.stars_rounded,
+    Icons.account_circle,
+  ];
+
   // دالة تحديد اللقب التحفيزي بناءً على إجمالي النقاط
   String _getMotivationalRank(int points) {
     if (points >= 1500) return "مستشار L Pro العالمي 👑";
@@ -34,6 +44,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (points >= 500) return "دائم التطور 🚀";
     if (points >= 100) return "دائم التعلم ✨";
     return "عضو جديد 🌱";
+  }
+
+  // دالة اختيار الصورة الشخصية الافتراضية
+  void _showAvatarPicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+      builder: (c) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text("اختر رمزك المفضل",
+                style: GoogleFonts.cairo(
+                    fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 20),
+            GridView.builder(
+              shrinkWrap: true,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3, mainAxisSpacing: 10, crossAxisSpacing: 10),
+              itemCount: avatars.length,
+              itemBuilder: (ctx, i) => InkWell(
+                onTap: () async {
+                  // هنا يمكنك حفظ رقم الأيقونة مستقبلاً، حالياً سنقوم بتحديث واجهة المستخدم
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user!.uid)
+                      .update({'avatarIndex': i});
+                  if (mounted) Navigator.pop(c);
+                },
+                child: CircleAvatar(
+                  backgroundColor: deepTeal.withValues(alpha: 0.1),
+                  child: Icon(avatars[i], color: deepTeal, size: 40),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _handleLogout() async {
@@ -148,13 +200,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
             int totalPoints = data?['points'] ?? 0;
             int starsPoints = data?['starsPoints'] ?? 0;
             int proPoints = data?['proPoints'] ?? 0;
+            int avatarIdx = data?['avatarIndex'] ?? 0;
             String role = data?['role'] ?? "user";
 
             return ListView(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               children: [
                 const SizedBox(height: 10),
-                _buildProfileHeader(name, totalPoints),
+                _buildProfileHeader(name, totalPoints, avatarIdx),
                 const SizedBox(height: 25),
                 Row(
                   children: [
@@ -172,7 +225,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     style: GoogleFonts.cairo(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
-                        color: deepTeal.withOpacity(0.8))),
+                        color: deepTeal.withValues(alpha: 0.8))),
                 const SizedBox(height: 10),
                 _buildProfileBtn("تعديل الاسم", Icons.edit_outlined,
                     () => _showEditDialog(name)),
@@ -204,23 +257,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileHeader(String name, int totalPoints) {
+  Widget _buildProfileHeader(String name, int totalPoints, int avatarIdx) {
     return Column(
       children: [
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border:
-                  Border.all(color: safetyOrange.withOpacity(0.5), width: 2)),
-          child: CircleAvatar(
-            radius: 50,
-            backgroundColor: deepTeal,
-            child: Text(name.isNotEmpty ? name[0].toUpperCase() : "L",
-                style: GoogleFonts.cairo(
-                    fontSize: 40,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white)),
+        GestureDetector(
+          onTap: _showAvatarPicker,
+          child: Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                        color: safetyOrange.withValues(alpha: 0.5), width: 2)),
+                child: CircleAvatar(
+                  radius: 50,
+                  backgroundColor: deepTeal,
+                  child: Icon(
+                      avatars[avatarIdx < avatars.length ? avatarIdx : 0],
+                      size: 50,
+                      color: Colors.white),
+                ),
+              ),
+              CircleAvatar(
+                  radius: 15,
+                  backgroundColor: safetyOrange,
+                  child: const Icon(Icons.camera_alt,
+                      size: 14, color: Colors.white)),
+            ],
           ),
         ),
         const SizedBox(height: 12),
@@ -231,7 +296,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
           decoration: BoxDecoration(
-              color: lightTeal.withOpacity(0.1),
+              color: lightTeal.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20)),
           child: Text(_getMotivationalRank(totalPoints),
               style: GoogleFonts.cairo(
@@ -249,11 +314,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 12,
               offset: const Offset(0, 4))
         ],
-        border: Border.all(color: color.withOpacity(0.15)),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
       ),
       child: Column(
         children: [
@@ -269,7 +334,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Text("نقطة",
               style: GoogleFonts.cairo(
                   fontSize: 11,
-                  color: color.withOpacity(0.8),
+                  color: color.withValues(alpha: 0.8),
                   fontWeight: FontWeight.bold)),
         ],
       ),
@@ -283,7 +348,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       margin: const EdgeInsets.symmetric(vertical: 6),
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(15),
-          side: BorderSide(color: Colors.grey.withOpacity(0.08))),
+          side: BorderSide(color: Colors.grey.withValues(alpha: 0.08))),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
         leading: Icon(icon,
@@ -296,8 +361,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 color: isExit ? Colors.redAccent : Colors.black87)),
         trailing: Icon(Icons.arrow_forward_ios_rounded,
             size: 14,
-            color:
-                isExit ? Colors.redAccent.withOpacity(0.5) : Colors.grey[400]),
+            color: isExit
+                ? Colors.redAccent.withValues(alpha: 0.5)
+                : Colors.grey[400]),
         onTap: onTap,
       ),
     );

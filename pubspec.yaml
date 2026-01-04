@@ -35,8 +35,11 @@ dependencies:
   flutter_local_notifications: ^17.2.1
   permission_handler: ^11.3.1
 
-  # المكتبة المطلوبة للطريقة الجديدة V1 (تمت إضافتها هنا)
+  # المكتبة المطلوبة للطريقة الجديدة V1
   googleapis_auth: ^2.0.0
+
+  # --- إضافة مكتبة الأصوات ---
+  audioplayers: ^6.1.0
 
   # تحسين أداء الصور
   cached_network_image: ^3.3.1
@@ -69,10 +72,12 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
 
-  # تعريف المجلدات والملفات (تمت إضافة ملف الـ JSON هنا)
+  # تعريف المجلدات والملفات
   assets:
     - assets/
     - assets/logo.svg
     - assets/top_brand.png
     - assets/icon.png
     - assets/service_account.json
+    # إضافة مجلد الأصوات
+    - assets/sounds/

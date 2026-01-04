@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:audioplayers/audioplayers.dart'; // مكتبة الأصوات
 import 'dart:async';
 
 import '../../core/constants/app_colors.dart';
@@ -26,6 +27,9 @@ class _QuizScreenState extends State<QuizScreen> {
   final Color safetyOrange = AppColors.secondaryOrange;
   final Color lightTurquoise = const Color(0xFFE0F7F9);
 
+  // مشغل الأصوات
+  final AudioPlayer _audioPlayer = AudioPlayer();
+
   int currentQuestionIndex = 0;
   int score = 0;
   int timeLeft = 25;
@@ -47,7 +51,18 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   void dispose() {
     timer?.cancel();
+    _audioPlayer.dispose(); // تنظيف الذاكرة من المشغل
     super.dispose();
+  }
+
+  // دالة موحدة لتشغيل الأصوات من الـ Assets
+  void _playSound(String fileName) async {
+    try {
+      await _audioPlayer.stop();
+      await _audioPlayer.play(AssetSource('sounds/$fileName'));
+    } catch (e) {
+      debugPrint("خطأ في تشغيل الصوت: $e");
+    }
   }
 
   Future<void> _fetchContent() async {
@@ -75,7 +90,7 @@ class _QuizScreenState extends State<QuizScreen> {
     }
   }
 
-  // --- عرض المواضيع التعليمية ---
+  // --- واجهة المواضيع التعليمية (لم تتغير لكن تم تحسين الـ Opacity) ---
   Widget _buildTopicView() {
     return Scaffold(
       backgroundColor: AppColors.scaffoldBackground,
@@ -96,10 +111,13 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Widget _buildDetailedTopicCard(Map<String, dynamic> data) {
     return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (c) => QuizTopicDetailPage(data: data)),
-      ),
+      onTap: () {
+        _playSound('click.mp3');
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (c) => QuizTopicDetailPage(data: data)),
+        );
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 20),
         decoration: BoxDecoration(
@@ -107,7 +125,7 @@ class _QuizScreenState extends State<QuizScreen> {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 15,
                 offset: const Offset(0, 5))
           ],
@@ -196,7 +214,12 @@ class _QuizScreenState extends State<QuizScreen> {
       setState(() {
         selectedOption = selected;
         showFeedback = true;
-        if (isCorrect) score += (widget.categoryTitle == "دوري النجوم") ? 2 : 5;
+        if (isCorrect) {
+          _playSound('success.mp3'); // تشغيل صوت النجاح
+          score += (widget.categoryTitle == "دوري النجوم") ? 2 : 5;
+        } else {
+          _playSound('wrong.mp3'); // تشغيل صوت الخطأ
+        }
       });
     }
 
@@ -310,7 +333,7 @@ class _QuizScreenState extends State<QuizScreen> {
           borderRadius: BorderRadius.circular(25),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 20,
                 offset: const Offset(0, 10))
           ]),
@@ -366,7 +389,10 @@ class _QuizScreenState extends State<QuizScreen> {
       leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
               color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context)),
+          onPressed: () {
+            _playSound('click.mp3');
+            Navigator.pop(context);
+          }),
       title: Text(widget.categoryTitle,
           style: GoogleFonts.cairo(
               fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16)),
@@ -389,6 +415,7 @@ class _QuizScreenState extends State<QuizScreen> {
                 Center(
                     child: TextButton(
                         onPressed: () {
+                          _playSound('click.mp3');
                           Navigator.pop(c);
                           Navigator.pop(context);
                         },
@@ -415,6 +442,7 @@ class _QuizScreenState extends State<QuizScreen> {
               actions: [
                 TextButton(
                     onPressed: () {
+                      _playSound('click.mp3');
                       Navigator.pop(c);
                       _saveScoreAndFinish();
                     },
@@ -422,6 +450,7 @@ class _QuizScreenState extends State<QuizScreen> {
                         style: GoogleFonts.cairo(color: Colors.red))),
                 ElevatedButton(
                     onPressed: () {
+                      _playSound('click.mp3');
                       Navigator.pop(c);
                       _nextStep();
                     },
@@ -477,7 +506,7 @@ class _QuizScreenState extends State<QuizScreen> {
             const SizedBox(height: 15),
             Text("استعد لإثبات مهاراتك",
                 style: GoogleFonts.cairo(
-                    fontSize: 16, color: deepTeal.withOpacity(0.7))),
+                    fontSize: 16, color: deepTeal.withValues(alpha: 0.7))),
             const SizedBox(height: 60),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -487,6 +516,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30))),
               onPressed: () {
+                _playSound('click.mp3'); // صوت الضغط لبدء اللعبة
                 setState(() => gameStarted = true);
                 _startTimer();
               },
