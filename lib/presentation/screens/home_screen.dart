@@ -31,9 +31,11 @@ class _HomeScreenState extends State<HomeScreen>
     _newsController =
         AnimationController(duration: const Duration(seconds: 35), vsync: this)
           ..repeat();
+
+    // ضبط الـ Offset لضمان انسيابية الحركة من اليمين تماماً
     _newsAnimation = Tween<Offset>(
-      begin: const Offset(1.8, 0),
-      end: const Offset(-2.8, 0),
+      begin: const Offset(2.2, 0),
+      end: const Offset(-3.5, 0),
     ).animate(CurvedAnimation(parent: _newsController, curve: Curves.linear));
   }
 
@@ -51,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen>
         textDirection: TextDirection.rtl,
         child: Column(
           children: [
-            _buildEdgeToEdgeTicker(),
+            _buildCrystalClearTicker(), // شريط الأخبار المطور والواضح
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -71,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 color: deepTeal))),
                     const SizedBox(height: 15),
                     _buildLProGrid(),
-                    const SizedBox(height: 50),
+                    const SizedBox(height: 55), // زيادة المسافة للتناسق
                     _buildModernEncouragement(),
                     const SizedBox(height: 40),
                   ],
@@ -84,7 +86,8 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildEdgeToEdgeTicker() {
+  // --- حل مشكلة مسح النص: استخدام حدة قصوى بدون Clipping ---
+  Widget _buildCrystalClearTicker() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('news').snapshots(),
       builder: (context, snapshot) {
@@ -106,20 +109,27 @@ class _HomeScreenState extends State<HomeScreen>
         } else {
           combinedList = [arMotto, enMotto];
         }
+
         return Container(
-          height: 32,
+          height: 38,
           width: double.infinity,
           color: safetyOrange,
           alignment: Alignment.center,
-          child: ClipRect(
-            child: SlideTransition(
-              position: _newsAnimation,
-              child: Text(combinedList.join("      "),
-                  style: GoogleFonts.cairo(
-                      color: Colors.white,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.bold),
-                  softWrap: false),
+          child: SlideTransition(
+            position: _newsAnimation,
+            child: IntrinsicWidth(
+              child: Text(
+                combinedList.join("      "),
+                style: GoogleFonts.cairo(
+                  color: Colors.white,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.bold,
+                  height: 1.0,
+                ),
+                softWrap: false,
+                overflow:
+                    TextOverflow.visible, // يضمن عدم مسح الحروف عند الأطراف
+              ),
             ),
           ),
         );
@@ -165,12 +175,11 @@ class _HomeScreenState extends State<HomeScreen>
       style: GoogleFonts.cairo(
           fontSize: 12, color: safetyOrange, fontWeight: FontWeight.w800));
 
-  // --- السهم الفيروزي المصمت المرسوم برمجياً لضمان الشكل المطلق ---
   Widget _customHandDrawnArrow() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 5),
       child: CustomPaint(
-        size: const Size(10, 10),
+        size: const Size(12, 10),
         painter: SolidTrianglePainter(turquoiseCyan),
       ),
     );
@@ -258,12 +267,12 @@ class _HomeScreenState extends State<HomeScreen>
           if (showBadge)
             Positioned(
               top: 14,
-              right: -17,
+              right: -16,
               child: Transform.rotate(
                 angle: 0.55,
                 child: Container(
-                  width: 100,
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  width: 105,
+                  padding: const EdgeInsets.symmetric(vertical: 5),
                   decoration: BoxDecoration(color: badgeColor, boxShadow: [
                     BoxShadow(
                         color: Colors.black26,
@@ -274,7 +283,7 @@ class _HomeScreenState extends State<HomeScreen>
                       child: Text(badge,
                           style: GoogleFonts.cairo(
                               color: Colors.white,
-                              fontSize: 10,
+                              fontSize: 11,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 0.5))),
                 ),
@@ -288,16 +297,16 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildModernEncouragement() =>
       Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         _engWord("Learn"),
-        _customHandDrawnArrowEn(),
+        _customCyanArrowEn(),
         _engWord("Growth"),
-        _customHandDrawnArrowEn(),
+        _customCyanArrowEn(),
         _engWord("Success")
       ]);
   Widget _engWord(String text) => Text(text,
       style: GoogleFonts.cairo(
-          color: lightTeal, fontSize: 15, fontWeight: FontWeight.w900));
+          color: lightTeal, fontSize: 16, fontWeight: FontWeight.w900));
 
-  Widget _customHandDrawnArrowEn() {
+  Widget _customCyanArrowEn() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       child: CustomPaint(
@@ -357,7 +366,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 }
 
-// --- كلاس رسم السهم (المثلث) بدقة ---
 class SolidTrianglePainter extends CustomPainter {
   final Color color;
   final bool isLeft;
@@ -421,7 +429,6 @@ class _AnimatedPremiumCardState extends State<_AnimatedPremiumCard> {
   }
 }
 
-// الرسامين Painters - تبقى بدون تغيير
 class PremiumTrophyPainter extends CustomPainter {
   final Color orange;
   PremiumTrophyPainter(this.orange);

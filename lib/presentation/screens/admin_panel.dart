@@ -1,17 +1,19 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+// تم حذف سطر http غير المستخدم وحل مشكلة projectId
+import 'package:googleapis_auth/auth_io.dart' as auth;
+import 'package:flutter/services.dart' show rootBundle;
 
-// استيراد الثوابت المركزية
 import '../../core/constants/app_colors.dart';
 import 'admin_messages_list.dart';
 
 class AdminPanel extends StatefulWidget {
   const AdminPanel({super.key});
-
   @override
   State<AdminPanel> createState() => _AdminPanelState();
 }
@@ -32,11 +34,12 @@ class _AdminPanelState extends State<AdminPanel> {
           iconTheme: const IconThemeData(color: Colors.white),
           bottom: TabBar(
             isScrollable: true,
-            tabAlignment: TabAlignment.center, // --- حل مشكلة توسط العناوين ---
+            tabAlignment: TabAlignment.center,
             indicatorColor: AppColors.secondaryOrange,
             indicatorWeight: 3,
             labelColor: Colors.white,
-            unselectedLabelColor: Colors.white.withOpacity(0.6),
+            unselectedLabelColor:
+                Colors.white.withValues(alpha: 0.6), // حل مشكلة withOpacity
             labelStyle:
                 GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
             tabs: const [
@@ -62,7 +65,56 @@ class _AdminPanelState extends State<AdminPanel> {
   }
 }
 
-// --- 1. إدارة الأعضاء ---
+// --- دالة إرسال الإشعارات المركزية (تصحيح خطأ projectId) ---
+Future<void> _sendNotification(String title, String body) async {
+  try {
+    final jsonString =
+        await rootBundle.loadString('assets/service_account.json');
+    final Map<String, dynamic> jsonMap = jsonDecode(jsonString);
+
+    // حل مشكلة projectId: نقرأها مباشرة من الخريطة (Map)
+    final String projectName = jsonMap['project_id'];
+
+    final accountCredentials = auth.ServiceAccountCredentials.fromJson(jsonMap);
+    final scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
+
+    final client =
+        await auth.clientViaServiceAccount(accountCredentials, scopes);
+
+    final String url =
+        'https://fcm.googleapis.com/v1/projects/$projectName/messages:send';
+
+    final response = await client.post(
+      Uri.parse(url),
+      body: jsonEncode({
+        'message': {
+          'topic': 'all_users',
+          'notification': {
+            'title': title,
+            'body': body,
+          },
+          'android': {
+            'notification': {
+              'channel_id': 'lpro_notifications',
+              'sound': 'default',
+            },
+          },
+        }
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      debugPrint("Notification Sent Successfully! ✅");
+    } else {
+      debugPrint("FCM Error: ${response.body}");
+    }
+    client.close();
+  } catch (e) {
+    debugPrint("Network Error: $e");
+  }
+}
+
+// --- 1. إدارة الأعضاء (حل مشكلة curly braces) ---
 class UserManager extends StatefulWidget {
   const UserManager({super.key});
   @override
@@ -81,11 +133,9 @@ class _UserManagerState extends State<UserManager> {
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance.collection('users').snapshots(),
             builder: (context, snapshot) {
-              if (snapshot.hasError)
-                return const Center(child: Text("حدث خطأ ما"));
-              if (!snapshot.hasData)
+              if (!snapshot.hasData) {
                 return const Center(child: CircularProgressIndicator());
-
+              }
               var docs = snapshot.data!.docs.where((d) {
                 var data = d.data() as Map<String, dynamic>;
                 String name = (data['name'] ?? "").toString().toLowerCase();
@@ -97,10 +147,8 @@ class _UserManagerState extends State<UserManager> {
               return ListView.builder(
                 itemCount: docs.length,
                 itemBuilder: (context, i) {
-                  var user = docs[i];
-                  var userData = user.data() as Map<String, dynamic>;
+                  var userData = docs[i].data() as Map<String, dynamic>;
                   bool isBlocked = userData['isBlocked'] ?? false;
-
                   return Card(
                     margin:
                         const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
@@ -113,9 +161,9 @@ class _UserManagerState extends State<UserManager> {
                         icon: Icon(Icons.block,
                             color: isBlocked ? Colors.red : Colors.grey),
                         onPressed: () =>
-                            user.reference.update({'isBlocked': !isBlocked}),
+                            docs[i].reference.update({'isBlocked': !isBlocked}),
                       ),
-                      onTap: () => _showUserDetails(user),
+                      onTap: () => _showUserDetails(docs[i]),
                     ),
                   );
                 },
@@ -170,8 +218,9 @@ class NewsManager extends StatelessWidget {
                 .orderBy('createdAt', descending: true)
                 .snapshots(),
             builder: (context, snapshot) {
-              if (!snapshot.hasData)
+              if (!snapshot.hasData) {
                 return const Center(child: CircularProgressIndicator());
+              }
               return ListView.builder(
                 itemCount: snapshot.data!.docs.length,
                 itemBuilder: (context, i) {
@@ -204,16 +253,19 @@ class NewsManager extends StatelessWidget {
                     onPressed: () => Navigator.pop(ctx),
                     child: const Text("إلغاء")),
                 ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       if (c.text.isNotEmpty) {
-                        FirebaseFirestore.instance.collection('news').add({
+                        await FirebaseFirestore.instance
+                            .collection('news')
+                            .add({
                           'content': c.text,
                           'createdAt': FieldValue.serverTimestamp()
                         });
-                        Navigator.pop(ctx);
+                        _sendNotification("خبر عاجل ⚡", c.text);
+                        if (context.mounted) Navigator.pop(ctx);
                       }
                     },
-                    child: const Text("إضافة"))
+                    child: const Text("إضافة وإرسال إشعار"))
               ],
             ));
   }
@@ -257,13 +309,13 @@ class _QuizManagerState extends State<QuizManager> {
             stream:
                 FirebaseFirestore.instance.collection('quizzes').snapshots(),
             builder: (context, snapshot) {
-              if (!snapshot.hasData)
+              if (!snapshot.hasData) {
                 return const Center(child: CircularProgressIndicator());
+              }
               var filtered = snapshot.data!.docs.where((d) {
                 var data = d.data() as Map<String, dynamic>;
                 return (data['question'] ?? "").toString().contains(query);
               }).toList();
-
               return ListView.builder(
                 itemCount: filtered.length,
                 itemBuilder: (context, i) {
@@ -302,7 +354,7 @@ class _QuizManagerState extends State<QuizManager> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text("إضافة سؤال",
+                Text("إضافة سؤال للتحدي",
                     style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
                 GestureDetector(
                   onTap: () => _pickQuizImage(setModalState),
@@ -332,11 +384,11 @@ class _QuizManagerState extends State<QuizManager> {
                 ...List.generate(
                     4,
                     (i) => Row(children: [
-                          Radio(
+                          Radio<int>(
                               value: i,
                               groupValue: correct,
                               onChanged: (v) =>
-                                  setModalState(() => correct = v as int)),
+                                  setModalState(() => correct = v!)),
                           Expanded(
                               child: TextField(
                                   controller: optC[i],
@@ -366,17 +418,16 @@ class _QuizManagerState extends State<QuizManager> {
                             'category': cat,
                             'imageUrl': url
                           });
-                          Navigator.pop(context);
+                          _sendNotification("تحدي جديد 🏆",
+                              "تم إضافة سؤال جديد في $cat.. ادخل وجاوب!");
+                          if (context.mounted) Navigator.pop(context);
                           setState(() => _quizImage = null);
                         },
                   style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryDeepTeal),
                   child: uploading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(color: Colors.white))
-                      : const Text("حفظ",
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text("حفظ وإرسال تنبيه",
                           style: TextStyle(color: Colors.white)),
                 ),
                 const SizedBox(height: 10),
@@ -417,7 +468,7 @@ class _QuizManagerState extends State<QuizManager> {
                         if (line.contains('#')) {
                           var p = line.split('#');
                           if (p.length >= 3) {
-                            FirebaseFirestore.instance
+                            await FirebaseFirestore.instance
                                 .collection('quizzes')
                                 .add({
                               'question': p[0],
@@ -429,9 +480,11 @@ class _QuizManagerState extends State<QuizManager> {
                           }
                         }
                       }
-                      Navigator.pop(ctx);
+                      _sendNotification("تحديث الدوري 🚀",
+                          "تم إضافة مجموعة أسئلة جديدة.. الترتيب قد يتغير!");
+                      if (context.mounted) Navigator.pop(ctx);
                     },
-                    child: const Text("رفع الكل"))
+                    child: const Text("رفع الكل وإخطار المستخدمين"))
               ],
             ));
   }
@@ -466,13 +519,13 @@ class _TopicManagerState extends State<TopicManager> {
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance.collection('topics').snapshots(),
             builder: (context, snapshot) {
-              if (!snapshot.hasData)
+              if (!snapshot.hasData) {
                 return const Center(child: CircularProgressIndicator());
+              }
               var docs = snapshot.data!.docs.where((d) {
                 var data = d.data() as Map<String, dynamic>;
                 return (data['title'] ?? "").toString().contains(query);
               }).toList();
-
               return ListView.builder(
                 itemCount: docs.length,
                 itemBuilder: (context, i) {
@@ -508,7 +561,7 @@ class _TopicManagerState extends State<TopicManager> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text("إضافة موضوع",
+                Text("إضافة موضوع تعليمي",
                     style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
                 GestureDetector(
                   onTap: () => _pickTopicImage(setModalState),
@@ -527,7 +580,6 @@ class _TopicManagerState extends State<TopicManager> {
                 DropdownButton<String>(
                   value: cat,
                   isExpanded: true,
-                  // --- تم التعديل ليتوافق مع أسماء الأقسام الجديدة ---
                   items: ["المعلومة بتفرق", "إعرف عميلك"]
                       .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                       .toList(),
@@ -562,17 +614,15 @@ class _TopicManagerState extends State<TopicManager> {
                             'category': cat,
                             'imageUrl': url
                           });
-                          Navigator.pop(context);
+                          _sendNotification("موضوع يهمك 📚", tC.text);
+                          if (context.mounted) Navigator.pop(context);
                           setState(() => _topicImage = null);
                         },
                   style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryDeepTeal),
                   child: uploading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(color: Colors.white))
-                      : const Text("حفظ الموضوع",
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text("حفظ ونشر إشعار",
                           style: TextStyle(color: Colors.white)),
                 ),
                 const SizedBox(height: 10),

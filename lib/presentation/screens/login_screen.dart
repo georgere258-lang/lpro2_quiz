@@ -29,6 +29,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final List<FocusNode> otpFocusNodes =
       List.generate(6, (index) => FocusNode());
 
+  // دالة إرسال الرمز (OTP)
   void _sendOtp() async {
     String phone = phoneController.text.trim();
     if (phone.startsWith('0')) {
@@ -68,6 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // دالة تأكيد الرمز
   void _verifyOtp() async {
     String otp = otpControllers.map((e) => e.text).join();
     if (otp.length < 6) {
@@ -90,6 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // الربط التشغيلي وحفظ البيانات
   void _navigateUser() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -100,6 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
             .get();
 
         if (!userDoc.exists) {
+          // إنشاء حساب جديد مع تصفير النقاط والرتبة الافتراضية
           await FirebaseFirestore.instance
               .collection('users')
               .doc(user.uid)
@@ -108,6 +112,8 @@ class _LoginScreenState extends State<LoginScreen> {
             'name': "عضو L Pro جديد",
             'phone': user.phoneNumber ?? phoneController.text,
             'points': 0,
+            'starsPoints': 0,
+            'proPoints': 0,
             'role': 'user',
             'createdAt': FieldValue.serverTimestamp(),
           });
@@ -134,11 +140,11 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void dispose() {
     phoneController.dispose();
-    for (var controller in otpControllers) {
-      controller.dispose();
+    for (var c in otpControllers) {
+      c.dispose();
     }
-    for (var node in otpFocusNodes) {
-      node.dispose();
+    for (var n in otpFocusNodes) {
+      n.dispose();
     }
     super.dispose();
   }
@@ -155,7 +161,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 30, vertical: 50),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       SvgPicture.asset('assets/logo.svg',
                           height: 110,
@@ -167,12 +172,19 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: AppColors.secondaryOrange,
                               fontSize: 18,
                               fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 60),
                       Text(isOtpStage ? "تأكيد الرمز" : "تسجيل الدخول",
                           style: GoogleFonts.cairo(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
                               color: Colors.white)),
+                      const SizedBox(height: 10),
+                      Text(
+                          isOtpStage
+                              ? "أدخل الكود المرسل لهاتفك"
+                              : "سجل برقم هاتفك لتبدأ التحدي",
+                          style: GoogleFonts.cairo(
+                              fontSize: 14, color: Colors.white70)),
                       const SizedBox(height: 40),
                       Directionality(
                         textDirection: TextDirection.ltr,
@@ -186,25 +198,24 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.secondaryOrange,
-                            elevation: 0,
-                            padding: EdgeInsets.zero, // لضمان التوسط
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(15)),
                           ),
                           onPressed: isOtpStage ? _verifyOtp : _sendOtp,
-                          child: Center(
-                            child: Text(
-                              isOtpStage ? "تأكيد" : "إرسال الرمز",
-                              textAlign: TextAlign.center,
+                          child: Text(
+                              isOtpStage ? "تأكيد والدخول" : "إرسال رمز التحقق",
                               style: GoogleFonts.cairo(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  height: 1.1),
-                            ),
-                          ),
+                                  fontSize: 18)),
                         ),
                       ),
+                      if (isOtpStage)
+                        TextButton(
+                          onPressed: () => setState(() => isOtpStage = false),
+                          child: Text("تعديل رقم الهاتف؟",
+                              style: GoogleFonts.cairo(color: Colors.white60)),
+                        )
                     ],
                   ),
                 ),
@@ -233,17 +244,17 @@ class _LoginScreenState extends State<LoginScreen> {
             const PopupMenuItem(
                 value: "🇸🇦 +966", child: Text("السعودية 🇸🇦")),
           ],
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(selectedCountry,
-                    style: const TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold)),
-                const Icon(Icons.arrow_drop_down, color: Colors.white),
-              ],
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(width: 12),
+              Text(selectedCountry,
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
+              const Icon(Icons.arrow_drop_down, color: Colors.white),
+              const VerticalDivider(
+                  color: Colors.white24, indent: 15, endIndent: 15),
+            ],
           ),
         ),
         filled: true,
@@ -257,7 +268,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildOtpInput() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: List.generate(
         6,
         (index) => SizedBox(
@@ -269,20 +280,18 @@ class _LoginScreenState extends State<LoginScreen> {
             keyboardType: TextInputType.number,
             maxLength: 1,
             onChanged: (val) {
-              if (val.length == 1 && index < 5) {
+              if (val.length == 1 && index < 5)
                 otpFocusNodes[index + 1].requestFocus();
-              }
-              if (val.isEmpty && index > 0) {
+              if (val.isEmpty && index > 0)
                 otpFocusNodes[index - 1].requestFocus();
-              }
             },
             style: const TextStyle(
                 color: Colors.black, fontSize: 22, fontWeight: FontWeight.bold),
             decoration: InputDecoration(
               counterText: "",
               filled: true,
-              fillColor: Colors.white.withOpacity(0.9),
-              contentPadding: EdgeInsets.zero, // لضمان توسط الرقم داخل المربع
+              fillColor: Colors.white,
+              contentPadding: EdgeInsets.zero,
               border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none),

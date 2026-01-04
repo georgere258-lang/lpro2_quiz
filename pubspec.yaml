@@ -24,21 +24,32 @@ dependencies:
   # تشغيل ملفات SVG (اللوجو)
   flutter_svg: ^2.0.10+1
 
-  # منظومة الفايربيز (تمت الترقية للجيل الثالث لحل كافة تعارضات التبعيات)
+  # منظومة الفايربيز
   firebase_core: ^3.1.0
   cloud_firestore: ^5.0.2
   firebase_auth: ^5.1.0
   firebase_storage: ^12.0.1
 
-  # تحسين أداء الصور (سرعة تحميل وتوفير داتا)
+  # --- منظومة الإشعارات والتفاعل ---
+  firebase_messaging: ^15.1.3
+  flutter_local_notifications: ^17.2.1
+  permission_handler: ^11.3.1
+
+  # المكتبة المطلوبة للطريقة الجديدة V1 (تمت إضافتها هنا)
+  googleapis_auth: ^2.0.0
+
+  # تحسين أداء الصور
   cached_network_image: ^3.3.1
 
   # أدوات اختيار الصور من الموبايل
   image_picker: ^1.0.7
 
-  # أدوات المشاركة والوقت (إصدارات متوافقة تماماً)
+  # أدوات المشاركة والوقت
   share_plus: ^10.0.0
-  intl: 0.20.2 # الإصدار المطابق لـ Flutter SDK كما هو مطلوب
+  intl: 0.20.2
+  
+  # لإرسال طلبات الـ HTTP
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:
@@ -58,9 +69,10 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
 
-  # تعريف المجلدات والملفات
+  # تعريف المجلدات والملفات (تمت إضافة ملف الـ JSON هنا)
   assets:
     - assets/
     - assets/logo.svg
     - assets/top_brand.png
     - assets/icon.png
+    - assets/service_account.json

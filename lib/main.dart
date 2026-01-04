@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 
-// استخدام المسار الكامل المرتبط باسم المشروع (تأكدي أن الاسم lpro2_quiz مطابق لـ pubspec.yaml)
+// استيراد الملفات الضرورية
 import 'package:lpro2_quiz/firebase_options.dart';
 import 'package:lpro2_quiz/core/theme/app_theme.dart';
 import 'package:lpro2_quiz/presentation/screens/splash_screen.dart';
@@ -13,20 +16,59 @@ import 'package:lpro2_quiz/presentation/screens/main_wrapper.dart';
 import 'package:lpro2_quiz/presentation/screens/about_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/admin_panel.dart';
 
+// 1. معالج الرسائل في الخلفية (يعمل حتى لو التطبيق مغلق)
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+}
+
+// 2. إعداد قناة الإشعارات لنظام أندرويد (High Importance لظهور الإشعار فوراً)
+const AndroidNotificationChannel channel = AndroidNotificationChannel(
+  'lpro_notifications',
+  'L Pro Notifications',
+  description: 'هذه القناة مخصصة لأخبار ومسابقات L Pro',
+  importance: Importance.max,
+);
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
 void main() async {
-  // التأكد من تهيئة الـ Widgets قبل أي عملية أخرى
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
-    // تهيئة Firebase
+    // تهيئة Firebase الأساسية
     await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
+        options: DefaultFirebaseOptions.currentPlatform);
+
+    // تسجيل معالج الخلفية
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    // تهيئة الإشعارات المحلية
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+
+    // طلب إذن نظام الأندرويد لإظهار الإشعارات
+    await Permission.notification.request();
+
+    FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+    // الاشتراك في قناة الإرسال الجماعي (التي نستخدمها من لوحة التحكم)
+    await messaging.subscribeToTopic('all_users');
+
+    // طلب صلاحيات الـ Alerts و الـ Sounds
+    await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
     );
   } catch (e) {
-    debugPrint("Firebase Initialization Error: $e");
+    debugPrint("Initialization Error: $e");
   }
 
-  // تثبيت اتجاه الشاشة رأسي فقط لضمان استقرار التصميم (Portrait Only)
+  // تثبيت اتجاه الشاشة ليكون رأسي دائماً
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -38,7 +80,6 @@ void main() async {
 class LProApp extends StatefulWidget {
   const LProApp({super.key});
 
-  // دالة لتغيير اللغة من أي مكان في التطبيق
   static void setLocale(BuildContext context, Locale newLocale) {
     _LProAppState? state = context.findAncestorStateOfType<_LProAppState>();
     state?.changeLanguage(newLocale);
@@ -49,7 +90,6 @@ class LProApp extends StatefulWidget {
 }
 
 class _LProAppState extends State<LProApp> {
-  // اللغة الافتراضية هي العربية (مصر)
   Locale _locale = const Locale('ar', 'EG');
 
   void changeLanguage(Locale locale) {
@@ -57,12 +97,55 @@ class _LProAppState extends State<LProApp> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _setupInteractedMessages();
+  }
+
+  void _setupInteractedMessages() {
+    // استقبال الإشعارات والتطبيق مفتوح في الـ Foreground
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      RemoteNotification? notification = message.notification;
+      AndroidNotification? android = message.notification?.android;
+
+      if (notification != null && android != null) {
+        flutterLocalNotificationsPlugin.show(
+          notification.hashCode,
+          notification.title,
+          notification.body,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              channel.id,
+              channel.name,
+              channelDescription: channel.description,
+              icon: '@mipmap/ic_launcher',
+            ),
+          ),
+        );
+      }
+    });
+
+    // التعامل مع فتح التطبيق من خلال إشعار وهو مغلق تماماً
+    FirebaseMessaging.instance.getInitialMessage().then((message) {
+      if (message != null) {
+        _handleMessageNavigation(message);
+      }
+    });
+
+    // التعامل مع فتح التطبيق من خلال إشعار وهو في الخلفية (Background)
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageNavigation);
+  }
+
+  void _handleMessageNavigation(RemoteMessage message) {
+    debugPrint("Notification Clicked: ${message.data}");
+    // ملاحظة لمريم: هنا يمكنك مستقبلاً إضافة كود التوجيه لصفحة معينة بناءً على الـ data
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'L Pro Quiz',
       debugShowCheckedModeBanner: false,
-
-      // إعدادات اللغات المدعومة
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -70,17 +153,12 @@ class _LProAppState extends State<LProApp> {
       ],
       supportedLocales: const [Locale('ar', 'EG'), Locale('en', 'US')],
       locale: _locale,
-
-      // تطبيق السمة (Theme) المركزية التي صممناها
       theme: LproTheme.lightTheme,
-
-      // إدارة المسارات (Navigation Management)
       initialRoute: '/',
       routes: {
         '/': (context) => const SplashScreen(),
         '/login': (context) => const LoginScreen(),
-        '/complete_profile': (context) =>
-            const CompleteProfileScreen(), // الشاشة المفقودة سابقاً
+        '/complete_profile': (context) => const CompleteProfileScreen(),
         '/home': (context) => const MainWrapper(),
         '/about': (context) => const AboutScreen(),
         '/admin': (context) => const AdminPanel(),

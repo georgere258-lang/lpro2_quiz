@@ -75,6 +75,7 @@ class _QuizScreenState extends State<QuizScreen> {
     }
   }
 
+  // --- عرض المواضيع التعليمية ---
   Widget _buildTopicView() {
     return Scaffold(
       backgroundColor: AppColors.scaffoldBackground,
@@ -97,7 +98,6 @@ class _QuizScreenState extends State<QuizScreen> {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        // تم تغيير الوجهة هنا لمنع التعارض
         MaterialPageRoute(builder: (c) => QuizTopicDetailPage(data: data)),
       ),
       child: Container(
@@ -251,6 +251,7 @@ class _QuizScreenState extends State<QuizScreen> {
     }
   }
 
+  // --- واجهة اللعب (الكويز) ---
   Widget _buildQuizPlayView() {
     var q = dataItems[currentQuestionIndex];
     return Scaffold(
@@ -505,7 +506,6 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 }
 
-// تم تغيير الاسم هنا لمنع التعارض مع ملف MasterPlan
 class QuizTopicDetailPage extends StatelessWidget {
   final Map<String, dynamic> data;
   const QuizTopicDetailPage({super.key, required this.data});

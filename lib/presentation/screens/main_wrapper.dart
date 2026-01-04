@@ -74,7 +74,7 @@ class _MainWrapperState extends State<MainWrapper> {
         backgroundColor: AppColors.primaryDeepTeal,
         elevation: 0,
         centerTitle: true,
-        automaticallyImplyLeading: false, // منع سهم الرجوع التلقائي عند الدخول
+        automaticallyImplyLeading: false, // منع سهم الرجوع التلقائي
         title: getAppBarTitle(),
         // إظهار زر العودة للرئيسية في التبويبات الأخرى
         leading: _currentIndex != 0
@@ -89,7 +89,7 @@ class _MainWrapperState extends State<MainWrapper> {
             : null,
       ),
 
-      // IndexedStack يحافظ على حالة الشاشات (State) أثناء التنقل لمنع إعادة التحميل
+      // IndexedStack يحافظ على حالة الشاشات (State) لمنع إعادة التحميل
       body: IndexedStack(
         index: _currentIndex,
         children: _pages,
@@ -99,7 +99,8 @@ class _MainWrapperState extends State<MainWrapper> {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              // تم التعديل هنا للنسخة الأحدث من فلاتر لمنع الخطأ الأحمر
+              color: Colors.black.withValues(alpha: 0.08),
               blurRadius: 15,
               offset: const Offset(0, -4),
             )
