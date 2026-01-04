@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// استيراد الشاشات من مساراتها الصحيحة
-import 'screens/home_screen.dart';
-import 'screens/leaderboard_screen.dart';
-import 'screens/profile_screen.dart';
-import 'screens/chat_support_screen.dart';
+// استيراد الثوابت المركزية
+import '../../core/constants/app_colors.dart';
+
+// استيراد الشاشات الأساسية للتنقل
+import 'home_screen.dart';
+import 'leaderboard_screen.dart';
+import 'profile_screen.dart';
+import 'chat_support_screen.dart';
 
 class MainWrapper extends StatefulWidget {
   const MainWrapper({super.key});
@@ -17,91 +20,107 @@ class MainWrapper extends StatefulWidget {
 class _MainWrapperState extends State<MainWrapper> {
   int _currentIndex = 0;
 
+  // قائمة الشاشات - تم الحفاظ عليها كثوابت لتحسين الأداء
+  final List<Widget> _pages = [
+    const HomeScreen(),
+    const LeaderboardScreen(),
+    const ChatSupportScreen(),
+    const ProfileScreen(),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    const Color deepTeal = Color(0xFF1B4D57);
-    const Color safetyOrange = Color(0xFFE67E22);
+    // تحديد اللغة لضبط العناوين
     bool isAr = Localizations.localeOf(context).languageCode == 'ar';
 
-    // قائمة الشاشات الأربعة الأساسية
-    final List<Widget> pages = [
-      const HomeScreen(),
-      const LeaderboardScreen(),
-      const ChatSupportScreen(), // الدعم الفني
-      const ProfileScreen(),
-    ];
-
-    // دالة لجلب العنوان المناسب للـ AppBar بناءً على الصفحة الحالية
-    Widget _getAppBarTitle() {
+    // وظيفة لتحديد عنوان الـ AppBar بناءً على القسم الحالي
+    Widget getAppBarTitle() {
       if (_currentIndex == 0) {
         return Image.asset(
           'assets/top_brand.png',
           height: 35,
           errorBuilder: (context, error, stackTrace) => Text(
-            "LPro Hero",
+            "L Pro",
             style: GoogleFonts.cairo(
-                fontWeight: FontWeight.w900, color: Colors.white),
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+              fontSize: 20,
+            ),
           ),
         );
       }
 
+      // مسميات العناوين المتوافقة مع الهوية الجديدة
       List<String> titles = [
         "",
-        isAr ? "ترتيب الدوري العقاري" : "Real Estate League",
+        isAr ? "دوري المتصدرين" : "Leaderboard",
         isAr ? "الدعم الفني المباشر" : "Live Support",
-        isAr ? "حسابي الشخصي" : "My Profile"
+        isAr ? "ملفي الشخصي" : "My Profile"
       ];
 
       return Text(
         titles[_currentIndex],
         style: GoogleFonts.cairo(
-            fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18),
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+          fontSize: 17,
+        ),
       );
     }
 
     return Scaffold(
+      backgroundColor: AppColors.scaffoldBackground,
       appBar: AppBar(
-        backgroundColor: deepTeal,
+        backgroundColor: AppColors.primaryDeepTeal,
         elevation: 0,
         centerTitle: true,
-        // تمكين زر الرجوع التلقائي إذا كان هناك صفحات في الذاكرة
-        automaticallyImplyLeading: true,
-        title: _getAppBarTitle(),
-        // إضافة زر رجوع يدوي للعودة للهوم إذا كنا في صفحة فرعية
+        automaticallyImplyLeading: false, // منع سهم الرجوع التلقائي عند الدخول
+        title: getAppBarTitle(),
+        // إظهار زر العودة للرئيسية في التبويبات الأخرى
         leading: _currentIndex != 0
             ? IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                    color: Colors.white, size: 20),
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
                 onPressed: () => setState(() => _currentIndex = 0),
               )
             : null,
       ),
+
+      // IndexedStack يحافظ على حالة الشاشات (State) أثناء التنقل لمنع إعادة التحميل
       body: IndexedStack(
         index: _currentIndex,
-        children: pages,
+        children: _pages,
       ),
+
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 15,
+              offset: const Offset(0, -4),
             )
           ],
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
           onTap: (i) => setState(() => _currentIndex = i),
-          selectedItemColor: safetyOrange,
+          selectedItemColor: AppColors.secondaryOrange,
           unselectedItemColor: Colors.grey[400],
           showUnselectedLabels: true,
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.white,
-          selectedLabelStyle:
-              GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 10),
-          unselectedLabelStyle:
-              GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 10),
+          selectedLabelStyle: GoogleFonts.cairo(
+            fontWeight: FontWeight.w900,
+            fontSize: 11,
+          ),
+          unselectedLabelStyle: GoogleFonts.cairo(
+            fontWeight: FontWeight.bold,
+            fontSize: 11,
+          ),
           items: [
             BottomNavigationBarItem(
               icon: const Icon(Icons.grid_view_outlined),

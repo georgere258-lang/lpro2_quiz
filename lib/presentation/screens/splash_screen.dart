@@ -1,10 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'dart:async';
+
+// تصحيح المسارات للوصول للثوابت
+import '../../core/constants/app_colors.dart';
+
+// استيراد الشاشات
 import 'login_screen.dart';
-import '../main_wrapper.dart';
+import 'main_wrapper.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -20,15 +25,19 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _scaleAnimation;
   late Animation<double> _fadeAnimation;
   late Animation<double> _pulseAnimation;
+
+  Timer? _navigationTimer;
   bool isUserLoggedIn = false;
 
   @override
   void initState() {
     super.initState();
 
+    // التحقق من حالة المستخدم
     final user = FirebaseAuth.instance.currentUser;
     isUserLoggedIn = (user != null);
 
+    // إعداد الإنيميشن
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -39,7 +48,6 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(milliseconds: 1200),
     );
 
-    // الأنيميشن يبدأ من 0.7 ليصل للحجم الطبيعي (1.0) بتأثير الارتداد
     _scaleAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
     );
@@ -52,12 +60,13 @@ class _SplashScreenState extends State<SplashScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
+    // تشغيل الإنيميشن
     _controller.forward().then((_) {
       if (mounted) _pulseController.repeat(reverse: true);
     });
 
-    // الانتقال التلقائي بعد 3 ثوانٍ
-    Timer(const Duration(seconds: 3), () {
+    // التنقل التلقائي فقط إذا كان المستخدم مسجلاً دخوله
+    _navigationTimer = Timer(const Duration(seconds: 3), () {
       if (mounted && isUserLoggedIn) {
         Navigator.pushReplacement(
           context,
@@ -69,6 +78,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    _navigationTimer?.cancel();
     _controller.dispose();
     _pulseController.dispose();
     super.dispose();
@@ -76,18 +86,15 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    const Color deepTeal = Color(0xFF1B4D57);
-    const Color safetyOrange = Color(0xFFE67E22);
-
     return Scaffold(
-      backgroundColor: deepTeal,
+      backgroundColor: AppColors.primaryDeepTeal,
       body: SizedBox(
         width: double.infinity,
         height: double.infinity,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // اللوجو الضخم (90% من عرض الشاشة)
+            // اللوجو (مع الحفاظ على الأنيميشن والمقاسات)
             ScaleTransition(
               scale: _scaleAnimation,
               child: SvgPicture.asset(
@@ -99,7 +106,6 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ),
 
-            // تم تقليل المسافة هنا من 60 إلى 20 لرفع الجملة للأعلى
             const SizedBox(height: 20),
 
             FadeTransition(
@@ -113,21 +119,22 @@ class _SplashScreenState extends State<SplashScreen>
                       style: GoogleFonts.cairo(
                         fontSize: 26,
                         fontWeight: FontWeight.w900,
-                        color: safetyOrange,
+                        color: AppColors.secondaryOrange,
                       ),
                     ),
                   ),
-
-                  // مسافة تحت النص لتعطي توازن للزرار
                   const SizedBox(height: 45),
 
+                  // إذا لم يكن مسجلاً يظهر زر "يلا Pro"
                   if (!isUserLoggedIn)
                     SizedBox(
                       width: 170,
                       height: 55,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: safetyOrange,
+                          backgroundColor: AppColors.secondaryOrange,
+                          padding: EdgeInsets
+                              .zero, // إزالة الحواف الداخلية لضمان التوسط
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(30)),
                         ),
@@ -138,18 +145,24 @@ class _SplashScreenState extends State<SplashScreen>
                                 builder: (c) => const LoginScreen()),
                           );
                         },
-                        child: Text(
-                          "يلا Pro",
-                          style: GoogleFonts.cairo(
-                            fontSize: 20,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
+                        child: Center(
+                          // توسيط النص تماماً
+                          child: Text(
+                            "يلا Pro",
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.cairo(
+                              fontSize: 20,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              height: 1.1, // لضبط التوسط الرأسي للنص العربي
+                            ),
                           ),
                         ),
                       ),
                     )
                   else
-                    const CircularProgressIndicator(color: safetyOrange),
+                    const CircularProgressIndicator(
+                        color: AppColors.secondaryOrange),
                 ],
               ),
             ),

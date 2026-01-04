@@ -1,63 +1,68 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
 
-// استيراد الشاشات الأساسية
-import 'screens/splash_screen.dart';
-import 'screens/login_screen.dart';
-import 'screens/about_screen.dart';
-import 'screens/admin_panel.dart';
-import 'main_wrapper.dart';
+// استخدام المسار الكامل المرتبط باسم المشروع (تأكدي أن الاسم lpro2_quiz مطابق لـ pubspec.yaml)
+import 'package:lpro2_quiz/firebase_options.dart';
+import 'package:lpro2_quiz/core/theme/app_theme.dart';
+import 'package:lpro2_quiz/presentation/screens/splash_screen.dart';
+import 'package:lpro2_quiz/presentation/screens/login_screen.dart';
+import 'package:lpro2_quiz/presentation/screens/complete_profile_screen.dart';
+import 'package:lpro2_quiz/presentation/screens/main_wrapper.dart';
+import 'package:lpro2_quiz/presentation/screens/about_screen.dart';
+import 'package:lpro2_quiz/presentation/screens/admin_panel.dart';
 
 void main() async {
-  // التأكد من تهيئة أدوات Flutter قبل بدء التطبيق
+  // التأكد من تهيئة الـ Widgets قبل أي عملية أخرى
   WidgetsFlutterBinding.ensureInitialized();
 
-  // تهيئة Firebase بناءً على خيارات المنصة (Android/iOS)
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  try {
+    // تهيئة Firebase
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint("Firebase Initialization Error: $e");
+  }
 
-  runApp(const RealEstateQuizApp());
+  // تثبيت اتجاه الشاشة رأسي فقط لضمان استقرار التصميم (Portrait Only)
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  runApp(const LProApp());
 }
 
-class RealEstateQuizApp extends StatefulWidget {
-  const RealEstateQuizApp({super.key});
+class LProApp extends StatefulWidget {
+  const LProApp({super.key});
 
-  // دالة تغيير اللغة من أي مكان في التطبيق
+  // دالة لتغيير اللغة من أي مكان في التطبيق
   static void setLocale(BuildContext context, Locale newLocale) {
-    _RealEstateQuizAppState? state =
-        context.findAncestorStateOfType<_RealEstateQuizAppState>();
+    _LProAppState? state = context.findAncestorStateOfType<_LProAppState>();
     state?.changeLanguage(newLocale);
   }
 
   @override
-  State<RealEstateQuizApp> createState() => _RealEstateQuizAppState();
+  State<LProApp> createState() => _LProAppState();
 }
 
-class _RealEstateQuizAppState extends State<RealEstateQuizApp> {
-  // اللغة الافتراضية للتطبيق هي العربية
+class _LProAppState extends State<LProApp> {
+  // اللغة الافتراضية هي العربية (مصر)
   Locale _locale = const Locale('ar', 'EG');
 
   void changeLanguage(Locale locale) {
-    setState(() {
-      _locale = locale;
-    });
+    setState(() => _locale = locale);
   }
 
   @override
   Widget build(BuildContext context) {
-    // الألوان الرئيسية للهوية البصرية
-    const Color deepTeal = Color(0xFF1B4D57);
-    const Color safetyOrange = Color(0xFFE67E22);
-
     return MaterialApp(
-      title: 'أبطال Pro',
+      title: 'L Pro Quiz',
       debugShowCheckedModeBanner: false,
 
-      // إعدادات اللغات والترجمة
+      // إعدادات اللغات المدعومة
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -66,43 +71,16 @@ class _RealEstateQuizAppState extends State<RealEstateQuizApp> {
       supportedLocales: const [Locale('ar', 'EG'), Locale('en', 'US')],
       locale: _locale,
 
-      // إعدادات التصميم الموحد (Theming)
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: deepTeal,
-          primary: deepTeal,
-          secondary: safetyOrange,
-          surface: Colors.white,
-        ),
+      // تطبيق السمة (Theme) المركزية التي صممناها
+      theme: LproTheme.lightTheme,
 
-        // إعدادات الخلفية العامة
-        scaffoldBackgroundColor: const Color(0xFFF4F7F8),
-
-        // تطبيق خط Cairo الفخم على كل نصوص التطبيق
-        textTheme:
-            GoogleFonts.cairoTextTheme(Theme.of(context).textTheme).apply(
-          bodyColor: deepTeal,
-          displayColor: deepTeal,
-        ),
-
-        // تحسين تصميم الأزرار بشكل افتراضي
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: deepTeal,
-            foregroundColor: Colors.white,
-            textStyle: GoogleFonts.cairo(fontWeight: FontWeight.bold),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-      ),
-
-      // إدارة التنقل (Routing System)
+      // إدارة المسارات (Navigation Management)
       initialRoute: '/',
       routes: {
         '/': (context) => const SplashScreen(),
         '/login': (context) => const LoginScreen(),
+        '/complete_profile': (context) =>
+            const CompleteProfileScreen(), // الشاشة المفقودة سابقاً
         '/home': (context) => const MainWrapper(),
         '/about': (context) => const AboutScreen(),
         '/admin': (context) => const AdminPanel(),

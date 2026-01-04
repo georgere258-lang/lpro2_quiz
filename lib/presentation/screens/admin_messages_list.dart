@@ -2,32 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'admin_reply_screen.dart';
-import 'package:intl/intl.dart'; // ستحتاجين لإضافة حزمة intl في pubspec.yaml لتنسيق الوقت
+import 'package:intl/intl.dart';
 
 class AdminMessagesList extends StatelessWidget {
   const AdminMessagesList({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final Color deepTeal = const Color(0xFF1B4D57);
-    final Color safetyOrange = const Color(0xFFE67E22);
+    const Color deepTeal = Color(0xFF1B4D57);
+    const Color safetyOrange = Color(0xFFE67E22);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7F8),
       appBar: AppBar(
+        // تم التعديل هنا: حذف كلمة الأبطال
         title: Text(
-          "صندوق رسائل الأبطال",
+          "صندوق الرسائل",
           style: GoogleFonts.cairo(
             color: Colors.white,
             fontWeight: FontWeight.bold,
+            fontSize: 18,
           ),
         ),
         backgroundColor: deepTeal,
         centerTitle: true,
         elevation: 0,
+        // إضافة أيقونة العودة بلون أبيض لضمان الوضوح
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        // ترتيب المحادثات حسب الأحدث تعديلاً (آخر رسالة وصلت)
         stream: FirebaseFirestore.instance
             .collection('support_chats')
             .orderBy('lastUpdate', descending: true)
@@ -67,10 +70,10 @@ class AdminMessagesList extends StatelessWidget {
               final String name = data['userName'] ?? "مستشار عقاري";
               final bool isUnread = data['unreadByAdmin'] ?? false;
 
-              // تنسيق الوقت
+              // تنسيق الوقت بشكل آمن
               String formattedTime = "";
               if (data['lastUpdate'] != null) {
-                DateTime dt = (data['lastUpdate'] as Timestamp).hisDateTime();
+                DateTime dt = (data['lastUpdate'] as Timestamp).toDate();
                 formattedTime = DateFormat('hh:mm a').format(dt);
               }
 
@@ -95,7 +98,7 @@ class AdminMessagesList extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         backgroundColor: deepTeal.withOpacity(0.1),
-                        child: Icon(Icons.person, color: deepTeal),
+                        child: const Icon(Icons.person, color: deepTeal),
                       ),
                       if (isUnread)
                         Positioned(
@@ -119,10 +122,10 @@ class AdminMessagesList extends StatelessWidget {
                       Text(
                         name,
                         style: GoogleFonts.cairo(
-                          fontWeight: isUnread
-                              ? FontWeight.w900
-                              : FontWeight.bold,
+                          fontWeight:
+                              isUnread ? FontWeight.w900 : FontWeight.bold,
                           color: deepTeal,
+                          fontSize: 15,
                         ),
                       ),
                       Text(
@@ -139,10 +142,10 @@ class AdminMessagesList extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.cairo(
-                      fontWeight: isUnread
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+                      fontWeight:
+                          isUnread ? FontWeight.bold : FontWeight.normal,
                       color: isUnread ? Colors.black87 : Colors.grey,
+                      fontSize: 13,
                     ),
                   ),
                   trailing: Icon(
@@ -169,9 +172,4 @@ class AdminMessagesList extends StatelessWidget {
       ),
     );
   }
-}
-
-// إضافة Extension بسيطة لتحويل Timestamp
-extension on Timestamp {
-  DateTime hisDateTime() => this.toDate();
 }

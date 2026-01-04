@@ -3,7 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../main_wrapper.dart';
+
+// تصحيح المسارات للوصول للثوابت والغلاف الرئيسي
+import '../../core/constants/app_colors.dart';
+import 'main_wrapper.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -19,13 +22,12 @@ class _LoginScreenState extends State<LoginScreen> {
   String verificationId = "";
 
   final TextEditingController phoneController = TextEditingController();
+
+  // نظام الـ 6 خانات
   final List<TextEditingController> otpControllers =
       List.generate(6, (index) => TextEditingController());
   final List<FocusNode> otpFocusNodes =
       List.generate(6, (index) => FocusNode());
-
-  final Color deepTeal = const Color(0xFF1B4D57);
-  final Color safetyOrange = const Color(0xFFE67E22);
 
   void _sendOtp() async {
     String phone = phoneController.text.trim();
@@ -34,11 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (phone.isEmpty || phone.length < 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text("يرجى إدخال رقم هاتف صحيح"),
-            backgroundColor: Colors.red),
-      );
+      _showSnackBar("يرجى إدخال رقم هاتف صحيح", Colors.red);
       return;
     }
 
@@ -53,11 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
         },
         verificationFailed: (FirebaseAuthException e) {
           setState(() => isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text("خطأ: ${e.message}"),
-                backgroundColor: Colors.red),
-          );
+          _showSnackBar("خطأ: ${e.message}", Colors.red);
         },
         codeSent: (String verId, int? resendToken) {
           setState(() {
@@ -70,17 +64,14 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } catch (e) {
       setState(() => isLoading = false);
+      _showSnackBar("حدث خطأ في الاتصال", Colors.red);
     }
   }
 
   void _verifyOtp() async {
     String otp = otpControllers.map((e) => e.text).join();
     if (otp.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text("يرجى إدخال الـ 6 أرقام كاملة"),
-            backgroundColor: Colors.orange),
-      );
+      _showSnackBar("يرجى إدخال الـ 6 أرقام كاملة", Colors.orange);
       return;
     }
 
@@ -95,11 +86,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _navigateUser();
     } catch (e) {
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text("الرمز غير صحيح، حاول مجدداً"),
-            backgroundColor: Colors.red),
-      );
+      _showSnackBar("الرمز غير صحيح، حاول مجدداً", Colors.red);
     }
   }
 
@@ -113,13 +100,12 @@ class _LoginScreenState extends State<LoginScreen> {
             .get();
 
         if (!userDoc.exists) {
-          // تم إزالة حقل photoUrl نهائياً لتبسيط البيانات وتوفير التكاليف
           await FirebaseFirestore.instance
               .collection('users')
               .doc(user.uid)
               .set({
             'uid': user.uid,
-            'name': "بطل Pro جديد",
+            'name': "عضو L Pro جديد",
             'phone': user.phoneNumber ?? phoneController.text,
             'points': 0,
             'role': 'user',
@@ -137,6 +123,14 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(message, style: GoogleFonts.cairo()),
+          backgroundColor: color),
+    );
+  }
+
   @override
   void dispose() {
     phoneController.dispose();
@@ -152,57 +146,67 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: deepTeal,
+      backgroundColor: AppColors.primaryDeepTeal,
       body: isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.white))
-          : SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 30),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 80),
-                    SvgPicture.asset('assets/logo.svg',
-                        height: 110,
-                        placeholderBuilder: (c) => const Icon(Icons.business,
-                            size: 80, color: Colors.white)),
-                    const SizedBox(height: 12),
-                    Text("المعلومة بتفرق",
-                        style: GoogleFonts.cairo(
-                            color: safetyOrange,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 40),
-                    Text(isOtpStage ? "تأكيد الرمز" : "تسجيل الدخول",
-                        style: GoogleFonts.cairo(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white)),
-                    const SizedBox(height: 40),
-                    Directionality(
-                      textDirection: TextDirection.ltr,
-                      child: isOtpStage ? _buildOtpInput() : _buildPhoneInput(),
-                    ),
-                    const SizedBox(height: 40),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 55,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: safetyOrange,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15)),
-                        ),
-                        onPressed: isOtpStage ? _verifyOtp : _sendOtp,
-                        child: Text(
-                          isOtpStage ? "تأكيد" : "إرسال الرمز",
+          : Center(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 30, vertical: 50),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SvgPicture.asset('assets/logo.svg',
+                          height: 110,
+                          placeholderBuilder: (c) => const Icon(Icons.business,
+                              size: 80, color: Colors.white)),
+                      const SizedBox(height: 12),
+                      Text("المعلومة بتفرق",
                           style: GoogleFonts.cairo(
-                              color: Colors.white,
+                              color: AppColors.secondaryOrange,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 40),
+                      Text(isOtpStage ? "تأكيد الرمز" : "تسجيل الدخول",
+                          style: GoogleFonts.cairo(
+                              fontSize: 24,
                               fontWeight: FontWeight.bold,
-                              fontSize: 18),
+                              color: Colors.white)),
+                      const SizedBox(height: 40),
+                      Directionality(
+                        textDirection: TextDirection.ltr,
+                        child:
+                            isOtpStage ? _buildOtpInput() : _buildPhoneInput(),
+                      ),
+                      const SizedBox(height: 40),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 55,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.secondaryOrange,
+                            elevation: 0,
+                            padding: EdgeInsets.zero, // لضمان التوسط
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15)),
+                          ),
+                          onPressed: isOtpStage ? _verifyOtp : _sendOtp,
+                          child: Center(
+                            child: Text(
+                              isOtpStage ? "تأكيد" : "إرسال الرمز",
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.cairo(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                  height: 1.1),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -255,38 +259,37 @@ class _LoginScreenState extends State<LoginScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: List.generate(
-          6,
-          (index) => SizedBox(
-                width: 45,
-                child: TextField(
-                  controller: otpControllers[index],
-                  focusNode: otpFocusNodes[index],
-                  textAlign: TextAlign.center,
-                  keyboardType: TextInputType.number,
-                  autofillHints: const [AutofillHints.oneTimeCode],
-                  maxLength: 1,
-                  onChanged: (val) {
-                    if (val.length == 1 && index < 5) {
-                      otpFocusNodes[index + 1].requestFocus();
-                    }
-                    if (val.isEmpty && index > 0) {
-                      otpFocusNodes[index - 1].requestFocus();
-                    }
-                  },
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold),
-                  decoration: InputDecoration(
-                    counterText: "",
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none),
-                  ),
-                ),
-              )),
+        6,
+        (index) => SizedBox(
+          width: 45,
+          child: TextField(
+            controller: otpControllers[index],
+            focusNode: otpFocusNodes[index],
+            textAlign: TextAlign.center,
+            keyboardType: TextInputType.number,
+            maxLength: 1,
+            onChanged: (val) {
+              if (val.length == 1 && index < 5) {
+                otpFocusNodes[index + 1].requestFocus();
+              }
+              if (val.isEmpty && index > 0) {
+                otpFocusNodes[index - 1].requestFocus();
+              }
+            },
+            style: const TextStyle(
+                color: Colors.black, fontSize: 22, fontWeight: FontWeight.bold),
+            decoration: InputDecoration(
+              counterText: "",
+              filled: true,
+              fillColor: Colors.white.withOpacity(0.9),
+              contentPadding: EdgeInsets.zero, // لضمان توسط الرقم داخل المربع
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

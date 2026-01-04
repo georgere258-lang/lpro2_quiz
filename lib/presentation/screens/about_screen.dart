@@ -1,21 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+// استيراد الثوابت المركزية
+import '../../core/constants/app_colors.dart';
+
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
 
-  final Color deepTeal = const Color(0xFF1B4D57);
-  final Color safetyOrange = const Color(0xFFE67E22);
-
   @override
   Widget build(BuildContext context) {
+    const Color deepTeal = AppColors.primaryDeepTeal;
+    const Color safetyOrange = AppColors.secondaryOrange;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7F8),
+      backgroundColor: AppColors.scaffoldBackground,
       appBar: AppBar(
         backgroundColor: deepTeal,
         elevation: 0,
-        // تم مسح الجملة فقط من هنا وترك المكان فارغاً
-        title: const Text(""),
+        title: const Text(""), // ترك العنوان فارغاً كما طلبتِ
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -25,7 +27,7 @@ class AboutScreen extends StatelessWidget {
           padding: const EdgeInsets.all(25),
           child: Column(
             children: [
-              // شعار البرنامج (تم إرجاعه كما كان تماماً)
+              // شعار البرنامج (تم الحفاظ عليه تماماً)
               Center(
                 child: Container(
                   height: 120,
@@ -76,10 +78,10 @@ class AboutScreen extends StatelessWidget {
               ),
               const SizedBox(height: 40),
 
-              // رؤيتنا
+              // رؤيتنا (تم تعديل النصوص لإزالة الكلمات المحظورة)
               _buildAboutCard(
                 "رؤيتنا",
-                "نهدف إلى خلق مجتمع من نخبة المستشارين العقاريين (أبطال Pro). نحن نؤمن أن السوق العقاري يعتمد على المعلومة الصادقة والذكاء في التنفيذ، ودورنا هو تمكينك لتكون البطل في مجالك.",
+                "نهدف إلى تمكين المستشارين العقاريين من خلال نظام L Pro المتطور. نحن نؤمن أن النجاح في السوق العقاري يعتمد على دقة المعلومة ومهارة التنفيذ، ودورنا هو توفير الأدوات التي تجعلك متميزاً في مجالك.",
                 Icons.emoji_events_outlined,
               ),
               const SizedBox(height: 20),
@@ -87,13 +89,13 @@ class AboutScreen extends StatelessWidget {
               // الإصدار
               _buildAboutCard(
                 "الإصدار",
-                "نسخة بريميوم 1.0.0\nمخصص للنخبة العقارية 2026",
+                "نسخة بريميوم 1.0.0\nمخصص لمجتمع L Pro العقاري 2026",
                 Icons.verified_user_outlined,
               ),
 
               const SizedBox(height: 60),
               Text(
-                "جميع الحقوق محفوظة لأبطال Pro © 2026",
+                "جميع الحقوق محفوظة لـ L Pro © 2026",
                 style: GoogleFonts.cairo(
                   fontSize: 11,
                   color: Colors.grey,
@@ -125,7 +127,7 @@ class AboutScreen extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: safetyOrange, size: 28),
+          Icon(icon, color: AppColors.secondaryOrange, size: 28),
           const SizedBox(width: 15),
           Expanded(
             child: Column(
@@ -136,7 +138,7 @@ class AboutScreen extends StatelessWidget {
                   style: GoogleFonts.cairo(
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
-                    color: deepTeal,
+                    color: AppColors.primaryDeepTeal,
                   ),
                 ),
                 const SizedBox(height: 10),

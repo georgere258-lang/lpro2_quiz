@@ -1,5 +1,5 @@
 name: lpro2_quiz
-description: "تطبيق دوري العقارات المطور لمريم - نسخة بريميوم"
+description: "تطبيق L Pro العقاري المطور - نسخة بريميوم"
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -15,23 +15,30 @@ dependencies:
     sdk: flutter
 
   # الخطوط وتنسيق النصوص
-  google_fonts: ^6.1.0
+  google_fonts: ^6.2.1
   
   # الأيقونات
   cupertino_icons: ^1.0.6
-  font_awesome_flutter: ^10.6.0
+  font_awesome_flutter: ^10.7.0
   
   # تشغيل ملفات SVG (اللوجو)
-  flutter_svg: ^2.0.10
+  flutter_svg: ^2.0.10+1
 
-  # منظومة الفايربيز الأساسية (بدون Storage)
-  firebase_core: ^2.24.2
-  cloud_firestore: ^4.14.0
-  firebase_auth: ^4.16.0
+  # منظومة الفايربيز (تمت الترقية للجيل الثالث لحل كافة تعارضات التبعيات)
+  firebase_core: ^3.1.0
+  cloud_firestore: ^5.0.2
+  firebase_auth: ^5.1.0
+  firebase_storage: ^12.0.1
 
-  # أدوات المشاركة والوقت
-  share_plus: ^12.0.1
-  intl: ^0.20.2
+  # تحسين أداء الصور (سرعة تحميل وتوفير داتا)
+  cached_network_image: ^3.3.1
+
+  # أدوات اختيار الصور من الموبايل
+  image_picker: ^1.0.7
+
+  # أدوات المشاركة والوقت (إصدارات متوافقة تماماً)
+  share_plus: ^10.0.0
+  intl: 0.20.2 # الإصدار المطابق لـ Flutter SDK كما هو مطلوب
 
 dev_dependencies:
   flutter_test:
@@ -51,9 +58,9 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
 
-  # تعريف الملفات الموجودة في مجلد assets
+  # تعريف المجلدات والملفات
   assets:
+    - assets/
     - assets/logo.svg
     - assets/top_brand.png
     - assets/icon.png
-    - assets/card_images/
