@@ -3,12 +3,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:ui';
+
 import '../../core/constants/app_colors.dart';
 import 'quiz_screen.dart';
 import 'master_plan_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -24,11 +26,10 @@ class _HomeScreenState extends State<HomeScreen>
   late AnimationController _newsController;
   late Animation<Offset> _newsAnimation;
 
-  // القائمة الاحتياطية لـ 30 معلومة
   final List<String> dailyTips = [
-    "العقار هو الملاذ الآمن تاريخياً ضد التضخم. راجع اليوم مشروعين بالتفصيل.. القادم أجمل! 🏠",
+    "العقارات هي الملاذ الآمن تاريخياً ضد التضخم. راجع اليوم مشروعين بالتفصيل.. القادم أجمل! 🏠",
     "تحديد احتياج العميل بدقة يوفر 70% من مجهود الإقناع. اسمع أكثر مما تتكلم اليوم.. أنت مستشار محترف! 🤝",
-    "الموقع هو العامل الأول في تقييم سعر إعادة البيع. ادرس اليوم خارطة الطرق الجديدة.. ذكاؤك هو رأس مالك! 📍",
+    "الموقع هو العامل الأول in تقييم سعر إعادة البيع. ادرس اليوم خارطة الطرق الجديدة.. ذكاؤك هو رأس مالك! 📍",
     "الثقة هي العملة الحقيقية في سوق العقارات. اتصل بعميل سابق للاطمئنان عليه فقط.. الأمانة تبني إمبراطوريات! 💎",
     "الاستثمار في العقار التجاري يتطلب حساب العائد الإيجاري (ROI) بدقة. حلل اليوم أرقام منطقة حيوية.. أنت مبدع! 📊",
     "العميل لا يشتري جدراناً، بل يشتري مستقبلاً. ركز اليوم على قصة المكان وليس فقط المواصفات.. أبدع في وصفك! ✨",
@@ -97,22 +98,27 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
                     _buildUserGreetingStream(),
-                    const SizedBox(height: 25),
-                    _buildGlassQuickFact(),
-                    const SizedBox(height: 35),
-                    Center(
-                        child: Text("من يملك المعلومة.. يملك القوة",
-                            style: GoogleFonts.cairo(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                color: deepTeal))),
                     const SizedBox(height: 15),
+                    _buildDynamicInfoCard(),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12, bottom: 18),
+                      child: Center(
+                        child: Text(
+                          "من يملك المعلومة.. يملك القوة",
+                          style: GoogleFonts.cairo(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w900,
+                            color: deepTeal.withOpacity(0.85),
+                          ),
+                        ),
+                      ),
+                    ),
                     _buildLProGrid(),
-                    const SizedBox(height: 55),
+                    const SizedBox(height: 25),
                     _buildModernEncouragement(),
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -123,13 +129,13 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildGlassQuickFact() {
+  Widget _buildDynamicInfoCard() {
     DateTime now = DateTime.now();
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('daily_tips')
           .where('isActive', isEqualTo: true)
-          .where('startDate', isLessThanOrEqualTo: now) // التصحيح هنا
+          .where('startDate', isLessThanOrEqualTo: now)
           .orderBy('startDate', descending: true)
           .limit(1)
           .snapshots(),
@@ -139,41 +145,7 @@ class _HomeScreenState extends State<HomeScreen>
           var data = snapshot.data!.docs.first.data() as Map<String, dynamic>;
           factToShow = data['content'] ?? _fallbackFact;
         }
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(15),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.8),
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(
-                      color: safetyOrange.withOpacity(0.1), width: 1.5)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    Icon(Icons.lightbulb_outline, color: deepTeal, size: 20),
-                    const SizedBox(width: 8),
-                    Text("معلومة في السريع",
-                        style: GoogleFonts.cairo(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            color: deepTeal))
-                  ]),
-                  const SizedBox(height: 10),
-                  Text(factToShow,
-                      style: GoogleFonts.cairo(
-                          fontSize: 12,
-                          color: Colors.black87,
-                          fontWeight: FontWeight.bold,
-                          height: 1.6)),
-                ],
-              ),
-            ),
-          ),
-        );
+        return InfoCardWidget(content: factToShow);
       },
     );
   }
@@ -200,13 +172,14 @@ class _HomeScreenState extends State<HomeScreen>
           child: SlideTransition(
             position: _newsAnimation,
             child: IntrinsicWidth(
-                child: Text(combinedList.join("      "),
-                    style: GoogleFonts.cairo(
-                        color: Colors.white,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.bold),
-                    softWrap: false,
-                    overflow: TextOverflow.visible)),
+              child: Text(combinedList.join("      "),
+                  style: GoogleFonts.cairo(
+                      color: Colors.white,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold),
+                  softWrap: false,
+                  overflow: TextOverflow.visible),
+            ),
           ),
         );
       },
@@ -221,14 +194,15 @@ class _HomeScreenState extends State<HomeScreen>
           .snapshots(),
       builder: (context, snapshot) {
         String name = "عضو L Pro";
-        if (snapshot.hasData && snapshot.data!.exists)
+        if (snapshot.hasData && snapshot.data!.exists) {
           name = snapshot.data!['name'] ?? "عضو L Pro";
+        }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text("أهلاً بك، $name ✨",
                 style: GoogleFonts.cairo(
-                    fontSize: 22,
+                    fontSize: 21,
                     fontWeight: FontWeight.w900,
                     color: deepTeal)),
             Row(children: [
@@ -247,12 +221,12 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _miniMotto(String text) => Text(text,
       style: GoogleFonts.cairo(
-          fontSize: 12, color: safetyOrange, fontWeight: FontWeight.w800));
+          fontSize: 11.5, color: safetyOrange, fontWeight: FontWeight.w800));
 
   Widget _customHandDrawnArrow() => Padding(
       padding: const EdgeInsets.symmetric(horizontal: 5),
       child: CustomPaint(
-          size: const Size(12, 10),
+          size: const Size(11, 9),
           painter: SolidTrianglePainter(turquoiseCyan)));
 
   Widget _buildLProGrid() {
@@ -260,15 +234,16 @@ class _HomeScreenState extends State<HomeScreen>
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
-      mainAxisSpacing: 20,
-      crossAxisSpacing: 20,
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      childAspectRatio: 1.15,
       children: [
         _buildPremiumCard(
             "دوري النجوم",
             "FRESH ✨",
             const Color(0xFF3498DB),
             CustomPaint(
-                size: const Size(50, 50),
+                size: const Size(42, 42),
                 painter: PremiumTrophyPainter(safetyOrange)),
             "دوري النجوم",
             true,
@@ -278,7 +253,7 @@ class _HomeScreenState extends State<HomeScreen>
             "PRO 🔥",
             safetyOrange,
             CustomPaint(
-                size: const Size(50, 50),
+                size: const Size(42, 42),
                 painter: PremiumMedalPainter(safetyOrange)),
             "دوري المحترفين",
             true,
@@ -288,7 +263,7 @@ class _HomeScreenState extends State<HomeScreen>
             "",
             Colors.transparent,
             CustomPaint(
-                size: const Size(55, 55),
+                size: const Size(46, 46),
                 painter: PaperAndPenPainter(lightTeal, safetyOrange)),
             "المعلومة بتفرق",
             false,
@@ -298,7 +273,7 @@ class _HomeScreenState extends State<HomeScreen>
             "",
             Colors.transparent,
             CustomPaint(
-                size: const Size(50, 50),
+                size: const Size(42, 42),
                 painter: DeepHollowQuestionPainter(lightTeal, safetyOrange)),
             "اعرف عميلك",
             false,
@@ -326,60 +301,139 @@ class _HomeScreenState extends State<HomeScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                 icon,
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Text(title,
                     style: GoogleFonts.cairo(
                         color: deepTeal,
-                        fontSize: 13,
+                        fontSize: 12.5,
                         fontWeight: FontWeight.w900))
               ])),
           if (showBadge)
             Positioned(
-                top: 14,
-                right: -16,
-                child: Transform.rotate(
-                    angle: 0.55,
-                    child: Container(
-                        width: 105,
-                        padding: const EdgeInsets.symmetric(vertical: 5),
-                        decoration: BoxDecoration(
-                            color: badgeColor,
-                            boxShadow: [
-                              BoxShadow(
-                                  color: Colors.black26,
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2))
-                            ]),
-                        child: Center(
-                            child: Text(badge,
-                                style: GoogleFonts.cairo(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w900)))))),
+              top: 10,
+              right: -14,
+              child: Transform.rotate(
+                angle: 0.55,
+                child: Container(
+                  width: 90,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  decoration: BoxDecoration(
+                      color: badgeColor,
+                      boxShadow: const [
+                        BoxShadow(
+                            color: Colors.black26,
+                            blurRadius: 4,
+                            offset: Offset(0, 2))
+                      ]),
+                  child: Center(
+                    child: Text(badge,
+                        style: GoogleFonts.cairo(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900)),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
+  // --- تم تعديل ترتيب العناصر هنا لتظهر Learn في اليسار و Success في اليمين ---
   Widget _buildModernEncouragement() =>
       Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        _engWord("Learn"),
+        _engWord("Success"),
         _customCyanArrowEn(),
         _engWord("Growth"),
         _customCyanArrowEn(),
-        _engWord("Success")
+        _engWord("Learn"),
       ]);
+
   Widget _engWord(String text) => Text(text,
       style: GoogleFonts.cairo(
-          color: lightTeal, fontSize: 16, fontWeight: FontWeight.w900));
+          color: lightTeal, fontSize: 15, fontWeight: FontWeight.w900));
+
   Widget _customCyanArrowEn() => Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       child: CustomPaint(
-          size: const Size(12, 12),
+          size: const Size(11, 11),
           painter: SolidTrianglePainter(turquoiseCyan, isLeft: false)));
 }
 
-// الرسامون (Painters) والمؤثرات كما هي
+class InfoCardWidget extends StatelessWidget {
+  final String content;
+  const InfoCardWidget({super.key, required this.content});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.07),
+              blurRadius: 25,
+              offset: const Offset(0, 10)),
+        ],
+        border: Border.all(
+            color: AppColors.primaryDeepTeal.withOpacity(0.1), width: 1.2),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.primaryDeepTeal, Color(0xFF006D77)],
+                  begin: Alignment.centerRight,
+                  end: Alignment.centerLeft,
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.tips_and_updates_rounded,
+                      color: AppColors.secondaryOrange, size: 20),
+                  const SizedBox(width: 10),
+                  Text(
+                    "معلومة L Pro",
+                    style: GoogleFonts.cairo(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              color: Colors.white,
+              child: Text(
+                content,
+                textAlign: TextAlign.right,
+                style: GoogleFonts.cairo(
+                  fontSize: 15,
+                  height: 1.7,
+                  color: const Color(0xFF2D3142),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class SolidTrianglePainter extends CustomPainter {
   final Color color;
   final bool isLeft;
@@ -451,7 +505,7 @@ class PremiumTrophyPainter extends CustomPainter {
     final paint = Paint()
       ..color = const Color(0xFF388E8E)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5;
+      ..strokeWidth = 2.3;
     Path cup = Path()
       ..moveTo(w * 0.3, h * 0.2)
       ..lineTo(w * 0.7, h * 0.2)
@@ -479,7 +533,7 @@ class PremiumMedalPainter extends CustomPainter {
     final paint = Paint()
       ..color = const Color(0xFF388E8E)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5;
+      ..strokeWidth = 2.3;
     canvas.drawRect(Rect.fromLTWH(w * 0.4, 0, w * 0.2, h * 0.45), paint);
     canvas.drawCircle(Offset(w * 0.5, h * 0.7), w * 0.28, paint);
   }
@@ -497,7 +551,7 @@ class DeepHollowQuestionPainter extends CustomPainter {
     final paint = Paint()
       ..color = themeColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2;
+      ..strokeWidth = 2.1;
     Path qPath = Path()
       ..moveTo(w * 0.3, h * 0.4)
       ..quadraticBezierTo(w * 0.35, h * 0.1, w * 0.65, h * 0.2)
@@ -505,7 +559,7 @@ class DeepHollowQuestionPainter extends CustomPainter {
       ..lineTo(w * 0.55, h * 0.65);
     canvas.drawPath(qPath, paint);
     canvas.drawCircle(
-        Offset(w * 0.55, h * 0.8), 4.5, Paint()..color = dotColor);
+        Offset(w * 0.55, h * 0.8), 4.2, Paint()..color = dotColor);
   }
 
   @override
@@ -521,7 +575,7 @@ class PaperAndPenPainter extends CustomPainter {
     final paint = Paint()
       ..color = themeColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2;
+      ..strokeWidth = 2.1;
     Rect paper = Rect.fromCenter(
         center: Offset(w * 0.4, h * 0.5), width: w * 0.45, height: h * 0.65);
     canvas.drawRRect(

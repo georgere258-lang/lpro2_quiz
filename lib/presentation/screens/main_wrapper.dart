@@ -39,7 +39,7 @@ class _MainWrapperState extends State<MainWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    // دالة لتحديد عنوان الـ AppBar بناءً على الفهرس الحالي (عربي فقط)
+    // دالة لتحديد عنوان الـ AppBar بناءً على الفهرس الحالي
     Widget getAppBarTitle() {
       if (_currentIndex == 0) {
         return Image.asset(
@@ -50,15 +50,16 @@ class _MainWrapperState extends State<MainWrapper> {
             style: GoogleFonts.cairo(
               fontWeight: FontWeight.w900,
               color: Colors.white,
-              fontSize: 20,
+              fontSize: 22,
             ),
           ),
         );
       }
 
+      // المسميات الجديدة المعتمدة لهوية Pro
       List<String> titles = [
         "",
-        "دوري المتصدرين",
+        "دوري المحترفين 🏆", // العنوان العلوي لصفحة الدوري
         "ملفي الشخصي",
         "الدعم الفني المباشر",
       ];
@@ -66,9 +67,9 @@ class _MainWrapperState extends State<MainWrapper> {
       return Text(
         titles[_currentIndex],
         style: GoogleFonts.cairo(
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.w900,
           color: Colors.white,
-          fontSize: 17,
+          fontSize: 18,
         ),
       );
     }
@@ -81,13 +82,13 @@ class _MainWrapperState extends State<MainWrapper> {
         centerTitle: true,
         automaticallyImplyLeading: false,
         title: getAppBarTitle(),
-        // زر الرجوع يظهر في الشاشات الفرعية ليعيد المستخدم للرئيسية
+        // زر الرجوع يعيد المستخدم للرئيسية
         leading: _currentIndex != 0
             ? IconButton(
                 icon: const Icon(
                   Icons.arrow_back_ios_new_rounded,
                   color: Colors.white,
-                  size: 18,
+                  size: 20,
                 ),
                 onPressed: () => setState(() => _currentIndex = 0),
               )
@@ -101,9 +102,9 @@ class _MainWrapperState extends State<MainWrapper> {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 15,
-              offset: const Offset(0, -4),
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, -5),
             )
           ],
         ),
@@ -112,12 +113,12 @@ class _MainWrapperState extends State<MainWrapper> {
           currentIndex: _currentIndex >= 3 ? 2 : _currentIndex,
           onTap: (i) => setState(() => _currentIndex = i),
           selectedItemColor: AppColors.secondaryOrange,
-          unselectedItemColor: Colors.grey[400],
+          unselectedItemColor: Colors.grey[500],
           showUnselectedLabels: true,
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.white,
           selectedLabelStyle:
-              GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 11),
+              GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 12),
           unselectedLabelStyle:
               GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 11),
           items: const [
@@ -129,7 +130,7 @@ class _MainWrapperState extends State<MainWrapper> {
             BottomNavigationBarItem(
               icon: Icon(Icons.emoji_events_outlined),
               activeIcon: Icon(Icons.emoji_events),
-              label: "الترتيب",
+              label: "دوري Pro", // المسمى المعتمد في الشريط السفلي
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),

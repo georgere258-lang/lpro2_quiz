@@ -6,8 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:async';
 import 'dart:math';
 
-import 'package:lpro2_quiz/core/constants/app_colors.dart';
-import 'package:lpro2_quiz/core/utils/sound_manager.dart';
+import '../../core/constants/app_colors.dart';
 
 class QuizScreen extends StatefulWidget {
   final String categoryTitle;
@@ -41,21 +40,16 @@ class _QuizScreenState extends State<QuizScreen> {
 
   List<Map<String, dynamic>> dataItems = [];
 
-  // مصفوفات الرسائل التحفيزية
   final List<String> starMessages = [
     "الاستمرار هو السر، كل معلومة بتعرفها النهاردة هي طوبة في صرح نجاحك بكرة 🌱",
-    "طبيعي تحس باللخبطة في الأول، المهم إنك مكمل وبتحاول، الصبر هو مفتاح العقارات 🔑",
     "المعلومة قوة، والتعلم المستمر هو اللي هيخليك تسبق الكل، برافو عليك ✨",
-    "تذكر إن كل خبير كان في يوم مبتدئ زيك، الاحباط مجرد محطة، كمل طريقك 🚀",
-    "نجاحك بيبدأ بقرارك إنك متوقفش تعلم مهما كانت التحديات، فخورين بيك 👏"
+    "تذكر إن كل خبير كان في يوم مبتدئ زيك، كمل طريقك 🚀",
   ];
 
   final List<String> proMessages = [
-    "افتكر اللحظة اللي قفلت فيها أصعب بيعة، القوة دي جواك وبتقدر تكررها تاني 🔥",
     "أنت مشيت طريق طويل ووصلت لمستوى المحترفين، كمل سلم النجاح للأخر 👑",
     "المحترف الحقيقي هو اللي بيطور نفسه كل يوم، خليك دايمًا في القمة 🏔️",
-    "الخبرة هي تراكم اللحظات دي، استعد للبيعة الجاية بمعلوماتك القوية 🔝",
-    "النجاح مش محطة، النجاح رحلة مستمرة وأنت أثبت إنك قدها، كمل يا Pro 🚀"
+    "النجاح رحلة مستمرة وأنت أثبت إنك قدها، كمل يا Pro 🚀"
   ];
 
   @override
@@ -71,19 +65,8 @@ class _QuizScreenState extends State<QuizScreen> {
     super.dispose();
   }
 
-  // فحص هل القسم إثرائي (للمعلومة فقط) أم تنافسي
   bool get isEducationalOnly =>
       widget.categoryTitle == "المعلومة بتفرق" || widget.isTopicMode;
-
-  void _playAppSound(String type) {
-    if (isEducationalOnly) return; // لا أصوات في الأقسام التعليمية
-    if (type == 'success')
-      SoundManager.playCorrect();
-    else if (type == 'wrong')
-      SoundManager.playWrong();
-    else
-      SoundManager.playTap();
-  }
 
   Future<void> _fetchContent() async {
     try {
@@ -110,16 +93,17 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void _startTimer() {
-    if (isEducationalOnly) return; // تعطيل التايمر في القسم التعليمي
+    if (isEducationalOnly) return;
     setState(
         () => timeLeft = (widget.categoryTitle == "دوري المحترفين") ? 15 : 25);
     timer?.cancel();
     timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (mounted) {
-        if (timeLeft > 0)
+        if (timeLeft > 0) {
           setState(() => timeLeft--);
-        else
+        } else {
           _handleAnswer("");
+        }
       }
     });
   }
@@ -131,8 +115,6 @@ class _QuizScreenState extends State<QuizScreen> {
     var currentQ = dataItems[currentQuestionIndex];
     bool isCorrect = _normalize(selected) ==
         _normalize(currentQ['options'][currentQ['correctAnswer']]);
-
-    _playAppSound(isCorrect ? 'success' : 'wrong');
 
     if (mounted) {
       setState(() {
@@ -209,12 +191,10 @@ class _QuizScreenState extends State<QuizScreen> {
       Navigator.pop(context);
       return;
     }
-
     final random = Random();
     String message = (widget.categoryTitle == "دوري النجوم")
         ? starMessages[random.nextInt(starMessages.length)]
         : proMessages[random.nextInt(proMessages.length)];
-
     showModalBottomSheet(
       context: context,
       isDismissible: false,
@@ -235,26 +215,22 @@ class _QuizScreenState extends State<QuizScreen> {
             const SizedBox(height: 15),
             Text(message,
                 textAlign: TextAlign.center,
-                style: GoogleFonts.cairo(
-                    fontSize: 15, height: 1.6, fontWeight: FontWeight.w600)),
+                style: GoogleFonts.cairo(fontSize: 15, height: 1.6)),
             const SizedBox(height: 25),
             SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: deepTeal,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15))),
-                onPressed: () {
-                  Navigator.pop(context);
-                  _saveScoreAndFinish();
-                },
-                child: Text("حفظ والعودة",
-                    style: GoogleFonts.cairo(
-                        color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-            )
+                width: double.infinity,
+                child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: deepTeal,
+                        padding: const EdgeInsets.symmetric(vertical: 15)),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _saveScoreAndFinish();
+                    },
+                    child: Text("حفظ والعودة",
+                        style: GoogleFonts.cairo(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold)))),
           ],
         ),
       ),
@@ -264,7 +240,7 @@ class _QuizScreenState extends State<QuizScreen> {
   Future<void> _saveScoreAndFinish() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null && score > 0 && !isEducationalOnly) {
-      setState(() => isSaving = true);
+      if (mounted) setState(() => isSaving = true);
       String pointsField =
           (widget.categoryTitle == "دوري النجوم") ? 'starsPoints' : 'proPoints';
       try {
@@ -277,7 +253,7 @@ class _QuizScreenState extends State<QuizScreen> {
           'lastQuizDate': FieldValue.serverTimestamp(),
         });
       } catch (e) {
-        debugPrint("Error: $e");
+        debugPrint("Error saving score: $e");
       }
     }
     if (mounted) {
@@ -294,7 +270,8 @@ class _QuizScreenState extends State<QuizScreen> {
       return Scaffold(
           appBar: _buildUnifiedHeader(),
           body: const Center(child: Text("لا يوجد محتوى حالياً")));
-    if (widget.isTopicMode) return _buildTopicView();
+    if (widget.isTopicMode || widget.categoryTitle == "المعلومة بتفرق")
+      return _buildTopicView();
     if (!gameStarted) return _buildStartView();
 
     var q = dataItems[currentQuestionIndex];
@@ -305,35 +282,18 @@ class _QuizScreenState extends State<QuizScreen> {
         textDirection: TextDirection.rtl,
         child: Column(
           children: [
-            if (!isEducationalOnly) // إخفاء شريط الوقت في الأقسام التعليمية
+            if (!isEducationalOnly)
               LinearProgressIndicator(
-                value: timeLeft /
-                    ((widget.categoryTitle == "دوري المحترفين") ? 15 : 25),
-                color: safetyOrange,
-                backgroundColor: Colors.white,
-                minHeight: 6,
-              ),
+                  value: timeLeft /
+                      ((widget.categoryTitle == "دوري المحترفين") ? 15 : 25),
+                  color: safetyOrange,
+                  backgroundColor: Colors.white,
+                  minHeight: 6),
             Padding(
-              padding: const EdgeInsets.all(15),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text("خطوة ${currentQuestionIndex + 1}",
-                      style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-                  if (!isEducationalOnly)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                          color: deepTeal,
-                          borderRadius: BorderRadius.circular(10)),
-                      child: Text("نقاط: $score",
-                          style: GoogleFonts.cairo(
-                              color: Colors.white, fontSize: 12)),
-                    )
-                ],
-              ),
-            ),
+                padding: const EdgeInsets.all(15),
+                child: Text("سؤال ${batchCount == 0 ? 5 : batchCount} من 5",
+                    style: GoogleFonts.cairo(
+                        fontWeight: FontWeight.bold, color: deepTeal))),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 25),
@@ -366,10 +326,10 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Widget _buildOptionItem(String opt, int correctIdx) {
     var currentQ = dataItems[currentQuestionIndex];
-    String correctVal = currentQ['options'][correctIdx];
-    bool isCorrect = showFeedback && opt == correctVal;
-    bool isWrong = showFeedback && opt == selectedOption && opt != correctVal;
-
+    bool isCorrect = showFeedback && opt == currentQ['options'][correctIdx];
+    bool isWrong = showFeedback &&
+        opt == selectedOption &&
+        opt != currentQ['options'][correctIdx];
     return GestureDetector(
       onTap: () => _handleAnswer(opt),
       child: AnimatedContainer(
@@ -394,96 +354,68 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   PreferredSizeWidget _buildUnifiedHeader() => AppBar(
-        backgroundColor: deepTeal,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: Colors.white, size: 20),
-          onPressed: () => isEducationalOnly
-              ? Navigator.pop(context)
-              : _showMotivationalExit(),
-        ),
-        title: Text(widget.categoryTitle,
-            style: GoogleFonts.cairo(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold)),
-      );
+      backgroundColor: deepTeal,
+      centerTitle: true,
+      title: Text(widget.categoryTitle,
+          style: GoogleFonts.cairo(
+              color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)));
 
-  void _showFinalResult() {
-    showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (c) => AlertDialog(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
-              title:
-                  const Text("انتهى التحدي! 🏆", textAlign: TextAlign.center),
-              actions: [
-                Center(
-                    child: ElevatedButton(
-                        onPressed: () => Navigator.of(context)
-                          ..pop()
-                          ..pop(),
-                        child: const Text("الرئيسية")))
-              ],
-            ));
+  Widget _buildStartView() {
+    bool isStar = widget.categoryTitle == "دوري النجوم";
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+            gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [deepTeal, deepTeal.withOpacity(0.85)])),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(isStar ? "دوري النجوم" : "دوري المحترفين",
+                style: GoogleFonts.cairo(
+                    fontSize: 35,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white)),
+            const SizedBox(height: 40),
+            ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: safetyOrange,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 60, vertical: 15),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15))),
+                onPressed: () {
+                  setState(() => gameStarted = true);
+                  _startTimer();
+                },
+                child: Text(isStar ? "يلا يا نجم ✨" : "يلا يا Pro 🔥",
+                    style: GoogleFonts.cairo(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18))),
+          ],
+        ),
+      ),
+    );
   }
 
-  String _normalize(String text) => text
-      .trim()
-      .replaceAll(RegExp(r'[\u064B-\u0652]'), '')
-      .replaceAll(RegExp(r'[أإآ]'), 'ا')
-      .replaceAll(RegExp(r'[ى]'), 'ي')
-      .replaceAll(RegExp(r'[ة]'), 'ه')
-      .toLowerCase();
-
-  Widget _buildQuestionCard(String text) => Container(
-      padding: const EdgeInsets.all(25),
-      decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20)
-          ]),
-      child: Text(text,
-          textAlign: TextAlign.center,
-          style: GoogleFonts.cairo(
-              fontSize: 17, fontWeight: FontWeight.bold, color: deepTeal)));
-
-  Widget _buildStartView() => Scaffold(
-      backgroundColor: lightTurquoise,
-      appBar: _buildUnifiedHeader(),
-      body: Center(
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Text(widget.categoryTitle,
-            style: GoogleFonts.cairo(
-                fontSize: 28, fontWeight: FontWeight.bold, color: deepTeal)),
-        const SizedBox(height: 40),
-        ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: safetyOrange,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 50, vertical: 15)),
-            onPressed: () {
-              setState(() => gameStarted = true);
-              _startTimer();
-            },
-            child: Text("ابدأ الآن 🚀",
-                style: GoogleFonts.cairo(
-                    color: Colors.white, fontWeight: FontWeight.bold)))
-      ])));
-
-  Widget _buildTopicView() => Scaffold(
+  Widget _buildTopicView() {
+    return Scaffold(
       backgroundColor: AppColors.scaffoldBackground,
       appBar: _buildUnifiedHeader(),
       body: Directionality(
-          textDirection: TextDirection.rtl,
-          child: ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: dataItems.length,
-              itemBuilder: (context, index) =>
-                  _buildDetailedTopicCard(dataItems[index]))));
+        textDirection: TextDirection.rtl,
+        child: ListView.builder(
+          padding: const EdgeInsets.all(20),
+          itemCount: dataItems.length,
+          itemBuilder: (context, index) =>
+              _buildDetailedTopicCard(dataItems[index]),
+        ),
+      ),
+    );
+  }
 
   Widget _buildDetailedTopicCard(Map<String, dynamic> data) {
     return GestureDetector(
@@ -495,10 +427,12 @@ class _QuizScreenState extends State<QuizScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15)
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4))
             ]),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (data['imageUrl'] != null && data['imageUrl'] != "")
               ClipRRect(
@@ -510,84 +444,159 @@ class _QuizScreenState extends State<QuizScreen> {
                       width: double.infinity,
                       fit: BoxFit.cover)),
             Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(data['title'] ?? "",
-                      style: GoogleFonts.cairo(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                          color: deepTeal)),
-                  const SizedBox(height: 5),
-                  Text(data['content'] ?? "",
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.cairo(
-                          fontSize: 13, color: Colors.black54, height: 1.5)),
-                  const SizedBox(height: 10),
-                  Row(children: [
-                    Text("اقرأ المزيد",
-                        style: GoogleFonts.cairo(
-                            fontSize: 12,
-                            color: safetyOrange,
-                            fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 5),
-                    Icon(Icons.arrow_circle_left_outlined,
-                        size: 16, color: safetyOrange)
-                  ]),
-                ],
-              ),
-            ),
+                padding: const EdgeInsets.all(15),
+                child: Text(data['title'] ?? "",
+                    style: GoogleFonts.cairo(
+                        fontWeight: FontWeight.bold,
+                        color: deepTeal,
+                        fontSize: 16))),
           ],
         ),
       ),
     );
   }
+
+  void _showFinalResult() {
+    showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (c) => AlertDialog(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20)),
+                title:
+                    const Text("انتهى التحدي! 🏆", textAlign: TextAlign.center),
+                actions: [
+                  Center(
+                      child: ElevatedButton(
+                          onPressed: () =>
+                              Navigator.popUntil(context, (r) => r.isFirst),
+                          child: const Text("الرئيسية")))
+                ]));
+  }
+
+  String _normalize(String text) => text.trim().toLowerCase();
+
+  Widget _buildQuestionCard(String text) => Container(
+      padding: const EdgeInsets.all(25),
+      decoration: BoxDecoration(
+          color: Colors.white, borderRadius: BorderRadius.circular(25)),
+      child: Text(text,
+          textAlign: TextAlign.center,
+          style: GoogleFonts.cairo(
+              fontSize: 17, fontWeight: FontWeight.bold, color: deepTeal)));
 }
 
+// --- عارض المواضيع الفنية المطور (صفحة عرض تفاصيل الموضوع) ---
 class QuizTopicDetailPage extends StatelessWidget {
   final Map<String, dynamic> data;
   const QuizTopicDetailPage({super.key, required this.data});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Directionality(
-        textDirection: TextDirection.rtl,
-        child: CustomScrollView(
-          slivers: [
-            SliverAppBar(
-                expandedHeight: 250,
-                pinned: true,
-                backgroundColor: AppColors.primaryDeepTeal,
-                flexibleSpace: FlexibleSpaceBar(
-                    background:
-                        data['imageUrl'] != null && data['imageUrl'] != ""
-                            ? CachedNetworkImage(
-                                imageUrl: data['imageUrl'], fit: BoxFit.cover)
-                            : Container(color: AppColors.primaryDeepTeal))),
-            SliverPadding(
-                padding: const EdgeInsets.all(25),
-                sliver: SliverList(
-                    delegate: SliverChildListDelegate([
-                  Text(data['title'] ?? "",
-                      style: GoogleFonts.cairo(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.primaryDeepTeal)),
-                  const SizedBox(height: 15),
-                  const Divider(),
-                  const SizedBox(height: 15),
-                  Text(data['content'] ?? "",
-                      style: GoogleFonts.cairo(
-                          fontSize: 15,
-                          height: 1.8,
-                          color: Colors.black87,
-                          fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 50)
-                ]))),
-          ],
+      backgroundColor: const Color(0xFFF8FBFB), // لون خلفية هادئ جداً
+      appBar: AppBar(
+        backgroundColor: AppColors.primaryDeepTeal,
+        elevation: 0,
+        centerTitle: true,
+        title: Text(data['title'] ?? "التفاصيل",
+            style:
+                GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.bold)),
+      ),
+      body: SingleChildScrollView(
+        child: Directionality(
+          textDirection: TextDirection.rtl,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // إذا كان هناك صورة للموضوع تظهر في الأعلى
+              if (data['imageUrl'] != null && data['imageUrl'] != "")
+                CachedNetworkImage(
+                  imageUrl: data['imageUrl'],
+                  width: double.infinity,
+                  height: 220,
+                  fit: BoxFit.cover,
+                ),
+
+              // كارت المحتوى الفني بتنسيق "معلومة L Pro" الفخم
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8)),
+                    ],
+                    border: Border.all(
+                        color: AppColors.primaryDeepTeal.withOpacity(0.1),
+                        width: 1.2),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: Column(
+                      children: [
+                        // هيدر الكارت (نفس ستايل الهوم)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 18, vertical: 12),
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppColors.primaryDeepTeal,
+                                Color(0xFF006D77)
+                              ],
+                              begin: Alignment.centerRight,
+                              end: Alignment.centerLeft,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.auto_stories_rounded,
+                                  color: AppColors.secondaryOrange, size: 22),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  data['title'] ?? "المحتوى الفني",
+                                  style: GoogleFonts.cairo(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 14),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // نص الموضوع (المهم جداً التنسيق والمحاذاة)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(22),
+                          color: Colors.white,
+                          child: Text(
+                            data['content'] ?? "",
+                            textAlign: TextAlign.right, // دائماً من اليمين
+                            style: GoogleFonts.cairo(
+                              fontSize: 16, // حجم خط مريح للقراءة الطويلة
+                              height: 1.8, // مسافة واسعة بين السطور
+                              color: const Color(0xFF2D3142),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 30),
+            ],
+          ),
         ),
       ),
     );

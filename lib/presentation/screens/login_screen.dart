@@ -4,7 +4,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 // استيراد الثوابت والصفحات حسب الهيكل المعتمد
 import '../../core/constants/app_colors.dart';

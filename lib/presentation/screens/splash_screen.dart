@@ -5,10 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-// تصحيح المسارات للوصول للثوابت
 import '../../core/constants/app_colors.dart';
-
-// استيراد الشاشات
 import 'login_screen.dart';
 import 'main_wrapper.dart';
 
@@ -27,60 +24,53 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _fadeAnimation;
   late Animation<double> _pulseAnimation;
 
-  Timer? _navigationTimer;
   bool isUserLoggedIn = false;
+  bool showLoginButton = false;
 
   @override
   void initState() {
     super.initState();
+    _initApp();
+  }
 
-    // تفعيل الإشعارات والاشتراك في القنوات فور الفتح
-    _initNotifications();
-
+  void _initApp() async {
     final user = FirebaseAuth.instance.currentUser;
     isUserLoggedIn = (user != null);
 
     _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    );
-
+        vsync: this, duration: const Duration(milliseconds: 1500));
     _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
+        vsync: this, duration: const Duration(milliseconds: 1200));
 
     _scaleAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
-    );
-
+        CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.03).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
+        CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut));
 
     _controller.forward().then((_) {
       if (mounted) _pulseController.repeat(reverse: true);
     });
 
-    _navigationTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted && isUserLoggedIn) {
+    // المنطق الوحيد المضاف: 3 ثوانٍ فحص للحالة
+    Future.delayed(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      if (isUserLoggedIn) {
         Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (c) => const MainWrapper()),
-        );
+            context, MaterialPageRoute(builder: (c) => const MainWrapper()));
+      } else {
+        setState(() => showLoginButton = true);
       }
     });
+
+    _initNotifications();
   }
 
   void _initNotifications() async {
     try {
       FirebaseMessaging messaging = FirebaseMessaging.instance;
       await messaging.subscribeToTopic('all_users');
-
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         await messaging.subscribeToTopic(user.uid);
@@ -95,7 +85,6 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
-    _navigationTimer?.cancel();
     _controller.dispose();
     _pulseController.dispose();
     super.dispose();
@@ -107,14 +96,14 @@ class _SplashScreenState extends State<SplashScreen>
       backgroundColor: AppColors.primaryDeepTeal,
       body: Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center, // توسيط عمودي
           children: [
-            // اللوجو بنسب ثابتة
+            // اللوجو بنفس مقاساتك الأصلية
             ScaleTransition(
               scale: _scaleAnimation,
               child: SvgPicture.asset(
                 'assets/logo.svg',
-                width: MediaQuery.of(context).size.width * 0.8,
+                width: MediaQuery.of(context).size.width * 0.8, // المقاس الأصلي
                 fit: BoxFit.contain,
                 placeholderBuilder: (c) =>
                     const Icon(Icons.business, size: 100, color: Colors.white),
@@ -129,6 +118,7 @@ class _SplashScreenState extends State<SplashScreen>
                     scale: _pulseAnimation,
                     child: Text(
                       "المعلومة بتفرق",
+                      textAlign: TextAlign.center, // توسيط النص
                       style: GoogleFonts.cairo(
                         fontSize: 24,
                         fontWeight: FontWeight.w900,
@@ -137,10 +127,11 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                   ),
                   const SizedBox(height: 35),
-                  if (!isUserLoggedIn)
+                  // الزر يظهر فقط للمستخدم الجديد بنفس تصميمك
+                  if (showLoginButton)
                     SizedBox(
-                      width: 160,
-                      height: 50, // تم ضبط الارتفاع ليكون متناسقاً
+                      width: 160, // العرض الأصلي من كودك
+                      height: 50, // الارتفاع الأصلي من كودك
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.secondaryOrange,
@@ -151,10 +142,9 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                         onPressed: () {
                           Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                                builder: (c) => const LoginScreen()),
-                          );
+                              context,
+                              MaterialPageRoute(
+                                  builder: (c) => const LoginScreen()));
                         },
                         child: Text(
                           "يلا Pro",
@@ -163,12 +153,12 @@ class _SplashScreenState extends State<SplashScreen>
                             fontSize: 18,
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
-                            height: 1.2, // لتوسيط النص العربي رأسياً
+                            height: 1.2,
                           ),
                         ),
                       ),
                     )
-                  else
+                  else if (isUserLoggedIn)
                     const CircularProgressIndicator(
                         color: AppColors.secondaryOrange),
                 ],
