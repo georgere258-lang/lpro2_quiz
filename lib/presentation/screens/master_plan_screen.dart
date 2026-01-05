@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
-// استيراد الثوابت المركزية
 import '../../core/constants/app_colors.dart';
 
 class MasterPlanScreen extends StatefulWidget {
@@ -17,7 +16,6 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
   final Color deepTeal = AppColors.primaryDeepTeal;
   final Color safetyOrange = AppColors.secondaryOrange;
 
-  // داتا تأسيسية قوية تظهر دائماً كمرجع للمحترفين
   final List<Map<String, dynamic>> staticTopics = [
     {
       'title': 'مصفوفة الاحتياج (Need Matrix)',
@@ -46,7 +44,8 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
+          physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics()),
           slivers: [
             _buildSliverAppBar(),
             SliverToBoxAdapter(
@@ -55,70 +54,69 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
                 child: Column(
                   children: [
                     _buildIntroText(),
-                    const SizedBox(height: 25),
-                    _buildSectionTitle("استراتيجيات التحليل العقاري 🧠"),
+                    const SizedBox(height: 35),
+                    _buildSectionHeader("استراتيجيات تحليل العميل 🧠"),
                   ],
                 ),
               ),
             ),
-
-            // عرض البيانات الديناميكية من Firebase
             StreamBuilder<QuerySnapshot>(
               stream:
                   FirebaseFirestore.instance.collection('topics').snapshots(),
               builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const SliverToBoxAdapter(
+                      child: Center(child: Text("خطأ في تحميل البيانات")));
+                }
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const SliverToBoxAdapter(
-                    child: Center(
-                        child: Padding(
-                            padding: EdgeInsets.all(40),
-                            child: CircularProgressIndicator())),
-                  );
+                      child: Center(
+                          child: Padding(
+                              padding: EdgeInsets.all(40),
+                              child: CircularProgressIndicator())));
                 }
 
                 final docs = snapshot.data?.docs.where((doc) {
-                      String cat = doc['category'].toString();
-                      return cat.contains("عرف عميلك");
+                      var data = doc.data() as Map<String, dynamic>;
+                      return data['category'] != null &&
+                          data['category'].toString().contains("عرف عميلك");
                     }).toList() ??
                     [];
 
-                if (docs.isNotEmpty) {
-                  return SliverPadding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          var data = docs[index].data() as Map<String, dynamic>;
-                          return _buildTopicCard(data);
-                        },
-                        childCount: docs.length,
-                      ),
+                if (docs.isEmpty)
+                  return const SliverToBoxAdapter(child: SizedBox());
+
+                return SliverPadding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        var data = docs[index].data() as Map<String, dynamic>;
+                        return _buildAttractiveTopicCard(data);
+                      },
+                      childCount: docs.length,
                     ),
-                  );
-                }
-                return const SliverToBoxAdapter(child: SizedBox());
+                  ),
+                );
               },
             ),
-
             SliverToBoxAdapter(
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                child: _buildSectionTitle("ثوابت الـ Pro الناجح ⭐"),
+                padding: const EdgeInsets.fromLTRB(20, 25, 20, 15),
+                child: _buildSectionHeader("ثوابت المستشار الـ Pro ⭐"),
               ),
             ),
-
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
-                  (context, index) =>
-                      _buildStaticTopicCard(staticTopics[index]),
+                  (context, index) => _buildStaticToolCard(staticTopics[index]),
                   childCount: staticTopics.length,
                 ),
               ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 50)),
+            const SliverToBoxAdapter(child: SizedBox(height: 60)),
           ],
         ),
       ),
@@ -130,10 +128,10 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
       expandedHeight: 100,
       pinned: true,
       backgroundColor: deepTeal,
-      elevation: 5,
-      title: Text("حلل عميلك كالمحترفين",
+      elevation: 0,
+      title: Text("اعرف عميلك",
           style: GoogleFonts.cairo(
-              fontWeight: FontWeight.w900, fontSize: 17, color: Colors.white)),
+              fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white)),
       centerTitle: true,
     );
   }
@@ -143,65 +141,74 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
-          ],
-          border: Border(right: BorderSide(color: safetyOrange, width: 6))),
-      child: Text(
-          "المستشار العقاري Pro لا يبيع العقار، بل يبيع الحل المناسب لاحتياج العميل. ابدأ بالتحليل لتصل للإغلاق.",
-          style: GoogleFonts.cairo(
-              fontSize: 14,
-              height: 1.6,
-              color: deepTeal,
-              fontWeight: FontWeight.bold)),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Text(title,
-          style: GoogleFonts.cairo(
-              fontSize: 18, fontWeight: FontWeight.w900, color: deepTeal)),
-    );
-  }
-
-  Widget _buildTopicCard(Map<String, dynamic> data) {
-    return GestureDetector(
-      onTap: () => Navigator.push(context,
-          MaterialPageRoute(builder: (c) => MasterPlanDetailPage(data: data))),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: safetyOrange.withOpacity(0.15),
                 blurRadius: 15,
-                offset: const Offset(0, 5))
+                offset: const Offset(0, 5)),
+          ],
+          border: Border(right: BorderSide(color: safetyOrange, width: 6))),
+      child: Text(
+          "المستشار العقاري Pro لا يبيع مجرد جدران، بل يقدم حلولاً ذكية لاحتياجات حقيقية. ابدأ بتحليل عميلك بعمق.",
+          style: GoogleFonts.cairo(
+              fontSize: 14.5,
+              height: 1.7,
+              color: deepTeal,
+              fontWeight: FontWeight.w700)),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+                color: safetyOrange.withOpacity(0.25),
+                offset: const Offset(3, 3),
+                blurRadius: 0),
+          ],
+          border: Border.all(color: deepTeal.withOpacity(0.1))),
+      child: Text(title,
+          style: GoogleFonts.cairo(
+              fontSize: 16, fontWeight: FontWeight.w900, color: deepTeal)),
+    );
+  }
+
+  Widget _buildAttractiveTopicCard(Map<String, dynamic> data) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => MasterPlanDetailPage(data: data)));
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 30),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 20,
+                offset: const Offset(0, 10)),
           ],
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (data['imageUrl'] != null && data['imageUrl'] != "")
               ClipRRect(
                 borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(20)),
+                    const BorderRadius.vertical(top: Radius.circular(28)),
                 child: CachedNetworkImage(
                   imageUrl: data['imageUrl'],
                   height: 180,
                   width: double.infinity,
                   fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(
-                      height: 180,
-                      color: Colors.grey[100],
-                      child: const Center(child: CircularProgressIndicator())),
-                  errorWidget: (context, url, error) => const Icon(
-                      Icons.broken_image,
-                      size: 50,
-                      color: Colors.grey),
                 ),
               ),
             Padding(
@@ -209,28 +216,65 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(data['title'] ?? "",
-                      style: GoogleFonts.cairo(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: deepTeal)),
-                  const SizedBox(height: 10),
+                  // العنوان المجسم بالظل البرتقالي
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                              color: safetyOrange.withOpacity(0.25),
+                              offset: const Offset(3, 3),
+                              blurRadius: 0),
+                        ],
+                        border: Border.all(color: deepTeal.withOpacity(0.05))),
+                    child: Text(data['title'] ?? "",
+                        style: GoogleFonts.cairo(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: deepTeal)),
+                  ),
+                  const SizedBox(height: 15),
                   Text(data['content'] ?? "",
-                      maxLines: 3,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.cairo(
-                          fontSize: 13, color: Colors.grey[700], height: 1.5)),
-                  const SizedBox(height: 12),
+                          fontSize: 13.5,
+                          color: Colors.grey[600],
+                          height: 1.6)),
+                  const SizedBox(height: 20),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text("إقرأ التحليل الكامل",
-                          style: GoogleFonts.cairo(
-                              fontSize: 12,
-                              color: safetyOrange,
-                              fontWeight: FontWeight.w900)),
-                      const SizedBox(width: 5),
-                      Icon(Icons.arrow_circle_left_outlined,
-                          size: 16, color: safetyOrange),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 8),
+                        decoration: BoxDecoration(
+                            color: deepTeal,
+                            borderRadius: BorderRadius.circular(15),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: deepTeal.withOpacity(0.3),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4))
+                            ]),
+                        child: Row(
+                          children: [
+                            Text("استكشف السر",
+                                style: GoogleFonts.cairo(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800)),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.arrow_back_rounded,
+                                size: 16, color: Colors.white),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.auto_awesome_motion_rounded,
+                          color: safetyOrange.withOpacity(0.5), size: 22),
                     ],
                   ),
                 ],
@@ -242,32 +286,54 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
     );
   }
 
-  Widget _buildStaticTopicCard(Map<String, dynamic> topic) {
+  Widget _buildStaticToolCard(Map<String, dynamic> topic) {
     return GestureDetector(
-      onTap: () => Navigator.push(context,
-          MaterialPageRoute(builder: (c) => MasterPlanDetailPage(data: topic))),
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => MasterPlanDetailPage(data: topic)));
+      },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(18),
+        margin: const EdgeInsets.only(bottom: 15),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: deepTeal.withOpacity(0.08))),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+                color: safetyOrange.withOpacity(0.12),
+                offset: const Offset(3, 3),
+                blurRadius: 0),
+          ],
+          border: Border.all(color: deepTeal.withOpacity(0.06)),
+        ),
         child: Row(
           children: [
-            CircleAvatar(
-                backgroundColor: safetyOrange.withOpacity(0.1),
-                child: Icon(topic['icon'] ?? Icons.bolt,
-                    color: safetyOrange, size: 22)),
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                  color: deepTeal, borderRadius: BorderRadius.circular(15)),
+              child: Icon(topic['icon'] ?? Icons.star_rounded,
+                  color: safetyOrange, size: 26),
+            ),
             const SizedBox(width: 15),
             Expanded(
-                child: Text(topic['title'],
-                    style: GoogleFonts.cairo(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: deepTeal))),
-            Icon(Icons.arrow_forward_ios_rounded,
-                size: 14, color: Colors.grey[400]),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(topic['title'],
+                      style: GoogleFonts.cairo(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: deepTeal)),
+                  Text("دليل المستشار العقاري",
+                      style: GoogleFonts.cairo(
+                          fontSize: 11, color: Colors.grey[500])),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_left_rounded, color: safetyOrange, size: 30),
           ],
         ),
       ),
@@ -275,7 +341,6 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
   }
 }
 
-// الكلاس الخاص بالتفاصيل يبقى كما هو مع التأكد من استخدام AppColors
 class MasterPlanDetailPage extends StatelessWidget {
   final Map<String, dynamic> data;
   const MasterPlanDetailPage({super.key, required this.data});
@@ -284,45 +349,60 @@ class MasterPlanDetailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      appBar: AppBar(backgroundColor: AppColors.primaryDeepTeal, elevation: 0),
       body: Directionality(
         textDirection: TextDirection.rtl,
-        child: CustomScrollView(
-          slivers: [
-            SliverAppBar(
-              expandedHeight: 250,
-              pinned: true,
-              backgroundColor: AppColors.primaryDeepTeal,
-              flexibleSpace: FlexibleSpaceBar(
-                background: data['imageUrl'] != null && data['imageUrl'] != ""
-                    ? CachedNetworkImage(
-                        imageUrl: data['imageUrl'], fit: BoxFit.cover)
-                    : Container(
-                        color: AppColors.primaryDeepTeal,
-                        child: Icon(data['icon'] ?? Icons.insights,
-                            size: 80, color: Colors.white24)),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (data['imageUrl'] != null && data['imageUrl'] != "")
+                CachedNetworkImage(
+                    imageUrl: data['imageUrl'],
+                    width: double.infinity,
+                    height: 250,
+                    fit: BoxFit.cover),
+              Padding(
+                padding: const EdgeInsets.all(25),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // العنوان المجسم داخل صفحة التفاصيل أيضاً
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                                color:
+                                    AppColors.secondaryOrange.withOpacity(0.3),
+                                offset: const Offset(4, 4),
+                                blurRadius: 0),
+                          ],
+                          border: Border.all(
+                              color:
+                                  AppColors.primaryDeepTeal.withOpacity(0.1))),
+                      child: Text(data['title'] ?? "",
+                          style: GoogleFonts.cairo(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.primaryDeepTeal)),
+                    ),
+                    const SizedBox(height: 30),
+                    Text(data['content'] ?? "",
+                        style: GoogleFonts.cairo(
+                            fontSize: 16,
+                            height: 1.9,
+                            color: const Color(0xFF2D3142),
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 100),
+                  ],
+                ),
               ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.all(25),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  Text(data['title'] ?? "",
-                      style: GoogleFonts.cairo(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.primaryDeepTeal)),
-                  const Divider(height: 40, thickness: 1.5),
-                  Text(data['content'] ?? "",
-                      style: GoogleFonts.cairo(
-                          fontSize: 16,
-                          height: 1.8,
-                          color: Colors.black87,
-                          fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 60),
-                ]),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

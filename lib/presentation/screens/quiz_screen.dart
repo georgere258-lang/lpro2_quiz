@@ -270,8 +270,7 @@ class _QuizScreenState extends State<QuizScreen> {
       return Scaffold(
           appBar: _buildUnifiedHeader(),
           body: const Center(child: Text("لا يوجد محتوى حالياً")));
-    if (widget.isTopicMode || widget.categoryTitle == "المعلومة بتفرق")
-      return _buildTopicView();
+    if (isEducationalOnly) return _buildTopicView();
     if (!gameStarted) return _buildStartView();
 
     var q = dataItems[currentQuestionIndex];
@@ -411,45 +410,112 @@ class _QuizScreenState extends State<QuizScreen> {
           padding: const EdgeInsets.all(20),
           itemCount: dataItems.length,
           itemBuilder: (context, index) =>
-              _buildDetailedTopicCard(dataItems[index]),
+              _buildAttractiveTopicCard(dataItems[index]),
         ),
       ),
     );
   }
 
-  Widget _buildDetailedTopicCard(Map<String, dynamic> data) {
+  // الكارت الجذاب والمجسم لقسم المعلومة بتفرق (نسخة طبق الأصل من اعرف عميلك)
+  Widget _buildAttractiveTopicCard(Map<String, dynamic> data) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => Navigator.push(context,
           MaterialPageRoute(builder: (c) => QuizTopicDetailPage(data: data))),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 20),
+        margin: const EdgeInsets.only(bottom: 30),
         decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4))
-            ]),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 20,
+                offset: const Offset(0, 10))
+          ],
+        ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (data['imageUrl'] != null && data['imageUrl'] != "")
               ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(20)),
-                  child: CachedNetworkImage(
-                      imageUrl: data['imageUrl'],
-                      height: 160,
-                      width: double.infinity,
-                      fit: BoxFit.cover)),
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(28)),
+                child: CachedNetworkImage(
+                    imageUrl: data['imageUrl'],
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover),
+              ),
             Padding(
-                padding: const EdgeInsets.all(15),
-                child: Text(data['title'] ?? "",
-                    style: GoogleFonts.cairo(
-                        fontWeight: FontWeight.bold,
-                        color: deepTeal,
-                        fontSize: 16))),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // العنوان المجسم بالظل البرتقالي
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                              color: safetyOrange.withOpacity(0.25),
+                              offset: const Offset(3, 3),
+                              blurRadius: 0),
+                        ],
+                        border: Border.all(color: deepTeal.withOpacity(0.05))),
+                    child: Text(data['title'] ?? "",
+                        style: GoogleFonts.cairo(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: deepTeal)),
+                  ),
+                  const SizedBox(height: 15),
+                  Text(data['content'] ?? "",
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.cairo(
+                          fontSize: 13.5,
+                          color: Colors.grey[600],
+                          height: 1.6)),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 18, vertical: 8),
+                        decoration: BoxDecoration(
+                            color: deepTeal,
+                            borderRadius: BorderRadius.circular(15),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: deepTeal.withOpacity(0.3),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4))
+                            ]),
+                        child: Row(
+                          children: [
+                            Text("اقرأ المعلومة",
+                                style: GoogleFonts.cairo(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800)),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.arrow_back_rounded,
+                                size: 16, color: Colors.white),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.lightbulb_outline_rounded,
+                          color: safetyOrange.withOpacity(0.5), size: 22),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -494,31 +560,26 @@ class QuizTopicDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FBFB), // لون خلفية هادئ جداً
+      backgroundColor: const Color(0xFFF8FBFB),
       appBar: AppBar(
-        backgroundColor: AppColors.primaryDeepTeal,
-        elevation: 0,
-        centerTitle: true,
-        title: Text(data['title'] ?? "التفاصيل",
-            style:
-                GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.bold)),
-      ),
+          backgroundColor: AppColors.primaryDeepTeal,
+          elevation: 0,
+          centerTitle: true,
+          title: Text(data['title'] ?? "التفاصيل",
+              style: GoogleFonts.cairo(
+                  fontSize: 16, fontWeight: FontWeight.bold))),
       body: SingleChildScrollView(
         child: Directionality(
           textDirection: TextDirection.rtl,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // إذا كان هناك صورة للموضوع تظهر في الأعلى
               if (data['imageUrl'] != null && data['imageUrl'] != "")
                 CachedNetworkImage(
-                  imageUrl: data['imageUrl'],
-                  width: double.infinity,
-                  height: 220,
-                  fit: BoxFit.cover,
-                ),
-
-              // كارت المحتوى الفني بتنسيق "معلومة L Pro" الفخم
+                    imageUrl: data['imageUrl'],
+                    width: double.infinity,
+                    height: 220,
+                    fit: BoxFit.cover),
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
@@ -530,7 +591,7 @@ class QuizTopicDetailPage extends StatelessWidget {
                       BoxShadow(
                           color: Colors.black.withOpacity(0.06),
                           blurRadius: 20,
-                          offset: const Offset(0, 8)),
+                          offset: const Offset(0, 8))
                     ],
                     border: Border.all(
                         color: AppColors.primaryDeepTeal.withOpacity(0.1),
@@ -540,54 +601,44 @@ class QuizTopicDetailPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(22),
                     child: Column(
                       children: [
-                        // هيدر الكارت (نفس ستايل الهوم)
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(
                               horizontal: 18, vertical: 12),
                           decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
+                              gradient: LinearGradient(
+                                  colors: [
                                 AppColors.primaryDeepTeal,
                                 Color(0xFF006D77)
                               ],
-                              begin: Alignment.centerRight,
-                              end: Alignment.centerLeft,
-                            ),
-                          ),
+                                  begin: Alignment.centerRight,
+                                  end: Alignment.centerLeft)),
                           child: Row(
                             children: [
                               const Icon(Icons.auto_stories_rounded,
                                   color: AppColors.secondaryOrange, size: 22),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: Text(
-                                  data['title'] ?? "المحتوى الفني",
-                                  style: GoogleFonts.cairo(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 14),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
+                                  child: Text(data['title'] ?? "المحتوى الفني",
+                                      style: GoogleFonts.cairo(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 14),
+                                      overflow: TextOverflow.ellipsis)),
                             ],
                           ),
                         ),
-                        // نص الموضوع (المهم جداً التنسيق والمحاذاة)
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(22),
                           color: Colors.white,
-                          child: Text(
-                            data['content'] ?? "",
-                            textAlign: TextAlign.right, // دائماً من اليمين
-                            style: GoogleFonts.cairo(
-                              fontSize: 16, // حجم خط مريح للقراءة الطويلة
-                              height: 1.8, // مسافة واسعة بين السطور
-                              color: const Color(0xFF2D3142),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                          child: Text(data['content'] ?? "",
+                              textAlign: TextAlign.right,
+                              style: GoogleFonts.cairo(
+                                  fontSize: 16,
+                                  height: 1.8,
+                                  color: const Color(0xFF2D3142),
+                                  fontWeight: FontWeight.w600)),
                         ),
                       ],
                     ),
