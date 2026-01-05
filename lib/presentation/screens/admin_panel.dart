@@ -101,151 +101,7 @@ Future<void> _sendNotification(String title, String body) async {
   }
 }
 
-// --- 1. إدارة نصيحة اليوم ---
-class DailyTipsManager extends StatelessWidget {
-  const DailyTipsManager({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _buildActionBtn(context, "إضافة معلومة سريعة جديدة",
-            Icons.tips_and_updates, () => _showAddTipForm(context)),
-        Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('daily_tips')
-                .orderBy('startDate', descending: true)
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              return ListView.builder(
-                itemCount: snapshot.data!.docs.length,
-                itemBuilder: (context, i) {
-                  var data =
-                      snapshot.data!.docs[i].data() as Map<String, dynamic>;
-                  bool active = data['isActive'] ?? false;
-                  DateTime start = (data['startDate'] as Timestamp).toDate();
-                  return Card(
-                    margin:
-                        const EdgeInsets.symmetric(horizontal: 15, vertical: 6),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: active
-                            ? Colors.green.withAlpha(30)
-                            : Colors.grey.withAlpha(30),
-                        child: Icon(Icons.info_outline,
-                            color: active ? Colors.green : Colors.grey),
-                      ),
-                      title: Text(data['content'] ?? "",
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.cairo(
-                              fontSize: 13, fontWeight: FontWeight.bold)),
-                      subtitle: Text(
-                          "تبدأ: ${DateFormat('yyyy-MM-dd').format(start)}",
-                          style: const TextStyle(fontSize: 11)),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Switch(
-                              value: active,
-                              onChanged: (v) => snapshot.data!.docs[i].reference
-                                  .update({'isActive': v})),
-                          IconButton(
-                              icon: const Icon(Icons.delete_outline,
-                                  color: Colors.red),
-                              onPressed: () =>
-                                  snapshot.data!.docs[i].reference.delete()),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showAddTipForm(BuildContext context) {
-    final c = TextEditingController();
-    DateTime start = DateTime.now();
-    bool notify = true;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) => Padding(
-          padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-              left: 20,
-              right: 20,
-              top: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text("إدراج معلومة مجدولة",
-                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 15),
-              TextField(
-                  controller: c,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                      hintText: "المعلومة", border: OutlineInputBorder())),
-              const SizedBox(height: 15),
-              ListTile(
-                title: const Text("تاريخ العرض"),
-                subtitle: Text(DateFormat('yyyy-MM-dd').format(start)),
-                trailing: const Icon(Icons.calendar_today),
-                onTap: () async {
-                  DateTime? picked = await showDatePicker(
-                      context: context,
-                      initialDate: start,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime(2030));
-                  if (picked != null) setState(() => start = picked);
-                },
-              ),
-              CheckboxListTile(
-                  title: const Text("إرسال إشعار فوري"),
-                  value: notify,
-                  onChanged: (v) => setState(() => notify = v!)),
-              const SizedBox(height: 15),
-              ElevatedButton(
-                onPressed: () async {
-                  if (c.text.isEmpty) return;
-                  await FirebaseFirestore.instance
-                      .collection('daily_tips')
-                      .add({
-                    'content': c.text,
-                    'startDate': Timestamp.fromDate(start),
-                    'isActive': true,
-                    'createdAt': FieldValue.serverTimestamp(),
-                  });
-                  if (notify) _sendNotification("معلومة جديدة تهمك 💡", c.text);
-                  if (context.mounted) Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryDeepTeal),
-                child: const Text("حفظ ونشر",
-                    style: TextStyle(color: Colors.white)),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// --- 2. إدارة الأعضاء ---
+// --- 1. إدارة الأعضاء ---
 class UserManager extends StatefulWidget {
   const UserManager({super.key});
   @override
@@ -264,9 +120,8 @@ class _UserManagerState extends State<UserManager> {
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance.collection('users').snapshots(),
             builder: (context, snapshot) {
-              if (!snapshot.hasData) {
+              if (!snapshot.hasData)
                 return const Center(child: CircularProgressIndicator());
-              }
               var docs = snapshot.data!.docs.where((d) {
                 var data = d.data() as Map<String, dynamic>;
                 String name = (data['name'] ?? "").toString().toLowerCase();
@@ -327,6 +182,146 @@ class _UserManagerState extends State<UserManager> {
   }
 }
 
+// --- 2. إدارة نصيحة اليوم ---
+class DailyTipsManager extends StatelessWidget {
+  const DailyTipsManager({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _buildActionBtn(context, "إضافة معلومة سريعة جديدة",
+            Icons.tips_and_updates, () => _showAddTipForm(context)),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('daily_tips')
+                .orderBy('startDate', descending: true)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData)
+                return const Center(child: CircularProgressIndicator());
+              return ListView.builder(
+                itemCount: snapshot.data!.docs.length,
+                itemBuilder: (context, i) {
+                  var data =
+                      snapshot.data!.docs[i].data() as Map<String, dynamic>;
+                  bool active = data['isActive'] ?? false;
+                  DateTime start = (data['startDate'] as Timestamp).toDate();
+                  return Card(
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 15, vertical: 6),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: active
+                            ? Colors.green.withAlpha(30)
+                            : Colors.grey.withAlpha(30),
+                        child: Icon(Icons.info_outline,
+                            color: active ? Colors.green : Colors.grey),
+                      ),
+                      title: Text(data['content'] ?? "",
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.cairo(
+                              fontSize: 13, fontWeight: FontWeight.bold)),
+                      subtitle: Text(
+                          "تبدأ: ${DateFormat('yyyy-MM-dd').format(start)}"),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Switch(
+                              value: active,
+                              onChanged: (v) => snapshot.data!.docs[i].reference
+                                  .update({'isActive': v})),
+                          IconButton(
+                              icon: const Icon(Icons.delete_outline,
+                                  color: Colors.red),
+                              onPressed: () =>
+                                  snapshot.data!.docs[i].reference.delete()),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showAddTipForm(BuildContext context) {
+    final c = TextEditingController();
+    DateTime start = DateTime.now();
+    bool notify = true;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 20,
+              right: 20,
+              top: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text("إدراج معلومة مجدولة",
+                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 15),
+              TextField(
+                  controller: c,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                      hintText: "المعلومة", border: OutlineInputBorder())),
+              ListTile(
+                title: const Text("تاريخ العرض"),
+                subtitle: Text(DateFormat('yyyy-MM-dd').format(start)),
+                trailing: const Icon(Icons.calendar_today),
+                onTap: () async {
+                  DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: start,
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime(2030));
+                  if (picked != null) setState(() => start = picked);
+                },
+              ),
+              CheckboxListTile(
+                  title: const Text("إرسال إشعار فوري"),
+                  value: notify,
+                  onChanged: (v) => setState(() => notify = v!)),
+              ElevatedButton(
+                onPressed: () async {
+                  if (c.text.isEmpty) return;
+                  await FirebaseFirestore.instance
+                      .collection('daily_tips')
+                      .add({
+                    'content': c.text,
+                    'startDate': Timestamp.fromDate(start),
+                    'isActive': true,
+                    'createdAt': FieldValue.serverTimestamp(),
+                  });
+                  if (notify) _sendNotification("معلومة جديدة تهمك 💡", c.text);
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryDeepTeal),
+                child: const Text("حفظ ونشر",
+                    style: TextStyle(color: Colors.white)),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // --- 3. إدارة الأخبار ---
 class NewsManager extends StatelessWidget {
   const NewsManager({super.key});
@@ -343,9 +338,8 @@ class NewsManager extends StatelessWidget {
                 .orderBy('createdAt', descending: true)
                 .snapshots(),
             builder: (context, snapshot) {
-              if (!snapshot.hasData) {
+              if (!snapshot.hasData)
                 return const Center(child: CircularProgressIndicator());
-              }
               return ListView.builder(
                 itemCount: snapshot.data!.docs.length,
                 itemBuilder: (context, i) {
@@ -382,7 +376,7 @@ class NewsManager extends StatelessWidget {
                   'createdAt': FieldValue.serverTimestamp()
                 });
                 _sendNotification("خبر عاجل ⚡", c.text);
-                if (context.mounted) Navigator.pop(ctx);
+                Navigator.pop(ctx);
               },
               child: const Text("إرسال")),
         ],
@@ -391,7 +385,7 @@ class NewsManager extends StatelessWidget {
   }
 }
 
-// --- 4. إدارة الأسئلة ---
+// --- 4. إدارة الأسئلة (كاملة مع الرفع المجمع) ---
 class QuizManager extends StatefulWidget {
   const QuizManager({super.key});
   @override
@@ -409,8 +403,8 @@ class _QuizManagerState extends State<QuizManager> {
               child: _buildActionBtn(
                   context, "سؤال واحد", Icons.add, () => _showQuizForm())),
           Expanded(
-              child: _buildActionBtn(context, "رفع مجمع", Icons.library_add,
-                  () => _showBulkUpload(context))),
+              child: _buildActionBtn(context, "رفع مجمع (JSON)",
+                  Icons.library_add, () => _showBulkUploadForm(context))),
         ]),
         _buildSearchField(
             "بحث في الأسئلة...", (v) => setState(() => query = v)),
@@ -419,9 +413,8 @@ class _QuizManagerState extends State<QuizManager> {
             stream:
                 FirebaseFirestore.instance.collection('quizzes').snapshots(),
             builder: (context, snapshot) {
-              if (!snapshot.hasData) {
+              if (!snapshot.hasData)
                 return const Center(child: CircularProgressIndicator());
-              }
               var filtered = snapshot.data!.docs
                   .where((d) => d['question'].toString().contains(query))
                   .toList();
@@ -455,34 +448,36 @@ class _QuizManagerState extends State<QuizManager> {
               left: 20,
               right: 20,
               top: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButton<String>(
-                value: cat,
-                isExpanded: true,
-                items: ["دوري النجوم", "دوري المحترفين"]
-                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                    .toList(),
-                onChanged: (v) => setModalState(() => cat = v!),
-              ),
-              TextField(
-                  controller: qC,
-                  decoration: const InputDecoration(labelText: "السؤال")),
-              ...List.generate(
-                  4,
-                  (i) => TextField(
-                      controller: optC[i],
-                      decoration: InputDecoration(labelText: "خيار ${i + 1}"))),
-              const SizedBox(height: 10),
-              const Text("رقم الإجابة الصحيحة (0-3)"),
-              Slider(
-                  value: correct.toDouble(),
-                  min: 0,
-                  max: 3,
-                  divisions: 3,
-                  onChanged: (v) => setModalState(() => correct = v.toInt())),
-              ElevatedButton(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButton<String>(
+                  value: cat,
+                  isExpanded: true,
+                  items: ["دوري النجوم", "دوري المحترفين"]
+                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                      .toList(),
+                  onChanged: (v) => setModalState(() => cat = v!),
+                ),
+                TextField(
+                    controller: qC,
+                    decoration: const InputDecoration(labelText: "السؤال")),
+                ...List.generate(
+                    4,
+                    (i) => TextField(
+                        controller: optC[i],
+                        decoration:
+                            InputDecoration(labelText: "خيار ${i + 1}"))),
+                const SizedBox(height: 10),
+                Text("رقم الإجابة الصحيحة: $correct"),
+                Slider(
+                    value: correct.toDouble(),
+                    min: 0,
+                    max: 3,
+                    divisions: 3,
+                    onChanged: (v) => setModalState(() => correct = v.toInt())),
+                ElevatedButton(
                   onPressed: () async {
                     await FirebaseFirestore.instance.collection('quizzes').add({
                       'question': qC.text,
@@ -490,22 +485,87 @@ class _QuizManagerState extends State<QuizManager> {
                       'correctAnswer': correct,
                       'category': cat,
                     });
-                    if (context.mounted) Navigator.pop(context);
+                    Navigator.pop(context);
                   },
-                  child: const Text("حفظ")),
-            ],
+                  child: const Text("حفظ"),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  void _showBulkUpload(BuildContext context) {
-    /* كود الرفع المجمع يبقى كما هو */
+  void _showBulkUploadForm(BuildContext context) {
+    final TextEditingController jsonController = TextEditingController();
+    String selectedCat = "دوري النجوم";
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 20,
+              right: 20,
+              top: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text("رفع مجمع بتنسيق JSON",
+                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+              DropdownButton<String>(
+                value: selectedCat,
+                isExpanded: true,
+                items: ["دوري النجوم", "دوري المحترفين"]
+                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                    .toList(),
+                onChanged: (v) => setState(() => selectedCat = v!),
+              ),
+              TextField(
+                  controller: jsonController,
+                  maxLines: 8,
+                  decoration: const InputDecoration(
+                      hintText:
+                          '[{"question": "...", "options": [".."], "correctAnswer": 0}]',
+                      border: OutlineInputBorder())),
+              const SizedBox(height: 15),
+              ElevatedButton(
+                onPressed: () async {
+                  try {
+                    List<dynamic> newList = jsonDecode(jsonController.text);
+                    for (var item in newList) {
+                      await FirebaseFirestore.instance
+                          .collection('quizzes')
+                          .add({
+                        'question': item['question'],
+                        'options': List<String>.from(item['options']),
+                        'correctAnswer': item['correctAnswer'],
+                        'category': selectedCat,
+                        'createdAt': FieldValue.serverTimestamp(),
+                      });
+                    }
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("تم الرفع بنجاح!")));
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("خطأ في التنسيق")));
+                  }
+                },
+                child: const Text("بدء الرفع"),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
-// --- 5. إدارة المواضيع (التعديل المطلوب هنا) ---
+// --- 5. إدارة المواضيع ---
 class TopicManager extends StatefulWidget {
   const TopicManager({super.key});
   @override
@@ -526,9 +586,8 @@ class _TopicManagerState extends State<TopicManager> {
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance.collection('topics').snapshots(),
             builder: (context, snapshot) {
-              if (!snapshot.hasData) {
+              if (!snapshot.hasData)
                 return const Center(child: CircularProgressIndicator());
-              }
               var filtered = snapshot.data!.docs
                   .where((d) => d['title'].toString().contains(query))
                   .toList();
@@ -550,7 +609,7 @@ class _TopicManagerState extends State<TopicManager> {
     final tC = TextEditingController();
     final cC = TextEditingController();
     final imgC = TextEditingController();
-    String selectedCategory = "المعلومة بتفرق"; // القيمة الافتراضية
+    String selectedCategory = "المعلومة بتفرق";
 
     showModalBottomSheet(
       context: context,
@@ -566,25 +625,15 @@ class _TopicManagerState extends State<TopicManager> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text("إضافة موضوع تعليمي",
+                Text("إضافة موضوع جديد",
                     style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 10),
-                // --- ميزة اختيار مكان الموضوع ---
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
-                      borderRadius: BorderRadius.circular(10)),
-                  child: DropdownButton<String>(
-                    value: selectedCategory,
-                    isExpanded: true,
-                    underline: const SizedBox(),
-                    items: ["المعلومة بتفرق", "اعرف عميلك"]
-                        .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                        .toList(),
-                    onChanged: (v) =>
-                        setModalState(() => selectedCategory = v!),
-                  ),
+                DropdownButton<String>(
+                  value: selectedCategory,
+                  isExpanded: true,
+                  items: ["المعلومة بتفرق", "عرف عميلك"]
+                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                      .toList(),
+                  onChanged: (v) => setModalState(() => selectedCategory = v!),
                 ),
                 TextField(
                     controller: imgC,
@@ -597,19 +646,18 @@ class _TopicManagerState extends State<TopicManager> {
                     controller: cC,
                     maxLines: 5,
                     decoration: const InputDecoration(labelText: "المحتوى")),
-                const SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: () async {
                     if (tC.text.isEmpty) return;
                     await FirebaseFirestore.instance.collection('topics').add({
                       'title': tC.text,
                       'content': cC.text,
-                      'category': selectedCategory, // استخدام التصنيف المختار
+                      'category': selectedCategory,
                       'imageUrl': imgC.text,
                       'createdAt': FieldValue.serverTimestamp(),
                     });
                     _sendNotification("موضوع جديد 📚", tC.text);
-                    if (context.mounted) Navigator.pop(context);
+                    Navigator.pop(context);
                   },
                   style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryDeepTeal),
