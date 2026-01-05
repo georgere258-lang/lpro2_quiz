@@ -39,8 +39,7 @@ class _MainWrapperState extends State<MainWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    bool isAr = Localizations.localeOf(context).languageCode == 'ar';
-
+    // دالة لتحديد عنوان الـ AppBar بناءً على الفهرس الحالي (عربي فقط)
     Widget getAppBarTitle() {
       if (_currentIndex == 0) {
         return Image.asset(
@@ -59,9 +58,9 @@ class _MainWrapperState extends State<MainWrapper> {
 
       List<String> titles = [
         "",
-        isAr ? "دوري المتصدرين" : "Leaderboard",
-        isAr ? "ملفي الشخصي" : "My Profile",
-        isAr ? "الدعم الفني المباشر" : "Support",
+        "دوري المتصدرين",
+        "ملفي الشخصي",
+        "الدعم الفني المباشر",
       ];
 
       return Text(
@@ -82,6 +81,7 @@ class _MainWrapperState extends State<MainWrapper> {
         centerTitle: true,
         automaticallyImplyLeading: false,
         title: getAppBarTitle(),
+        // زر الرجوع يظهر في الشاشات الفرعية ليعيد المستخدم للرئيسية
         leading: _currentIndex != 0
             ? IconButton(
                 icon: const Icon(
@@ -101,13 +101,14 @@ class _MainWrapperState extends State<MainWrapper> {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
+              color: Colors.black.withOpacity(0.08),
               blurRadius: 15,
               offset: const Offset(0, -4),
             )
           ],
         ),
         child: BottomNavigationBar(
+          // إذا كنا في صفحة الدعم (3)، يظل زر الحساب (2) هو المضاء
           currentIndex: _currentIndex >= 3 ? 2 : _currentIndex,
           onTap: (i) => setState(() => _currentIndex = i),
           selectedItemColor: AppColors.secondaryOrange,
@@ -119,21 +120,21 @@ class _MainWrapperState extends State<MainWrapper> {
               GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 11),
           unselectedLabelStyle:
               GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 11),
-          items: [
+          items: const [
             BottomNavigationBarItem(
-              icon: const Icon(Icons.grid_view_outlined),
-              activeIcon: const Icon(Icons.grid_view_rounded),
-              label: isAr ? "الرئيسية" : "Home",
+              icon: Icon(Icons.grid_view_outlined),
+              activeIcon: Icon(Icons.grid_view_rounded),
+              label: "الرئيسية",
             ),
             BottomNavigationBarItem(
-              icon: const Icon(Icons.emoji_events_outlined),
-              activeIcon: const Icon(Icons.emoji_events),
-              label: isAr ? "الترتيب" : "Rank",
+              icon: Icon(Icons.emoji_events_outlined),
+              activeIcon: Icon(Icons.emoji_events),
+              label: "الترتيب",
             ),
             BottomNavigationBarItem(
-              icon: const Icon(Icons.person_outline),
-              activeIcon: const Icon(Icons.person),
-              label: isAr ? "حسابي" : "Profile",
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: "حسابي",
             ),
           ],
         ),

@@ -6,7 +6,6 @@ import 'dart:ui';
 import '../../core/constants/app_colors.dart';
 import 'quiz_screen.dart';
 import 'master_plan_screen.dart';
-import 'admin_panel.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,32 +16,70 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   final Color deepTeal = AppColors.primaryDeepTeal;
-  final Color lightTeal = const Color(0xFF4FA8A8);
   final Color safetyOrange = AppColors.secondaryOrange;
+  final Color lightTeal = const Color(0xFF4FA8A8);
   final Color turquoiseCyan = const Color(0xFF00CED1);
   final User? user = FirebaseAuth.instance.currentUser;
 
   late AnimationController _newsController;
   late Animation<Offset> _newsAnimation;
 
+  // القائمة الاحتياطية لـ 30 معلومة
+  final List<String> dailyTips = [
+    "العقار هو الملاذ الآمن تاريخياً ضد التضخم. راجع اليوم مشروعين بالتفصيل.. القادم أجمل! 🏠",
+    "تحديد احتياج العميل بدقة يوفر 70% من مجهود الإقناع. اسمع أكثر مما تتكلم اليوم.. أنت مستشار محترف! 🤝",
+    "الموقع هو العامل الأول في تقييم سعر إعادة البيع. ادرس اليوم خارطة الطرق الجديدة.. ذكاؤك هو رأس مالك! 📍",
+    "الثقة هي العملة الحقيقية في سوق العقارات. اتصل بعميل سابق للاطمئنان عليه فقط.. الأمانة تبني إمبراطوريات! 💎",
+    "الاستثمار في العقار التجاري يتطلب حساب العائد الإيجاري (ROI) بدقة. حلل اليوم أرقام منطقة حيوية.. أنت مبدع! 📊",
+    "العميل لا يشتري جدراناً، بل يشتري مستقبلاً. ركز اليوم على قصة المكان وليس فقط المواصفات.. أبدع في وصفك! ✨",
+    "العقار يمرض ولا يموت. ذكر عملاءك اليوم بقيمة الاستثمار طويل الأمد.. الصبر مفتاح الأرباح! 🔑",
+    "المتابعة (Follow-up) هي سر إغلاق الصفقة. راجع اليوم قائمة عملائك المهتمين.. النجاح يطرق باب المثابرين! 🚀",
+    "أسعار الفائدة تؤثر مباشرة على القوة الشرائية. تابع اليوم تحديثات البنك المركزي.. كن خبيراً يثق به الناس! 📈",
+    "المساحات الصغيرة (Studios) هي الأكثر طلباً للإيجار حالياً. ابحث اليوم عن وحدات مميزة بهذا النمط.. اصطاد الفرص! 🏗️",
+    "المعرفة بالقوانين العقارية تحميك وتحمي عميلك. اقرأ اليوم مادة واحدة من قانون التمويل.. حمايتك للعميل فخر! ⚖️",
+    "أول 7 ثوانٍ في المكالمة تحدد انطباع العميل عنك. تدرب اليوم على نبرة صوت واثقة.. أنت واجهة النجاح! 📞",
+    "التنوع في المحفظة العقارية يقلل المخاطر. اقترح اليوم على مستثمريك مناطق جديدة واعدة.. رؤيتك تصنع الفارق! 🌍",
+    "العقارات تحت الإنشاء (Off-plan) توفر أعلى ربحية عند الاستلام. ادرس جداول الاستلام لعام 2026.. خطط للمستقبل! 🏗️",
+    "الصدق في عيوب الوحدة قبل ميزاتها يبني ولاءً أبدياً. كن شفافاً اليوم في كل معلومة.. نزاهتك هي علامتك التجارية! 🤝",
+    "السوق العقاري موسمي بطبعه. استعد اليوم لموسم الإجازات بخطة تسويق ذكية.. كن دائماً خطوة للأمام! 📅",
+    "التشطيب الراقي يرفع قيمة العقار بنسبة تصل لـ 20%. قارن اليوم بين أسعار نصف التشطيب والكامل.. عينك خبيرة! 🎨",
+    "لغة الجسد في المعاينات تعطي رسائل أقوى من الكلام. حافظ اليوم على تواصل بصري واثق.. الحضور هو نصف البيعة! 👔",
+    "الأحياء القريبة من الجامعات والمستشفيات هي الأعلى استدامة إيجارية. ابحث عن هذه النقاط اليوم.. تفكيرك استراتيجي! 🏫",
+    "السعر العادل هو الذي يرضي البائع ويجذب المشتري. قم اليوم بعمل مقارنة أسعار (CMA) دقيقة.. أنت ضابط الإيقاع! ⚖️",
+    "الرقمنة (PropTech) هي مستقبل المهنة. جرب اليوم تطبيقاً جديداً للتنظيم أو التصوير.. واكب التطور! 📱",
+    "العميل المتردد يحتاج لـ خبير وليس لـ بائع. قدم اليوم تحليلاً اقتصادياً بدل الضغط للبيع.. أنت مستشار حقيقي! 🧠",
+    "البيوت الذكية (Smart Homes) تزيد من سرعة البيع. ابرز هذه الميزات في عرضك اليوم.. التكنولوجيا هي لغة العصر! 🏠",
+    "الاستثمار في نفسك هو أفضل استثمار عقاري. خصص اليوم 15 دقيقة لتعلم مهارة تفاوض جديدة.. نموك لا يتوقف! 📚",
+    "الكلمات الإيجابية تفتح الأبواب المغلقة. ابدأ مكالماتك اليوم بابتسامة تظهر في صوتك.. طاقتك سر نجاحك! 😊",
+    "المنافسة الشريفة ترفع مستوى السوق. تعلم اليوم من زميل متميز وشاركه نجاحك.. العظمة في التعاون! 🤝",
+    "العائد على السعادة لا يقل عن العائد على المال. ابحث لعميلك عن بيت يحبه فعلاً.. أنت صانع أحلام! 🏡",
+    "الأزمات تخلق الفرص للمستثمر الذكي. طمئن عملائك اليوم بتحليل واقعي للسوق.. كن منارة في العاصفة! ⛈️",
+    "التفاصيل الصغيرة في العقد هي ما تمنع المشاكل الكبيرة. راجع بنود التعاقد بدقة اليوم.. دقة ملاحظتك تنقذ صفقات! 📝",
+    "النجاح هو مجموع محاولات صغيرة تتكرر كل يوم. احتفل اليوم بإنجازاتك مهما كانت بسيطة.. أنت Pro حقيقي! 🏆",
+  ];
+
   @override
   void initState() {
     super.initState();
     _newsController =
-        AnimationController(duration: const Duration(seconds: 35), vsync: this)
+        AnimationController(duration: const Duration(seconds: 55), vsync: this)
           ..repeat();
-
-    // ضبط الـ Offset لضمان انسيابية الحركة من اليمين تماماً
-    _newsAnimation = Tween<Offset>(
-      begin: const Offset(2.2, 0),
-      end: const Offset(-3.5, 0),
-    ).animate(CurvedAnimation(parent: _newsController, curve: Curves.linear));
+    _newsAnimation =
+        Tween<Offset>(begin: const Offset(2.5, 0), end: const Offset(-4.5, 0))
+            .animate(
+                CurvedAnimation(parent: _newsController, curve: Curves.linear));
   }
 
   @override
   void dispose() {
     _newsController.dispose();
     super.dispose();
+  }
+
+  String get _fallbackFact {
+    int dayOfYear =
+        DateTime.now().difference(DateTime(DateTime.now().year, 1, 1)).inDays;
+    return dailyTips[dayOfYear % dailyTips.length];
   }
 
   @override
@@ -53,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen>
         textDirection: TextDirection.rtl,
         child: Column(
           children: [
-            _buildCrystalClearTicker(), // شريط الأخبار المطور والواضح
+            _buildCrystalClearTicker(),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -73,7 +110,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 color: deepTeal))),
                     const SizedBox(height: 15),
                     _buildLProGrid(),
-                    const SizedBox(height: 55), // زيادة المسافة للتناسق
+                    const SizedBox(height: 55),
                     _buildModernEncouragement(),
                     const SizedBox(height: 40),
                   ],
@@ -86,7 +123,61 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // --- حل مشكلة مسح النص: استخدام حدة قصوى بدون Clipping ---
+  Widget _buildGlassQuickFact() {
+    DateTime now = DateTime.now();
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('daily_tips')
+          .where('isActive', isEqualTo: true)
+          .where('startDate', isLessThanOrEqualTo: now) // التصحيح هنا
+          .orderBy('startDate', descending: true)
+          .limit(1)
+          .snapshots(),
+      builder: (context, snapshot) {
+        String factToShow = _fallbackFact;
+        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+          var data = snapshot.data!.docs.first.data() as Map<String, dynamic>;
+          factToShow = data['content'] ?? _fallbackFact;
+        }
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(15),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(
+                      color: safetyOrange.withOpacity(0.1), width: 1.5)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Icon(Icons.lightbulb_outline, color: deepTeal, size: 20),
+                    const SizedBox(width: 8),
+                    Text("معلومة في السريع",
+                        style: GoogleFonts.cairo(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            color: deepTeal))
+                  ]),
+                  const SizedBox(height: 10),
+                  Text(factToShow,
+                      style: GoogleFonts.cairo(
+                          fontSize: 12,
+                          color: Colors.black87,
+                          fontWeight: FontWeight.bold,
+                          height: 1.6)),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildCrystalClearTicker() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('news').snapshots(),
@@ -97,19 +188,10 @@ class _HomeScreenState extends State<HomeScreen>
         if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
           var newsItems =
               snapshot.data!.docs.map((doc) => "⚡ ${doc['content']}").toList();
-          if (newsItems.length == 1) {
-            combinedList = [arMotto, newsItems[0], enMotto];
-          } else {
-            for (int i = 0; i < newsItems.length; i++) {
-              combinedList.add(newsItems[i]);
-              if (i == 1) combinedList.add(arMotto);
-              if (i == 3) combinedList.add(enMotto);
-            }
-          }
+          combinedList = [arMotto, ...newsItems, enMotto];
         } else {
           combinedList = [arMotto, enMotto];
         }
-
         return Container(
           height: 38,
           width: double.infinity,
@@ -118,19 +200,13 @@ class _HomeScreenState extends State<HomeScreen>
           child: SlideTransition(
             position: _newsAnimation,
             child: IntrinsicWidth(
-              child: Text(
-                combinedList.join("      "),
-                style: GoogleFonts.cairo(
-                  color: Colors.white,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.bold,
-                  height: 1.0,
-                ),
-                softWrap: false,
-                overflow:
-                    TextOverflow.visible, // يضمن عدم مسح الحروف عند الأطراف
-              ),
-            ),
+                child: Text(combinedList.join("      "),
+                    style: GoogleFonts.cairo(
+                        color: Colors.white,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold),
+                    softWrap: false,
+                    overflow: TextOverflow.visible)),
           ),
         );
       },
@@ -155,16 +231,14 @@ class _HomeScreenState extends State<HomeScreen>
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
                     color: deepTeal)),
-            Row(
-              children: [
-                _miniMotto("تعلم مستمر"),
-                _customHandDrawnArrow(), // سهم مرسوم يدوياً لليسار
-                _miniMotto("تطور كبير"),
-                _customHandDrawnArrow(), // سهم مرسوم يدوياً لليسار
-                _miniMotto("نجاح اكيد"),
-                const Text(" 💪", style: TextStyle(fontSize: 14)),
-              ],
-            ),
+            Row(children: [
+              _miniMotto("تعلم مستمر"),
+              _customHandDrawnArrow(),
+              _miniMotto("تطور كبير"),
+              _customHandDrawnArrow(),
+              _miniMotto("نجاح اكيد"),
+              const Text(" 💪", style: TextStyle(fontSize: 14))
+            ]),
           ],
         );
       },
@@ -175,15 +249,11 @@ class _HomeScreenState extends State<HomeScreen>
       style: GoogleFonts.cairo(
           fontSize: 12, color: safetyOrange, fontWeight: FontWeight.w800));
 
-  Widget _customHandDrawnArrow() {
-    return Padding(
+  Widget _customHandDrawnArrow() => Padding(
       padding: const EdgeInsets.symmetric(horizontal: 5),
       child: CustomPaint(
-        size: const Size(12, 10),
-        painter: SolidTrianglePainter(turquoiseCyan),
-      ),
-    );
-  }
+          size: const Size(12, 10),
+          painter: SolidTrianglePainter(turquoiseCyan)));
 
   Widget _buildLProGrid() {
     return GridView.count(
@@ -192,7 +262,6 @@ class _HomeScreenState extends State<HomeScreen>
       crossAxisCount: 2,
       mainAxisSpacing: 20,
       crossAxisSpacing: 20,
-      childAspectRatio: 1.0,
       children: [
         _buildPremiumCard(
             "دوري النجوم",
@@ -266,29 +335,27 @@ class _HomeScreenState extends State<HomeScreen>
               ])),
           if (showBadge)
             Positioned(
-              top: 14,
-              right: -16,
-              child: Transform.rotate(
-                angle: 0.55,
-                child: Container(
-                  width: 105,
-                  padding: const EdgeInsets.symmetric(vertical: 5),
-                  decoration: BoxDecoration(color: badgeColor, boxShadow: [
-                    BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 4,
-                        offset: const Offset(0, 2))
-                  ]),
-                  child: Center(
-                      child: Text(badge,
-                          style: GoogleFonts.cairo(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.5))),
-                ),
-              ),
-            ),
+                top: 14,
+                right: -16,
+                child: Transform.rotate(
+                    angle: 0.55,
+                    child: Container(
+                        width: 105,
+                        padding: const EdgeInsets.symmetric(vertical: 5),
+                        decoration: BoxDecoration(
+                            color: badgeColor,
+                            boxShadow: [
+                              BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2))
+                            ]),
+                        child: Center(
+                            child: Text(badge,
+                                style: GoogleFonts.cairo(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900)))))),
         ],
       ),
     );
@@ -305,67 +372,14 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _engWord(String text) => Text(text,
       style: GoogleFonts.cairo(
           color: lightTeal, fontSize: 16, fontWeight: FontWeight.w900));
-
-  Widget _customCyanArrowEn() {
-    return Padding(
+  Widget _customCyanArrowEn() => Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       child: CustomPaint(
           size: const Size(12, 12),
-          painter: SolidTrianglePainter(turquoiseCyan, isLeft: false)),
-    );
-  }
-
-  Widget _buildGlassQuickFact() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(15),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.8),
-              borderRadius: BorderRadius.circular(15),
-              border:
-                  Border.all(color: safetyOrange.withOpacity(0.1), width: 1.5)),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Icon(Icons.lightbulb_outline, color: deepTeal, size: 20),
-              const SizedBox(width: 8),
-              Text("معلومة في السريع",
-                  style: GoogleFonts.cairo(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      color: deepTeal))
-            ]),
-            const SizedBox(height: 10),
-            Text(getDailyFact(),
-                style: GoogleFonts.cairo(
-                    fontSize: 12,
-                    color: Colors.black87,
-                    fontWeight: FontWeight.bold,
-                    height: 1.6)),
-          ]),
-        ),
-      ),
-    );
-  }
-
-  String getDailyFact() {
-    int day = DateTime.now().weekday;
-    switch (day) {
-      case DateTime.sunday:
-        return "العقار هو الملاذ الآمن تاريخياً ضد التضخم. خليك شغوف وراجع اليوم مشروعين بالتفصيل.. القادم أجمل!";
-      case DateTime.monday:
-        return "المستشار الناجح يبيع مستقبلاً آمناً بناءً على أرقام دقيقة. حلل اليوم أسعار المتر في منطقتك.. أنت مبدع!";
-      case DateTime.tuesday:
-        return "العلاقة مع العميل تبدأ بعد البيع وليس قبله. تواصل اليوم مع عميل سابق.. التطور يبدأ بخطوة!";
-      default:
-        return "المعلومة هي العملة الأغلى في سوق العقارات. استمر في التعلم، نجاحك مضمون!";
-    }
-  }
+          painter: SolidTrianglePainter(turquoiseCyan, isLeft: false)));
 }
 
+// الرسامون (Painters) والمؤثرات كما هي
 class SolidTrianglePainter extends CustomPainter {
   final Color color;
   final bool isLeft;
@@ -406,26 +420,25 @@ class _AnimatedPremiumCardState extends State<_AnimatedPremiumCard> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: (_) => setState(() => _scale = 0.96),
-      onTapUp: (_) => setState(() => _scale = 1.0),
-      onTapCancel: () => setState(() => _scale = 1.0),
-      onTap: widget.onTap,
-      child: AnimatedScale(
-          scale: _scale,
-          duration: const Duration(milliseconds: 100),
-          child: Container(
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 12,
-                        offset: const Offset(0, 6))
-                  ]),
-              child: widget.child)),
-    );
+        onTapDown: (_) => setState(() => _scale = 0.96),
+        onTapUp: (_) => setState(() => _scale = 1.0),
+        onTapCancel: () => setState(() => _scale = 1.0),
+        onTap: widget.onTap,
+        child: AnimatedScale(
+            scale: _scale,
+            duration: const Duration(milliseconds: 100),
+            child: Container(
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6))
+                    ]),
+                child: widget.child)));
   }
 }
 

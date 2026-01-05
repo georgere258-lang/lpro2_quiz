@@ -42,10 +42,13 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# --- Firebase & Secrets (القسم الجديد لحماية ملفاتك) ---
-# تجاهل ملف مفتاح الخدمة السري
+# --- Firebase & Secrets (حماية الملفات الحساسة) ---
+# ملف مفتاح الخدمة السري (هام جداً)
 assets/service_account.json
 
-# تجاهل ملفات إعدادات Firebase التي تحتوي على مفاتيح الربط (اختياري للأمان العالي)
-# ios/Runner/GoogleService-Info.plist
-# android/app/google-services.json
+# ملفات إعدادات Firebase (يُفضل إخفاؤها في المشاريع العامة)
+ios/Runner/GoogleService-Info.plist
+android/app/google-services.json
+
+# ملفات متغيرات البيئة
+.env

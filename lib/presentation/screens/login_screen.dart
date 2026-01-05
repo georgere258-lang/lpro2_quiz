@@ -4,8 +4,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:permission_handler/permission_handler.dart';
 
-// تصحيح المسارات للوصول للثوابت والغلاف الرئيسي
+// استيراد الثوابت والصفحات حسب الهيكل المعتمد
 import '../../core/constants/app_colors.dart';
 import 'main_wrapper.dart';
 
@@ -23,19 +24,31 @@ class _LoginScreenState extends State<LoginScreen> {
   String verificationId = "";
 
   final TextEditingController phoneController = TextEditingController();
-
   final List<TextEditingController> otpControllers =
       List.generate(6, (index) => TextEditingController());
   final List<FocusNode> otpFocusNodes =
       List.generate(6, (index) => FocusNode());
 
+  // دالة تفعيل الإشعارات مع طلب الإذن الرسمي
   void _activateNotifications(String uid) async {
     try {
-      FirebaseMessaging messaging = FirebaseMessaging.instance;
-      await messaging.subscribeToTopic('all_users');
-      await messaging.subscribeToTopic(uid);
-      if (uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
-        await messaging.subscribeToTopic('admin_notifications');
+      // طلب الإذن لأجهزة أندرويد الحديثة و iOS
+      NotificationSettings settings =
+          await FirebaseMessaging.instance.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+        FirebaseMessaging messaging = FirebaseMessaging.instance;
+        await messaging.subscribeToTopic('all_users');
+        await messaging.subscribeToTopic(uid);
+
+        // التحقق من الـ UID الخاص بالمسؤول لتفعيل إشعارات الإدارة
+        if (uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
+          await messaging.subscribeToTopic('admin_notifications');
+        }
       }
     } catch (e) {
       debugPrint("Notification Activation Error: $e");
@@ -72,8 +85,14 @@ class _LoginScreenState extends State<LoginScreen> {
             isOtpStage = true;
             isLoading = false;
           });
+          // تركيز تلقائي على أول حقل OTP
+          Future.delayed(const Duration(milliseconds: 300), () {
+            otpFocusNodes[0].requestFocus();
+          });
         },
-        codeAutoRetrievalTimeout: (String verId) {},
+        codeAutoRetrievalTimeout: (String verId) {
+          verificationId = verId;
+        },
       );
     } catch (e) {
       setState(() => isLoading = false);
@@ -114,6 +133,7 @@ class _LoginScreenState extends State<LoginScreen> {
             .doc(user.uid)
             .get();
 
+        // التعديل: لا نقوم بمسح البيانات إذا كان المستخدم موجوداً مسبقاً
         if (!userDoc.exists) {
           await FirebaseFirestore.instance
               .collection('users')
@@ -203,8 +223,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             isOtpStage ? _buildOtpInput() : _buildPhoneInput(),
                       ),
                       const SizedBox(height: 40),
-
-                      // --- الحل النهائي لمشكلة توسيط النص في المربع البرتقالي ---
                       Center(
                         child: SizedBox(
                           width: 150,
@@ -213,30 +231,26 @@ class _LoginScreenState extends State<LoginScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.secondaryOrange,
                               elevation: 0,
-                              padding:
-                                  EdgeInsets.zero, // إلغاء أي بادينج افتراضي
+                              padding: EdgeInsets.zero,
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(15)),
                             ),
                             onPressed: isOtpStage ? _verifyOtp : _sendOtp,
                             child: Container(
-                              alignment:
-                                  Alignment.center, // إجبار التوسط الحسابي
+                              alignment: Alignment.center,
                               child: Text(
                                 isOtpStage ? "تأكيد" : "إرسال",
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.cairo(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
-                                    height:
-                                        1.0, // إلغاء المسافات العمودية الافتراضية
+                                    height: 1.0,
                                     fontSize: 18),
                               ),
                             ),
                           ),
                         ),
                       ),
-
                       if (isOtpStage)
                         Padding(
                           padding: const EdgeInsets.only(top: 15),
@@ -311,39 +325,31 @@ class _LoginScreenState extends State<LoginScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Theme(
-            data: Theme.of(context).copyWith(
-              colorScheme: ColorScheme.fromSwatch()
-                  .copyWith(primary: Colors.transparent),
-            ),
-            child: TextField(
-              controller: otpControllers[index],
-              focusNode: otpFocusNodes[index],
-              textAlign: TextAlign.center,
-              keyboardType: TextInputType.number,
-              maxLength: 1,
-              showCursor: false,
-              onChanged: (val) {
-                if (val.length == 1 && index < 5) {
-                  otpFocusNodes[index + 1].requestFocus();
-                }
-                if (val.isEmpty && index > 0) {
-                  otpFocusNodes[index - 1].requestFocus();
-                }
-              },
-              style: GoogleFonts.poppins(
-                  color: Colors.black,
-                  fontSize: 22,
-                  height: 1.0,
-                  fontWeight: FontWeight.bold),
-              decoration: const InputDecoration(
-                counterText: "",
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-                focusedBorder: InputBorder.none,
-                enabledBorder: InputBorder.none,
-              ),
+          child: TextField(
+            controller: otpControllers[index],
+            focusNode: otpFocusNodes[index],
+            textAlign: TextAlign.center,
+            keyboardType: TextInputType.number,
+            maxLength: 1,
+            showCursor: false,
+            onChanged: (val) {
+              if (val.length == 1 && index < 5) {
+                otpFocusNodes[index + 1].requestFocus();
+              }
+              if (val.isEmpty && index > 0) {
+                otpFocusNodes[index - 1].requestFocus();
+              }
+            },
+            style: GoogleFonts.poppins(
+                color: Colors.black,
+                fontSize: 22,
+                height: 1.0,
+                fontWeight: FontWeight.bold),
+            decoration: const InputDecoration(
+              counterText: "",
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
             ),
           ),
         ),

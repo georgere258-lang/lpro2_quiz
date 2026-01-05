@@ -13,7 +13,6 @@ import 'login_screen.dart';
 import 'admin_panel.dart';
 
 class ProfileScreen extends StatefulWidget {
-  // إضافة الوظيفة المطلوبة لفتح شاشة الدعم من الـ MainWrapper
   final VoidCallback? onSupportPressed;
 
   const ProfileScreen({super.key, this.onSupportPressed});
@@ -25,7 +24,6 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   final User? user = FirebaseAuth.instance.currentUser;
 
-  // استخدام الألوان المركزية
   final Color deepTeal = AppColors.primaryDeepTeal;
   final Color safetyOrange = AppColors.secondaryOrange;
   final Color lightTeal = const Color(0xFF4FA8A8);
@@ -39,12 +37,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Icons.account_circle,
   ];
 
+  // دالة الرتب الحماسية المعتمدة
   String _getMotivationalRank(int points) {
-    if (points >= 1500) return "مستشار L Pro العالمي 👑";
-    if (points >= 1000) return "خبير L Pro المتميز 🔥";
-    if (points >= 500) return "دائم التطور 🚀";
-    if (points >= 100) return "دائم التعلم ✨";
-    return "عضو جديد 🌱";
+    if (points >= 5000) return "👑 مستشار المعرفة العقارية";
+    if (points >= 1500) return "🔥 شغوف بالتطوير";
+    if (points >= 500) return "🚀 منطلق نحو المعرفة";
+    if (points >= 100) return "🌱 مستكشف عقاري";
+    return "عضو جديد ✨";
   }
 
   void _showAvatarPicker() {
@@ -233,14 +232,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Icons.share_outlined,
                     () => Share.share(
                         "انضم لتحدي L Pro وطور مهاراتك العقارية! 🚀")),
-
-                // --- إضافة زر الدعم الفني هنا ---
                 _buildProfileBtn(
                     "الدعم الفني المباشر",
                     Icons.headset_mic_outlined,
                     widget.onSupportPressed ?? () {},
                     iconColor: Colors.blueAccent),
-
                 _buildProfileBtn("حول التطبيق", Icons.info_outline_rounded, () {
                   Navigator.push(context,
                       MaterialPageRoute(builder: (c) => const AboutScreen()));

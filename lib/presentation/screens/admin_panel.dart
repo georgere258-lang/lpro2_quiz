@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:googleapis_auth/auth_io.dart' as auth;
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:intl/intl.dart';
 
 // استيراد الثوابت والصفحات
 import 'package:lpro2_quiz/core/constants/app_colors.dart';
@@ -19,7 +20,7 @@ class _AdminPanelState extends State<AdminPanel> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 5,
+      length: 6, // تم الزيادة لدعم إدارة المعلومات السريعة
       child: Scaffold(
         backgroundColor: const Color(0xFFF4F7F8),
         appBar: AppBar(
@@ -40,6 +41,9 @@ class _AdminPanelState extends State<AdminPanel> {
                 GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
             tabs: const [
               Tab(text: "الأعضاء", icon: Icon(Icons.people_alt)),
+              Tab(
+                  text: "نصيحة اليوم",
+                  icon: Icon(Icons.lightbulb)), // التبويب الجديد
               Tab(text: "الأخبار", icon: Icon(Icons.campaign)),
               Tab(text: "الأسئلة", icon: Icon(Icons.quiz)),
               Tab(text: "المواضيع", icon: Icon(Icons.article)),
@@ -50,6 +54,7 @@ class _AdminPanelState extends State<AdminPanel> {
         body: const TabBarView(
           children: [
             UserManager(),
+            DailyTipsManager(), // ربط الواجهة الجديدة
             NewsManager(),
             QuizManager(),
             TopicManager(),
@@ -61,7 +66,7 @@ class _AdminPanelState extends State<AdminPanel> {
   }
 }
 
-// --- دالة إرسال الإشعارات (تعمل مجاناً) ---
+// --- دالة إرسال الإشعارات المشتركة ---
 Future<void> _sendNotification(String title, String body) async {
   auth.AutoRefreshingAuthClient? client;
   try {
@@ -98,7 +103,158 @@ Future<void> _sendNotification(String title, String body) async {
   }
 }
 
-// --- 1. إدارة الأعضاء ---
+// --- إدارة نصيحة اليوم (المعلومة في السريع) ---
+class DailyTipsManager extends StatelessWidget {
+  const DailyTipsManager({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _buildActionBtn(context, "إضافة معلومة سريعة جديدة",
+            Icons.tips_and_updates, () => _showAddTipForm(context)),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('daily_tips')
+                .orderBy('startDate', descending: true)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData)
+                return const Center(child: CircularProgressIndicator());
+              return ListView.builder(
+                itemCount: snapshot.data!.docs.length,
+                itemBuilder: (context, i) {
+                  var data =
+                      snapshot.data!.docs[i].data() as Map<String, dynamic>;
+                  bool active = data['isActive'] ?? false;
+                  DateTime start = (data['startDate'] as Timestamp).toDate();
+
+                  return Card(
+                    margin:
+                        const EdgeInsets.symmetric(horizontal: 15, vertical: 6),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: active
+                            ? Colors.green.withAlpha(30)
+                            : Colors.grey.withAlpha(30),
+                        child: Icon(Icons.info_outline,
+                            color: active ? Colors.green : Colors.grey),
+                      ),
+                      title: Text(data['content'] ?? "",
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.cairo(
+                              fontSize: 13, fontWeight: FontWeight.bold)),
+                      subtitle: Text(
+                          "تبدأ: ${DateFormat('yyyy-MM-dd').format(start)}",
+                          style: const TextStyle(fontSize: 11)),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Switch(
+                            value: active,
+                            onChanged: (v) => snapshot.data!.docs[i].reference
+                                .update({'isActive': v}),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline,
+                                color: Colors.red),
+                            onPressed: () =>
+                                snapshot.data!.docs[i].reference.delete(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showAddTipForm(BuildContext context) {
+    final c = TextEditingController();
+    DateTime start = DateTime.now();
+    DateTime end = DateTime.now().add(const Duration(days: 1));
+    bool notify = true;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) => Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 20,
+              right: 20,
+              top: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text("إدراج معلومة مجدولة",
+                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 15),
+              TextField(
+                  controller: c,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                      hintText: "المعلومة + التوجيه + التحفيز",
+                      border: OutlineInputBorder())),
+              const SizedBox(height: 15),
+              ListTile(
+                title: const Text("تاريخ العرض"),
+                subtitle: Text(DateFormat('yyyy-MM-dd').format(start)),
+                trailing: const Icon(Icons.calendar_today),
+                onTap: () async {
+                  DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: start,
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime(2030));
+                  if (picked != null) setState(() => start = picked);
+                },
+              ),
+              CheckboxListTile(
+                title: const Text("إرسال إشعار فوري للمستخدمين"),
+                value: notify,
+                onChanged: (v) => setState(() => notify = v!),
+              ),
+              const SizedBox(height: 15),
+              ElevatedButton(
+                onPressed: () async {
+                  if (c.text.isEmpty) return;
+                  await FirebaseFirestore.instance
+                      .collection('daily_tips')
+                      .add({
+                    'content': c.text,
+                    'startDate': Timestamp.fromDate(start),
+                    'endDate': Timestamp.fromDate(
+                        end.add(const Duration(days: 365))), // افتراضياً لسنة
+                    'isActive': true,
+                    'createdAt': FieldValue.serverTimestamp(),
+                  });
+                  if (notify) _sendNotification("معلومة جديدة تهمك 💡", c.text);
+                  if (context.mounted) Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryDeepTeal),
+                child: const Text("حفظ ونشر",
+                    style: TextStyle(color: Colors.white)),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// --- 1. إدارة الأعضاء (UserManager) ---
 class UserManager extends StatefulWidget {
   const UserManager({super.key});
   @override
@@ -120,9 +276,8 @@ class _UserManagerState extends State<UserManager> {
                 .limit(100)
                 .snapshots(),
             builder: (context, snapshot) {
-              if (!snapshot.hasData) {
+              if (!snapshot.hasData)
                 return const Center(child: CircularProgressIndicator());
-              }
               var docs = snapshot.data!.docs.where((d) {
                 var data = d.data() as Map<String, dynamic>;
                 String name = (data['name'] ?? "").toString().toLowerCase();
@@ -188,14 +343,14 @@ class _UserManagerState extends State<UserManager> {
   }
 }
 
-// --- 2. إدارة الأخبار ---
+// --- 2. إدارة الأخبار (NewsManager) ---
 class NewsManager extends StatelessWidget {
   const NewsManager({super.key});
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _buildActionBtn(context, "إضافة خبر جديد", Icons.add_comment,
+        _buildActionBtn(context, "إضافة خبر جديد للشريط", Icons.add_comment,
             () => _showAddNews(context)),
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
@@ -204,9 +359,8 @@ class NewsManager extends StatelessWidget {
                 .orderBy('createdAt', descending: true)
                 .snapshots(),
             builder: (context, snapshot) {
-              if (!snapshot.hasData) {
+              if (!snapshot.hasData)
                 return const Center(child: CircularProgressIndicator());
-              }
               return ListView.builder(
                 itemCount: snapshot.data!.docs.length,
                 itemBuilder: (context, i) {
@@ -230,7 +384,7 @@ class NewsManager extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text("إضافة خبر", style: GoogleFonts.cairo()),
+        title: Text("إضافة خبر للشريط", style: GoogleFonts.cairo()),
         content: TextField(
             controller: c,
             decoration: const InputDecoration(hintText: "نص الخبر")),
@@ -256,7 +410,7 @@ class NewsManager extends StatelessWidget {
   }
 }
 
-// --- 3. إدارة الأسئلة (تم التعديل لتخطي الـ Storage) ---
+// --- 3. إدارة الأسئلة (QuizManager) ---
 class QuizManager extends StatefulWidget {
   const QuizManager({super.key});
   @override
@@ -265,7 +419,6 @@ class QuizManager extends StatefulWidget {
 
 class _QuizManagerState extends State<QuizManager> {
   String query = "";
-
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -287,9 +440,8 @@ class _QuizManagerState extends State<QuizManager> {
             stream:
                 FirebaseFirestore.instance.collection('quizzes').snapshots(),
             builder: (context, snapshot) {
-              if (!snapshot.hasData) {
+              if (!snapshot.hasData)
                 return const Center(child: CircularProgressIndicator());
-              }
               var filtered = snapshot.data!.docs.where((d) {
                 var data = d.data() as Map<String, dynamic>;
                 return (data['question'] ?? "").toString().contains(query);
@@ -313,7 +465,7 @@ class _QuizManagerState extends State<QuizManager> {
 
   void _showQuizForm() {
     final qC = TextEditingController();
-    final imgC = TextEditingController(); // حقل رابط الصورة
+    final imgC = TextEditingController();
     final optC = List.generate(4, (i) => TextEditingController());
     int correct = 0;
     String cat = "دوري النجوم";
@@ -332,17 +484,13 @@ class _QuizManagerState extends State<QuizManager> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text("إضافة سؤال (عن طريق الرابط)",
+                Text("إضافة سؤال مسابقة",
                     style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 10),
                 TextField(
-                  controller: imgC,
-                  decoration: const InputDecoration(
-                    labelText: "رابط الصورة (اختياري)",
-                    hintText: "انسخ رابط الصورة من ImgBB أو جوجل",
-                    prefixIcon: Icon(Icons.link),
-                  ),
-                ),
+                    controller: imgC,
+                    decoration: const InputDecoration(
+                        labelText: "رابط الصورة (اختياري)",
+                        prefixIcon: Icon(Icons.link))),
                 DropdownButton<String>(
                   value: cat,
                   isExpanded: true,
@@ -377,7 +525,7 @@ class _QuizManagerState extends State<QuizManager> {
                       'options': optC.map((e) => e.text).toList(),
                       'correctAnswer': correct,
                       'category': cat,
-                      'imageUrl': imgC.text // حفظ الرابط مباشرة
+                      'imageUrl': imgC.text
                     });
                     _sendNotification(
                         "تحدي جديد 🏆", "تم إضافة سؤال جديد في $cat");
@@ -402,14 +550,14 @@ class _QuizManagerState extends State<QuizManager> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text("رفع مجمع", style: GoogleFonts.cairo()),
+        title: Text("رفع مجمع (أسئلة)", style: GoogleFonts.cairo()),
         content: TextField(
-          controller: bulk,
-          maxLines: 5,
-          decoration: const InputDecoration(
-              hintText: "سؤال#خيار1,خيار2,خيار3,خيار4#رقم_الاجابة#رابط_الصورة",
-              border: OutlineInputBorder()),
-        ),
+            controller: bulk,
+            maxLines: 5,
+            decoration: const InputDecoration(
+                hintText:
+                    "سؤال#خيار1,خيار2,خيار3,خيار4#رقم_الاجابة#رابط_الصورة",
+                border: OutlineInputBorder())),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx), child: const Text("إلغاء")),
@@ -446,7 +594,7 @@ class _QuizManagerState extends State<QuizManager> {
   }
 }
 
-// --- 4. إدارة المواضيع (تخطي الـ Storage) ---
+// --- 4. إدارة المواضيع (TopicManager) ---
 class TopicManager extends StatefulWidget {
   const TopicManager({super.key});
   @override
@@ -459,7 +607,7 @@ class _TopicManagerState extends State<TopicManager> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _buildActionBtn(context, "إضافة موضوع برابط صورة", Icons.article,
+        _buildActionBtn(context, "إضافة موضوع تعليمي", Icons.article,
             () => _showTopicForm()),
         _buildSearchField(
             "بحث في المواضيع...", (v) => setState(() => query = v)),
@@ -467,9 +615,8 @@ class _TopicManagerState extends State<TopicManager> {
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance.collection('topics').snapshots(),
             builder: (context, snapshot) {
-              if (!snapshot.hasData) {
+              if (!snapshot.hasData)
                 return const Center(child: CircularProgressIndicator());
-              }
               var docs = snapshot.data!.docs.where((d) {
                 var data = d.data() as Map<String, dynamic>;
                 return (data['title'] ?? "").toString().contains(query);
@@ -493,8 +640,6 @@ class _TopicManagerState extends State<TopicManager> {
     final tC = TextEditingController();
     final cC = TextEditingController();
     final imgC = TextEditingController();
-    String cat = "المعلومة بتفرق";
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -528,7 +673,7 @@ class _TopicManagerState extends State<TopicManager> {
                   await FirebaseFirestore.instance.collection('topics').add({
                     'title': tC.text,
                     'content': cC.text,
-                    'category': cat,
+                    'category': "المعلومة بتفرق",
                     'imageUrl': imgC.text
                   });
                   _sendNotification("موضوع يهمك 📚", tC.text);
@@ -547,7 +692,7 @@ class _TopicManagerState extends State<TopicManager> {
   }
 }
 
-// --- Helpers ---
+// --- Helpers (الأدوات المساعدة) ---
 Widget _buildSearchField(String hint, Function(String) onChange) {
   return Padding(
     padding: const EdgeInsets.all(12),
@@ -569,7 +714,7 @@ Widget _buildSearchField(String hint, Function(String) onChange) {
 Widget _buildActionBtn(
     BuildContext context, String title, IconData icon, VoidCallback onTap) {
   return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
     child: ElevatedButton.icon(
       onPressed: onTap,
       icon: Icon(icon, color: Colors.white, size: 18),
@@ -578,8 +723,8 @@ Widget _buildActionBtn(
               fontWeight: FontWeight.bold, color: Colors.white, fontSize: 12)),
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primaryDeepTeal,
-        minimumSize: const Size(double.infinity, 45),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        minimumSize: const Size(double.infinity, 48),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     ),
   );
@@ -593,7 +738,7 @@ Widget _buildListTile(String title, String sub, VoidCallback onDel) {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Text(sub),
+      subtitle: Text(sub, style: const TextStyle(fontSize: 12)),
       trailing: IconButton(
           icon: const Icon(Icons.delete_outline, color: Colors.red),
           onPressed: onDel),
@@ -610,7 +755,7 @@ Widget _infoRow(String label, String value) {
             style: GoogleFonts.cairo(
                 fontWeight: FontWeight.bold, color: AppColors.primaryDeepTeal)),
         const SizedBox(width: 10),
-        Text(value, style: GoogleFonts.cairo()),
+        Expanded(child: Text(value, style: GoogleFonts.cairo())),
       ],
     ),
   );

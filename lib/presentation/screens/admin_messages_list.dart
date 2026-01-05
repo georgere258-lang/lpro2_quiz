@@ -4,8 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 // استيراد الثوابت والصفحات حسب الهيكل المعتمد
-import 'package:lpro2_quiz/core/constants/app_colors.dart';
-import 'package:lpro2_quiz/presentation/screens/admin_reply_screen.dart';
+import '../../core/constants/app_colors.dart';
+import 'admin_reply_screen.dart';
 
 class AdminMessagesList extends StatelessWidget {
   const AdminMessagesList({super.key});

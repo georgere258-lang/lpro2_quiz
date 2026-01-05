@@ -28,7 +28,7 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
     super.dispose();
   }
 
-  // --- دالة إرسال الإشعار للمديرة ---
+  // --- دالة إرسال الإشعار للمديرة عبر FCM V1 ---
   Future<void> _sendNotificationToAdmin(
       String userName, String messageText) async {
     auth.AutoRefreshingAuthClient? client;
@@ -49,8 +49,7 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
         Uri.parse(url),
         body: jsonEncode({
           'message': {
-            'topic':
-                'admin_notifications', // سنفترض أنكِ مشتركة في هذا التوبيك كمديرة
+            'topic': 'admin_notifications',
             'notification': {
               'title': 'رسالة دعم جديدة 💬',
               'body': 'من $userName: $messageText'
@@ -82,7 +81,7 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
     _msgController.clear();
 
     try {
-      // 1. إضافة الرسالة للمجموعة الفرعية
+      // 1. إضافة الرسالة للمجموعة الفرعية الخاصة بالمستخدم
       await FirebaseFirestore.instance
           .collection('support_chats')
           .doc(user!.uid)
@@ -93,7 +92,7 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
         'timestamp': FieldValue.serverTimestamp(),
       });
 
-      // 2. تحديث المستند الرئيسي لتنبيه المسؤول
+      // 2. تحديث المستند الرئيسي لتسهيل الفرز في لوحة الإدارة
       await FirebaseFirestore.instance
           .collection('support_chats')
           .doc(user!.uid)
@@ -105,7 +104,7 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
         'unreadByAdmin': true,
       }, SetOptions(merge: true));
 
-      // 3. إرسال الإشعار للمديرة
+      // 3. إشعار المديرة فورياً
       _sendNotificationToAdmin(uName, txt);
     } catch (e) {
       debugPrint("Error sending message: $e");
@@ -144,12 +143,14 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
                 var docs = snapshot.data?.docs ?? [];
+
                 return ListView.builder(
-                  reverse: true,
+                  reverse: true, // لتبدأ الرسائل من الأسفل
                   padding:
                       const EdgeInsets.symmetric(horizontal: 15, vertical: 20),
                   itemCount: docs.length + 1,
                   itemBuilder: (context, i) {
+                    // عرض رسالة ترحيبية في نهاية القائمة (التي تظهر في الأعلى فعلياً)
                     if (i == docs.length) {
                       return _buildChatBubble(
                           "أهلاً بك في L Pro.. كيف يمكننا مساعدتك اليوم؟ إذا كان لديك اقتراح أو سؤال لا تتردد في مراسلتنا 💡",

@@ -30,7 +30,7 @@ class _AdminReplyScreenState extends State<AdminReplyScreen> {
   @override
   void initState() {
     super.initState();
-    _markAsRead();
+    _markAsRead(); // بمجرد فتح الشاشة نعتبر الرسائل مقروءة للإدارة
   }
 
   @override
@@ -39,7 +39,7 @@ class _AdminReplyScreenState extends State<AdminReplyScreen> {
     super.dispose();
   }
 
-  // --- دالة إرسال إشعار للمستخدم الفردي ---
+  // --- دالة إرسال إشعار للمستخدم الفردي عبر FCM V1 ---
   Future<void> _sendNotificationToUser(
       String targetUserId, String replyText) async {
     auth.AutoRefreshingAuthClient? client;
@@ -56,13 +56,11 @@ class _AdminReplyScreenState extends State<AdminReplyScreen> {
       final String url =
           'https://fcm.googleapis.com/v1/projects/$projectName/messages:send';
 
-      // سنرسل الإشعار عبر "Topic" خاص بالـ UID الخاص بالمستخدم لضمان وصولها له وحده
       await client.post(
         Uri.parse(url),
         body: jsonEncode({
           'message': {
-            'topic':
-                targetUserId, // المستخدم يشترك تلقائياً في توبيك يحمل الـ UID الخاص به
+            'topic': targetUserId, // الـ Topic هو الـ UID الخاص بالمستخدم
             'notification': {
               'title': 'رد جديد من الإدارة ✉️',
               'body': replyText
@@ -77,7 +75,6 @@ class _AdminReplyScreenState extends State<AdminReplyScreen> {
           }
         }),
       );
-      debugPrint("Reply Notification Sent to User: $targetUserId");
     } catch (e) {
       debugPrint("FCM Reply Error: $e");
     } finally {
@@ -115,7 +112,7 @@ class _AdminReplyScreenState extends State<AdminReplyScreen> {
         'timestamp': FieldValue.serverTimestamp(),
       });
 
-      // 2. تحديث المستند الرئيسي
+      // 2. تحديث المستند الرئيسي (لعرضه في قائمة الرسائل)
       await FirebaseFirestore.instance
           .collection('support_chats')
           .doc(widget.userId)
@@ -126,7 +123,7 @@ class _AdminReplyScreenState extends State<AdminReplyScreen> {
       });
 
       // 3. إرسال الإشعار للمستخدم
-      await _sendNotificationToUser(widget.userId, replyText);
+      _sendNotificationToUser(widget.userId, replyText);
     } catch (e) {
       _showErrorSnackBar("فشل إرسال الرد، حاول مجدداً");
     } finally {
@@ -172,15 +169,7 @@ class _AdminReplyScreenState extends State<AdminReplyScreen> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return Center(
-                    child: Text(
-                      "لا توجد رسائل سابقة",
-                      style: GoogleFonts.cairo(color: Colors.grey),
-                    ),
-                  );
-                }
-                var docs = snapshot.data!.docs;
+                var docs = snapshot.data?.docs ?? [];
                 return ListView.builder(
                   reverse: true,
                   padding:
@@ -244,13 +233,11 @@ class _AdminReplyScreenState extends State<AdminReplyScreen> {
         left: 15,
         right: 15,
       ),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 15,
-              offset: const Offset(0, -5))
+              color: Colors.black12, blurRadius: 10, offset: Offset(0, -2))
         ],
       ),
       child: Row(
