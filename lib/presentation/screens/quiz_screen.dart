@@ -3,21 +3,18 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:confetti/confetti.dart'; // إضافة مكتبة الاحتفال
+import 'package:confetti/confetti.dart';
 import 'dart:async';
-import 'dart:math';
 
 import '../../core/constants/app_colors.dart';
-import '../../core/utils/sound_manager.dart'; // المسار الصحيح لمدير الصوت
+import '../../core/utils/sound_manager.dart';
 
 class QuizScreen extends StatefulWidget {
   final String categoryTitle;
-  final bool isTopicMode;
 
   const QuizScreen({
     super.key,
     required this.categoryTitle,
-    this.isTopicMode = false,
   });
 
   @override
@@ -33,7 +30,6 @@ class _QuizScreenState extends State<QuizScreen> {
   int batchCount = 0;
   int roundNumber = 1;
   int score = 0;
-  int totalSessionScore = 0;
   int dailyQuestionsAnswered = 0;
 
   late int timeLeft;
@@ -44,8 +40,6 @@ class _QuizScreenState extends State<QuizScreen> {
   bool isLoading = true;
 
   List<Map<String, dynamic>> dataItems = [];
-
-  // متحكم الاحتفال
   late ConfettiController _confettiController;
 
   @override
@@ -72,10 +66,10 @@ class _QuizScreenState extends State<QuizScreen> {
       if (doc.exists) {
         var data = doc.data() as Map<String, dynamic>;
         Timestamp? lastDate = data['lastQuizDate'];
+        DateTime now = DateTime.now();
 
         if (lastDate != null) {
           DateTime lastDateTime = lastDate.toDate();
-          DateTime now = DateTime.now();
           bool isSameDay = lastDateTime.year == now.year &&
               lastDateTime.month == now.month &&
               lastDateTime.day == now.day;
@@ -87,6 +81,7 @@ class _QuizScreenState extends State<QuizScreen> {
               if (roundNumber > 4) roundNumber = 4;
             });
           } else {
+            // تصفير عداد اليوم فقط مع بداية يوم جديد دون المساس بالنقاط
             await FirebaseFirestore.instance
                 .collection('users')
                 .doc(user.uid)
@@ -104,14 +99,10 @@ class _QuizScreenState extends State<QuizScreen> {
     super.dispose();
   }
 
-  bool get isEducationalOnly =>
-      widget.categoryTitle == "المعلومة بتفرق" || widget.isTopicMode;
-
   Future<void> _fetchContent() async {
     try {
-      String collectionName = widget.isTopicMode ? 'topics' : 'quizzes';
       var snapshot = await FirebaseFirestore.instance
-          .collection(collectionName)
+          .collection('quizzes')
           .where('category', isEqualTo: widget.categoryTitle)
           .get();
 
@@ -122,7 +113,7 @@ class _QuizScreenState extends State<QuizScreen> {
             data['id'] = doc.id;
             return data;
           }).toList();
-          if (!isEducationalOnly) dataItems.shuffle();
+          dataItems.shuffle();
           isLoading = false;
         });
       }
@@ -132,7 +123,6 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void _startTimer() {
-    if (isEducationalOnly) return;
     setState(
         () => timeLeft = (widget.categoryTitle == "دوري المحترفين") ? 15 : 25);
     timer?.cancel();
@@ -160,20 +150,19 @@ class _QuizScreenState extends State<QuizScreen> {
         selectedOption = selected;
         showFeedback = true;
         batchCount++;
-        if (isCorrect && !isEducationalOnly) {
-          SoundManager.playCorrect(); // تشغيل صوت النجاح
-          int pointsToAdd = (widget.categoryTitle == "دوري النجوم") ? 2 : 5;
-          score += pointsToAdd;
-          totalSessionScore += pointsToAdd;
-        } else if (!isCorrect && !isEducationalOnly) {
-          SoundManager.playWrong(); // تشغيل صوت الخطأ
+        if (isCorrect) {
+          SoundManager.playCorrect();
+          // نظام نقاط موحد: دوري النجوم (2) | دوري المحترفين (5)
+          score += (widget.categoryTitle == "دوري النجوم") ? 2 : 5;
+        } else {
+          SoundManager.playWrong();
         }
       });
     }
 
     Future.delayed(const Duration(milliseconds: 1500), () {
       if (!mounted) return;
-      if (!isEducationalOnly && batchCount >= 5) {
+      if (batchCount >= 5) {
         _saveProgressAndShowRound();
       } else {
         _nextStep();
@@ -192,36 +181,39 @@ class _QuizScreenState extends State<QuizScreen> {
         _startTimer();
       }
     } else {
-      isEducationalOnly ? Navigator.pop(context) : _showFinalTotalResult();
+      Navigator.popUntil(context, (r) => r.isFirst);
     }
   }
 
+  // --- دالة الربط السحري بفايربيز ---
   Future<void> _saveProgressAndShowRound() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user != null && !isEducationalOnly) {
-      String pointsField =
+    if (user != null) {
+      // تحديد حقل الدوري بدقة لضمان ظهورها في البروفايل
+      String leagueField =
           (widget.categoryTitle == "دوري النجوم") ? 'starsPoints' : 'proPoints';
+
       try {
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .update({
+          // 1. زيادة المجموع العام (للهوم والترتيب العام)
           'points': FieldValue.increment(score),
-          pointsField: FieldValue.increment(score),
+          // 2. زيادة نقاط الدوري الخاص (للقسم المخصص في البروفايل)
+          leagueField: FieldValue.increment(score),
+          // 3. تحديث النشاط اليومي
           'dailyQuestionsCount': FieldValue.increment(5),
           'lastQuizDate': FieldValue.serverTimestamp(),
         });
 
         dailyQuestionsAnswered += 5;
-
-        // إذا أكمل الـ 4 جولات (20 سؤال) نقوم بتشغيل الاحتفال
         if (dailyQuestionsAnswered >= 20) {
           _confettiController.play();
         }
-
         _showRoundResultPage();
       } catch (e) {
-        debugPrint("Error saving: $e");
+        debugPrint("Error in DB Sync: $e");
       }
     }
   }
@@ -229,7 +221,7 @@ class _QuizScreenState extends State<QuizScreen> {
   void _showRoundResultPage() {
     timer?.cancel();
     int roundEarnedPoints = score;
-    setState(() => score = 0);
+    setState(() => score = 0); // تصفير عداد الجولة الحالية فقط
 
     showModalBottomSheet(
       context: context,
@@ -344,7 +336,6 @@ class _QuizScreenState extends State<QuizScreen> {
               ],
             ),
           ),
-          // عرض القصاصات الملونة
           ConfettiWidget(
             confettiController: _confettiController,
             blastDirectionality: BlastDirectionality.explosive,
@@ -362,21 +353,14 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  void _showFinalTotalResult() {
-    Navigator.popUntil(context, (r) => r.isFirst);
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
+    if (isLoading)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    if (dataItems.isEmpty) {
+    if (dataItems.isEmpty)
       return Scaffold(
           appBar: _buildUnifiedHeader(),
-          body: const Center(child: Text("لا يوجد محتوى حالياً")));
-    }
-    if (isEducationalOnly) return _buildAttractiveTopicView();
+          body: const Center(child: Text("لا يوجد أسئلة حالياً")));
     if (!gameStarted) return _buildStartView();
 
     var q = dataItems[currentQuestionIndex];
@@ -387,13 +371,12 @@ class _QuizScreenState extends State<QuizScreen> {
         textDirection: TextDirection.rtl,
         child: Column(
           children: [
-            if (!isEducationalOnly)
-              LinearProgressIndicator(
-                  value: timeLeft /
-                      ((widget.categoryTitle == "دوري المحترفين") ? 15 : 25),
-                  color: safetyOrange,
-                  backgroundColor: Colors.white,
-                  minHeight: 6),
+            LinearProgressIndicator(
+                value: timeLeft /
+                    ((widget.categoryTitle == "دوري المحترفين") ? 15 : 25),
+                color: safetyOrange,
+                backgroundColor: Colors.white,
+                minHeight: 6),
             Padding(
                 padding: const EdgeInsets.all(15),
                 child: Row(
@@ -433,7 +416,8 @@ class _QuizScreenState extends State<QuizScreen> {
                               imageUrl: q['imageUrl'],
                               height: 160,
                               width: double.infinity,
-                              fit: BoxFit.cover)),
+                              fit: BoxFit.cover,
+                              memCacheHeight: 400)),
                     const SizedBox(height: 20),
                     _buildQuestionCard(q['question']),
                     const SizedBox(height: 30),
@@ -530,128 +514,6 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  Widget _buildAttractiveTopicView() {
-    return Scaffold(
-      backgroundColor: AppColors.scaffoldBackground,
-      appBar: _buildUnifiedHeader(),
-      body: Directionality(
-        textDirection: TextDirection.rtl,
-        child: ListView.builder(
-          padding: const EdgeInsets.all(20),
-          itemCount: dataItems.length,
-          itemBuilder: (context, index) =>
-              _buildAttractiveTopicCard(dataItems[index]),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAttractiveTopicCard(Map<String, dynamic> data) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        SoundManager.playTap();
-        Navigator.push(context,
-            MaterialPageRoute(builder: (c) => QuizTopicDetailPage(data: data)));
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 30),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 20,
-                offset: const Offset(0, 10))
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (data['imageUrl'] != null && data['imageUrl'] != "")
-              ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(28)),
-                  child: CachedNetworkImage(
-                      imageUrl: data['imageUrl'],
-                      height: 180,
-                      width: double.infinity,
-                      fit: BoxFit.cover)),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                              color: safetyOrange.withOpacity(0.25),
-                              offset: const Offset(3, 3),
-                              blurRadius: 0)
-                        ],
-                        border: Border.all(color: deepTeal.withOpacity(0.05))),
-                    child: Text(data['title'] ?? "",
-                        style: GoogleFonts.cairo(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
-                            color: deepTeal)),
-                  ),
-                  const SizedBox(height: 15),
-                  Text(data['content'] ?? "",
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.cairo(
-                          fontSize: 13.5,
-                          color: Colors.grey[600],
-                          height: 1.6)),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 18, vertical: 8),
-                        decoration: BoxDecoration(
-                            color: deepTeal,
-                            borderRadius: BorderRadius.circular(15),
-                            boxShadow: [
-                              BoxShadow(
-                                  color: deepTeal.withOpacity(0.3),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4))
-                            ]),
-                        child: Row(
-                          children: [
-                            Text("اقرأ المعلومة",
-                                style: GoogleFonts.cairo(
-                                    fontSize: 12,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w800)),
-                            const SizedBox(width: 8),
-                            const Icon(Icons.arrow_back_rounded,
-                                size: 16, color: Colors.white),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.lightbulb_outline_rounded,
-                          color: safetyOrange.withOpacity(0.5), size: 22),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   String _normalize(String text) => text.trim().toLowerCase();
   Widget _buildQuestionCard(String text) => Container(
       padding: const EdgeInsets.all(25),
@@ -661,106 +523,4 @@ class _QuizScreenState extends State<QuizScreen> {
           textAlign: TextAlign.center,
           style: GoogleFonts.cairo(
               fontSize: 17, fontWeight: FontWeight.bold, color: deepTeal)));
-}
-
-// عارض تفاصيل الموضوع الفني
-class QuizTopicDetailPage extends StatelessWidget {
-  final Map<String, dynamic> data;
-  const QuizTopicDetailPage({super.key, required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FBFB),
-      appBar: AppBar(
-          backgroundColor: AppColors.primaryDeepTeal,
-          elevation: 0,
-          centerTitle: true,
-          title: Text(data['title'] ?? "التفاصيل",
-              style: GoogleFonts.cairo(
-                  fontSize: 16, fontWeight: FontWeight.bold))),
-      body: SingleChildScrollView(
-        child: Directionality(
-          textDirection: TextDirection.rtl,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (data['imageUrl'] != null && data['imageUrl'] != "")
-                CachedNetworkImage(
-                    imageUrl: data['imageUrl'],
-                    width: double.infinity,
-                    height: 220,
-                    fit: BoxFit.cover),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(22),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withOpacity(0.06),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8))
-                    ],
-                    border: Border.all(
-                        color: AppColors.primaryDeepTeal.withOpacity(0.1),
-                        width: 1.2),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(22),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 18, vertical: 12),
-                          decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                  colors: [
-                                AppColors.primaryDeepTeal,
-                                Color(0xFF006D77)
-                              ],
-                                  begin: Alignment.centerRight,
-                                  end: Alignment.centerLeft)),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.auto_stories_rounded,
-                                  color: AppColors.secondaryOrange, size: 22),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                  child: Text(data['title'] ?? "المحتوى الفني",
-                                      style: GoogleFonts.cairo(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 14),
-                                      overflow: TextOverflow.ellipsis)),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(22),
-                          color: Colors.white,
-                          child: Text(data['content'] ?? "",
-                              textAlign: TextAlign.right,
-                              style: GoogleFonts.cairo(
-                                  fontSize: 16,
-                                  height: 1.8,
-                                  color: const Color(0xFF2D3142),
-                                  fontWeight: FontWeight.w600)),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 30),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

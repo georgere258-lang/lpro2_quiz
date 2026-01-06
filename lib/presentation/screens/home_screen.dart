@@ -7,6 +7,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/sound_manager.dart';
 import 'quiz_screen.dart';
 import 'master_plan_screen.dart';
+import 'fact_screen.dart'; // استيراد الصفحة الجديدة
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -145,7 +146,7 @@ class _HomeScreenState extends State<HomeScreen>
                 painter: PremiumTrophyPainter(safetyOrange)),
             "دوري النجوم",
             true,
-            isQuiz: true),
+            targetScreen: const QuizScreen(categoryTitle: "دوري النجوم")),
         _buildPremiumCard(
             "دوري المحترفين",
             "PRO 🔥",
@@ -155,7 +156,7 @@ class _HomeScreenState extends State<HomeScreen>
                 painter: PremiumMedalPainter(safetyOrange)),
             "دوري المحترفين",
             true,
-            isQuiz: true),
+            targetScreen: const QuizScreen(categoryTitle: "دوري المحترفين")),
         _buildPremiumCard(
             "المعلومة بتفرق",
             "",
@@ -165,7 +166,7 @@ class _HomeScreenState extends State<HomeScreen>
                 painter: PaperAndPenPainter(lightTeal, safetyOrange)),
             "المعلومة بتفرق",
             false,
-            isQuiz: false),
+            targetScreen: const FactScreen()), // الربط الجديد هنا
         _buildPremiumCard(
             "اعرف عميلك",
             "",
@@ -175,25 +176,20 @@ class _HomeScreenState extends State<HomeScreen>
                 painter: DeepHollowQuestionPainter(lightTeal, safetyOrange)),
             "اعرف عميلك",
             false,
-            isQuiz: false,
-            isMasterPlan: true),
+            targetScreen: const MasterPlanScreen()),
       ],
     );
   }
 
+  // تعديل بارامترات الكارد لتستقبل الـ targetScreen مباشرة
   Widget _buildPremiumCard(String title, String badge, Color badgeColor,
       Widget icon, String category, bool showBadge,
-      {required bool isQuiz, bool isMasterPlan = false}) {
+      {required Widget targetScreen}) {
     return _AnimatedPremiumCard(
       onTap: () {
-        SoundManager.playTap(); // تشغيل الصوت المباشر
+        SoundManager.playTap();
         Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (c) => isMasterPlan
-                    ? const MasterPlanScreen()
-                    : QuizScreen(
-                        categoryTitle: category, isTopicMode: !isQuiz)));
+            context, MaterialPageRoute(builder: (c) => targetScreen));
       },
       child: Stack(
         clipBehavior: Clip.none,
@@ -259,20 +255,41 @@ class _HomeScreenState extends State<HomeScreen>
           .snapshots(),
       builder: (context, snapshot) {
         String name = "عضو L Pro";
+        int dailyCount = 0;
+        int points = 0;
+
         if (snapshot.hasData && snapshot.data!.exists) {
-          name = snapshot.data!['name'] ?? name;
+          var data = snapshot.data!.data() as Map<String, dynamic>;
+          name = data['name'] ?? name;
+          dailyCount = data['dailyQuestionsCount'] ?? 0;
+          points = data['points'] ?? 0;
         }
+
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text("أهلاً بك، $name ✨",
-              style: GoogleFonts.cairo(
-                  fontSize: 21, fontWeight: FontWeight.w900, color: deepTeal)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("أهلاً بك، $name ✨",
+                  style: GoogleFonts.cairo(
+                      fontSize: 21,
+                      fontWeight: FontWeight.w900,
+                      color: deepTeal)),
+              Text("$points ن",
+                  style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w900,
+                      color: safetyOrange,
+                      fontSize: 14)),
+            ],
+          ),
           Row(children: [
             _miniMotto("تعلم مستمر"),
             _customHandDrawnArrow(),
             _miniMotto("تطور كبير"),
             _customHandDrawnArrow(),
             _miniMotto("نجاح اكيد"),
-            const Text(" 💪")
+            Text(" 💪 ${dailyCount > 0 ? '($dailyCount/20)' : ''}",
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
           ]),
         ]);
       },
@@ -305,8 +322,7 @@ class _HomeScreenState extends State<HomeScreen>
           painter: SolidTrianglePainter(turquoiseCyan, isLeft: false)));
 }
 
-// --- الكلاسات المساعدة (Painters, Widgets) ---
-
+// --- الكلاسات المساعدة (Painters, Widgets) تبقى كما هي ---
 class InfoCardWidget extends StatelessWidget {
   final String content;
   const InfoCardWidget({super.key, required this.content});

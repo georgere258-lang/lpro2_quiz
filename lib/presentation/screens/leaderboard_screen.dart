@@ -15,6 +15,8 @@ class LeaderboardScreen extends StatefulWidget {
 class _LeaderboardScreenState extends State<LeaderboardScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+
+  // سنعتمد على حقل 'points' كحقل ترتيب موحد لضمان ظهور الـ 50 مستخدم في كل التبويبات
   final List<String> _rankingFields = ['points', 'starsPoints', 'proPoints'];
 
   final List<IconData> avatars = [
@@ -45,7 +47,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       appBar: AppBar(
         backgroundColor: AppColors.primaryDeepTeal,
         elevation: 0,
-        // تم حذف العنوان تماماً (تم مسح النتائج ودوري المحترفين)
+        toolbarHeight: 20,
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
@@ -57,9 +59,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           labelStyle:
               GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
           tabs: const [
-            Tab(text: "الترتيب العام"),
-            Tab(text: "دوري النجوم"),
-            Tab(text: "دوري المحترفين"),
+            Tab(text: "الترتيب العام 🏆"),
+            Tab(text: "دوري النجوم ✨"),
+            Tab(text: "دوري المحترفين 🔥"),
           ],
         ),
       ),
@@ -75,36 +77,60 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     );
   }
 
-  Widget _buildLeaderboardList(String orderByField) {
+  Widget _buildLeaderboardList(String currentField) {
     return StreamBuilder<QuerySnapshot>(
+      // السحر هنا: الترتيب دايماً حسب points عشان القائمة تظهر كاملة بالـ 50 شخص
       stream: FirebaseFirestore.instance
           .collection('users')
-          .orderBy(orderByField, descending: true)
-          .limit(20)
+          .orderBy('points', descending: true)
+          .limit(50)
           .snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(
+              child: Text("حدث خطأ في تحميل البيانات",
+                  style: GoogleFonts.cairo()));
+        }
+
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
               child:
                   CircularProgressIndicator(color: AppColors.secondaryOrange));
         }
-        final allUsers = snapshot.data!.docs
-            .map((doc) =>
-                UserModel.fromMap(doc.data() as Map<String, dynamic>, doc.id))
-            .toList();
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Center(
+              child:
+                  Text("لا يوجد متسابقون حالياً", style: GoogleFonts.cairo()));
+        }
+
+        final allUsers = snapshot.data!.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return UserModel.fromMap(data, doc.id);
+        }).toList();
+
+        // إعادة ترتيب القائمة داخل الموبايل (Logic) بناءً على التبويب المفتوح
+        // عشان اللي عنده نقاط أكتر في دوري النجوم يطلع فوق حتى لو نقاطه الكلية أقل
+        allUsers.sort((a, b) {
+          int valA = _getPointsValue(a, currentField);
+          int valB = _getPointsValue(b, currentField);
+          return valB.compareTo(valA);
+        });
+
         final topThree = allUsers.take(3).toList();
-        final others = allUsers.skip(3).toList();
+        final others =
+            allUsers.length > 3 ? allUsers.skip(3).toList() : <UserModel>[];
 
         return Column(
           children: [
-            _buildPodiumHeader(topThree, orderByField),
+            _buildPodiumHeader(topThree, currentField),
             Expanded(
               child: ListView.builder(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
                 itemCount: others.length,
                 itemBuilder: (context, index) =>
-                    _buildUserTile(index + 4, others[index], orderByField),
+                    _buildUserTile(index + 4, others[index], currentField),
               ),
             ),
           ],
@@ -115,8 +141,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   Widget _buildPodiumHeader(List<UserModel> topThree, String field) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(
-          10, 40, 10, 30), // زيادة المساحة العلوية بعد الحذف
+      padding: const EdgeInsets.fromLTRB(10, 20, 10, 30),
       decoration: const BoxDecoration(
           color: AppColors.primaryDeepTeal,
           borderRadius: BorderRadius.vertical(bottom: Radius.circular(45))),
@@ -124,7 +149,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // تم مسح كل النصوص العلوية هنا
           if (topThree.length >= 2) _buildPodiumItem(topThree[1], 2, 75, field),
           if (topThree.isNotEmpty) _buildPodiumItem(topThree[0], 1, 100, field),
           if (topThree.length >= 3) _buildPodiumItem(topThree[2], 3, 70, field),
@@ -137,6 +161,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     Color medalColor = rank == 1
         ? const Color(0xFFFFD700)
         : (rank == 2 ? const Color(0xFFE0E0E0) : const Color(0xFFCD7F32));
+
     return Column(
       children: [
         Stack(
@@ -193,6 +218,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 10,
+                offset: const Offset(0, 4))
+          ],
           border:
               Border.all(color: AppColors.primaryDeepTeal.withOpacity(0.05))),
       child: Row(
@@ -241,6 +272,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   int _getPointsValue(UserModel user, String field) {
     if (field == 'starsPoints') return user.starsPoints;
     if (field == 'proPoints') return user.proPoints;
-    return user.starsPoints + user.proPoints;
+    return user.points;
   }
 }

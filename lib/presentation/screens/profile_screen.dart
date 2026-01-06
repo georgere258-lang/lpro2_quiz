@@ -4,12 +4,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 
-// استيراد الثوابت والمديرين والـ Model
 import '../../core/constants/app_colors.dart';
-import '../../core/utils/sound_manager.dart'; // مدير الصوت الموحد
+import '../../core/utils/sound_manager.dart';
 import '../../data/models/user_model.dart';
 
-// استيراد الشاشات
 import 'about_screen.dart';
 import 'login_screen.dart';
 import 'admin_panel.dart';
@@ -156,34 +154,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             var data = snapshot.data?.data() as Map<String, dynamic>? ?? {};
             var userModel = UserModel.fromMap(data, user?.uid ?? "");
-            int avatarIdx = data['avatarIndex'] ?? 0;
-            int totalPoints = userModel.starsPoints + userModel.proPoints;
+
+            // الربط مع الحقل الموحد الجديد
+            int displayTotalPoints = userModel.points;
             int dailyCount = data['dailyQuestionsCount'] ?? 0;
+
+            // منطق معالجة النقاط القديمة (الميزان الذكي)
+            int sPoints = userModel.starsPoints;
+            int pPoints = userModel.proPoints;
+
+            // لو مستخدم قديم وعنده نقاط إجمالية بس معندوش تقسيمات، اظهرهم في دوري النجوم
+            if (displayTotalPoints > 0 && sPoints == 0 && pPoints == 0) {
+              sPoints = displayTotalPoints;
+            }
 
             return ListView(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               children: [
                 const SizedBox(height: 30),
-                _buildProfileHeader(
-                    userModel.displayName, totalPoints, avatarIdx),
+                _buildProfileHeader(userModel.displayName, displayTotalPoints,
+                    userModel.avatarIndex),
                 const SizedBox(height: 25),
-
-                // كارت تقدم اليوم الجديد
                 _buildDailyProgressCard(dailyCount),
-
                 const SizedBox(height: 20),
                 Row(
                   children: [
                     Expanded(
-                        child: _buildMiniPointCard("دوري النجوم",
-                            userModel.starsPoints, const Color(0xFF3498DB))),
+                        child: _buildMiniPointCard(
+                            "دوري النجوم", sPoints, const Color(0xFF3498DB))),
                     const SizedBox(width: 15),
                     Expanded(
-                        child: _buildMiniPointCard("دوري المحترفين",
-                            userModel.proPoints, safetyOrange)),
+                        child: _buildMiniPointCard(
+                            "دوري المحترفين", pPoints, safetyOrange)),
                   ],
                 ),
-
                 const SizedBox(height: 30),
                 _buildSectionLabel("إعدادات الاحتراف"),
                 _buildProfileBtn("تغيير اسم الـ Pro", Icons.edit_note_rounded,
@@ -205,7 +209,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Navigator.push(context,
                       MaterialPageRoute(builder: (c) => const AboutScreen()));
                 }),
-
                 if (userModel.role == "admin")
                   _buildProfileBtn(
                       "لوحة التحكم (Admin)", Icons.admin_panel_settings_rounded,
@@ -214,7 +217,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Navigator.push(context,
                         MaterialPageRoute(builder: (c) => const AdminPanel()));
                   }, iconColor: safetyOrange),
-
                 const Padding(
                     padding: EdgeInsets.symmetric(vertical: 15),
                     child: Divider(thickness: 0.5)),
