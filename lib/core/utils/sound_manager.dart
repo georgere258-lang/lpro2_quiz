@@ -1,42 +1,28 @@
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 
 class SoundManager {
+  static bool isMuted = false;
+  // مشغل واحد ثابت نستخدمه في كل التطبيق
   static final AudioPlayer _player = AudioPlayer();
 
-  // تهيئة الإعدادات (تستدعى في main.dart)
   static void init() {
-    _player.setReleaseMode(ReleaseMode.stop);
+    debugPrint("🔊 Sound Engine Initialized");
   }
 
-  // دالة تشغيل صوت الإجابة الصحيحة
-  static void playCorrect() async {
+  static Future<void> _playSound(String fileName) async {
+    if (isMuted) return;
     try {
-      await _player.stop(); // إيقاف أي صوت حالي
-      await _player.setVolume(0.8); // مستوى صوت متوازن للنجاح
-      await _player.play(AssetSource('sounds/correct.mp3'));
+      // إيقاف أي صوت شغال حالياً قبل البدء
+      await _player.stop();
+      // تشغيل الصوت من المسار المعرف في الـ pubspec
+      await _player.play(AssetSource('sounds/$fileName'));
     } catch (e) {
-      print("Sound Play Error: $e");
+      debugPrint("❌ Audio Error ($fileName): $e");
     }
   }
 
-  // دالة تشغيل صوت الإجابة الخاطئة (معدلة لرفع الشدة)
-  static void playWrong() async {
-    try {
-      await _player.stop(); // إيقاف فوري لضمان انطلاق صوت التنبيه
-      await _player.setVolume(1.0); // رفع الصوت للحد الأقصى (100%)
-      await _player.play(AssetSource('sounds/wrong.mp3'));
-    } catch (e) {
-      print("Sound Play Error: $e");
-    }
-  }
-
-  // صوت النقر العام في التطبيق
-  static void playTap() async {
-    try {
-      await _player.setVolume(0.4);
-      await _player.play(AssetSource('sounds/tap.mp3'));
-    } catch (e) {
-      print("Sound Play Error: $e");
-    }
-  }
+  static Future<void> playTap() async => await _playSound('click.mp3');
+  static Future<void> playCorrect() async => await _playSound('success.mp3');
+  static Future<void> playWrong() async => await _playSound('wrong.mp3');
 }

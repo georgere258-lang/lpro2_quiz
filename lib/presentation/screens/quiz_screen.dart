@@ -3,10 +3,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:confetti/confetti.dart'; // إضافة مكتبة الاحتفال
 import 'dart:async';
 import 'dart:math';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/sound_manager.dart'; // المسار الصحيح لمدير الصوت
 
 class QuizScreen extends StatefulWidget {
   final String categoryTitle;
@@ -32,7 +34,7 @@ class _QuizScreenState extends State<QuizScreen> {
   int roundNumber = 1;
   int score = 0;
   int totalSessionScore = 0;
-  int dailyQuestionsAnswered = 0; // العداد الجديد المرتبط بفايربيز
+  int dailyQuestionsAnswered = 0;
 
   late int timeLeft;
   Timer? timer;
@@ -43,14 +45,18 @@ class _QuizScreenState extends State<QuizScreen> {
 
   List<Map<String, dynamic>> dataItems = [];
 
+  // متحكم الاحتفال
+  late ConfettiController _confettiController;
+
   @override
   void initState() {
     super.initState();
+    _confettiController =
+        ConfettiController(duration: const Duration(seconds: 3));
     timeLeft = (widget.categoryTitle == "دوري المحترفين") ? 15 : 25;
     _initializeData();
   }
 
-  // ميثود جديدة لتهيئة البيانات وربط العداد بالواقع
   Future<void> _initializeData() async {
     await _fetchDailyProgress();
     await _fetchContent();
@@ -67,7 +73,6 @@ class _QuizScreenState extends State<QuizScreen> {
         var data = doc.data() as Map<String, dynamic>;
         Timestamp? lastDate = data['lastQuizDate'];
 
-        // التحقق هل نحن في نفس اليوم؟
         if (lastDate != null) {
           DateTime lastDateTime = lastDate.toDate();
           DateTime now = DateTime.now();
@@ -78,13 +83,10 @@ class _QuizScreenState extends State<QuizScreen> {
           if (isSameDay) {
             setState(() {
               dailyQuestionsAnswered = data['dailyQuestionsCount'] ?? 0;
-              // حساب الجولة: كل 5 أسئلة بجولة (مثلاً لو جاوب 10 يبقى هو هيبدأ الجولة 3)
               roundNumber = (dailyQuestionsAnswered ~/ 5) + 1;
-              if (roundNumber > 4)
-                roundNumber = 4; // الحد الأقصى للجولات الرسمية
+              if (roundNumber > 4) roundNumber = 4;
             });
           } else {
-            // يوم جديد: نصفر العداد في فايربيز
             await FirebaseFirestore.instance
                 .collection('users')
                 .doc(user.uid)
@@ -98,6 +100,7 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   void dispose() {
     timer?.cancel();
+    _confettiController.dispose();
     super.dispose();
   }
 
@@ -158,9 +161,12 @@ class _QuizScreenState extends State<QuizScreen> {
         showFeedback = true;
         batchCount++;
         if (isCorrect && !isEducationalOnly) {
+          SoundManager.playCorrect(); // تشغيل صوت النجاح
           int pointsToAdd = (widget.categoryTitle == "دوري النجوم") ? 2 : 5;
           score += pointsToAdd;
           totalSessionScore += pointsToAdd;
+        } else if (!isCorrect && !isEducationalOnly) {
+          SoundManager.playWrong(); // تشغيل صوت الخطأ
         }
       });
     }
@@ -202,12 +208,17 @@ class _QuizScreenState extends State<QuizScreen> {
             .update({
           'points': FieldValue.increment(score),
           pointsField: FieldValue.increment(score),
-          'dailyQuestionsCount': FieldValue.increment(5), // حفظ عدد الأسئلة
+          'dailyQuestionsCount': FieldValue.increment(5),
           'lastQuizDate': FieldValue.serverTimestamp(),
         });
 
-        // تحديث العداد المحلي قبل عرض الرسالة
         dailyQuestionsAnswered += 5;
+
+        // إذا أكمل الـ 4 جولات (20 سؤال) نقوم بتشغيل الاحتفال
+        if (dailyQuestionsAnswered >= 20) {
+          _confettiController.play();
+        }
+
         _showRoundResultPage();
       } catch (e) {
         debugPrint("Error saving: $e");
@@ -225,103 +236,128 @@ class _QuizScreenState extends State<QuizScreen> {
       isDismissible: false,
       enableDrag: false,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(30),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                color: lightTurquoise,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                      color: safetyOrange.withOpacity(0.1),
-                      offset: const Offset(3, 3),
-                      blurRadius: 0)
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.stars_rounded, color: safetyOrange, size: 28),
-                  const SizedBox(width: 10),
-                  Text("كسبت $roundEarnedPoints نقطة في الجولة",
-                      style: GoogleFonts.cairo(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: deepTeal)),
-                ],
-              ),
+      builder: (context) => Stack(
+        alignment: Alignment.topCenter,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(30),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
             ),
-            const SizedBox(height: 20),
-            Text("عاش يا Pro! خلصت الجولة $roundNumber 🏆",
-                style: GoogleFonts.cairo(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    color: deepTeal)),
-            const SizedBox(height: 10),
-            Text(
-                roundNumber < 4
-                    ? "باقي لك ${4 - roundNumber} جولات لتقفيل تارجت اليوم"
-                    : "مبروك! قفلت تارجت الـ 20 سؤال لليوم بنجاح 🌟",
-                textAlign: TextAlign.center,
-                style:
-                    GoogleFonts.cairo(fontSize: 14, color: Colors.grey[600])),
-            const SizedBox(height: 30),
-            Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: deepTeal,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15)),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      setState(() {
-                        roundNumber++;
-                        batchCount = 0;
-                        showFeedback = false;
-                        selectedOption = null;
-                        currentQuestionIndex++;
-                      });
-                      _startTimer();
-                    },
-                    child: Text(
-                        roundNumber < 4 ? "جولة تانية 🚀" : "جولة إضافية 🔥",
-                        style: GoogleFonts.cairo(
-                            color: Colors.white, fontWeight: FontWeight.bold)),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: lightTurquoise,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                          color: safetyOrange.withOpacity(0.1),
+                          offset: const Offset(3, 3),
+                          blurRadius: 0)
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.stars_rounded, color: safetyOrange, size: 28),
+                      const SizedBox(width: 10),
+                      Text("كسبت $roundEarnedPoints نقطة في الجولة",
+                          style: GoogleFonts.cairo(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: deepTeal)),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 15),
-                Expanded(
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      side: BorderSide(color: deepTeal),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15)),
+                const SizedBox(height: 20),
+                Text("عاش يا Pro! خلصت الجولة $roundNumber 🏆",
+                    style: GoogleFonts.cairo(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: deepTeal)),
+                const SizedBox(height: 10),
+                Text(
+                    roundNumber < 4
+                        ? "باقي لك ${4 - roundNumber} جولات لتقفيل تارجت اليوم"
+                        : "مبروك! قفلت تارجت الـ 20 سؤال لليوم بنجاح 🌟",
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.cairo(
+                        fontSize: 14, color: Colors.grey[600])),
+                const SizedBox(height: 30),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: deepTeal,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15)),
+                        ),
+                        onPressed: () {
+                          SoundManager.playTap();
+                          Navigator.pop(context);
+                          setState(() {
+                            roundNumber++;
+                            batchCount = 0;
+                            showFeedback = false;
+                            selectedOption = null;
+                            currentQuestionIndex++;
+                          });
+                          _startTimer();
+                        },
+                        child: Text(
+                            roundNumber < 4
+                                ? "جولة تانية 🚀"
+                                : "جولة إضافية 🔥",
+                            style: GoogleFonts.cairo(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold)),
+                      ),
                     ),
-                    onPressed: () =>
-                        Navigator.popUntil(context, (r) => r.isFirst),
-                    child: Text("الرئيسية",
-                        style: GoogleFonts.cairo(
-                            color: deepTeal, fontWeight: FontWeight.bold)),
-                  ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          side: BorderSide(color: deepTeal),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15)),
+                        ),
+                        onPressed: () {
+                          SoundManager.playTap();
+                          Navigator.popUntil(context, (r) => r.isFirst);
+                        },
+                        child: Text("الرئيسية",
+                            style: GoogleFonts.cairo(
+                                color: deepTeal, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 15),
               ],
             ),
-            const SizedBox(height: 15),
-          ],
-        ),
+          ),
+          // عرض القصاصات الملونة
+          ConfettiWidget(
+            confettiController: _confettiController,
+            blastDirectionality: BlastDirectionality.explosive,
+            shouldLoop: false,
+            colors: const [
+              Colors.green,
+              Colors.blue,
+              Colors.pink,
+              Colors.orange,
+              Colors.purple
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -332,12 +368,14 @@ class _QuizScreenState extends State<QuizScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading)
+    if (isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (dataItems.isEmpty)
+    }
+    if (dataItems.isEmpty) {
       return Scaffold(
           appBar: _buildUnifiedHeader(),
           body: const Center(child: Text("لا يوجد محتوى حالياً")));
+    }
     if (isEducationalOnly) return _buildAttractiveTopicView();
     if (!gameStarted) return _buildStartView();
 
@@ -361,7 +399,6 @@ class _QuizScreenState extends State<QuizScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // العداد اللي فوق بقى مربوط بفايربيز
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 5),
@@ -414,7 +451,6 @@ class _QuizScreenState extends State<QuizScreen> {
     );
   }
 
-  // (بقية الميثودز _buildOptionItem, _buildAttractiveTopicView, QuizTopicDetailPage تبقى كما هي في الكود السابق)
   Widget _buildOptionItem(String opt, int correctIdx) {
     var currentQ = dataItems[currentQuestionIndex];
     bool isCorrect = showFeedback && opt == currentQ['options'][correctIdx];
@@ -479,6 +515,7 @@ class _QuizScreenState extends State<QuizScreen> {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(15))),
                 onPressed: () {
+                  SoundManager.playTap();
                   setState(() => gameStarted = true);
                   _startTimer();
                 },
@@ -512,8 +549,11 @@ class _QuizScreenState extends State<QuizScreen> {
   Widget _buildAttractiveTopicCard(Map<String, dynamic> data) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => Navigator.push(context,
-          MaterialPageRoute(builder: (c) => QuizTopicDetailPage(data: data))),
+      onTap: () {
+        SoundManager.playTap();
+        Navigator.push(context,
+            MaterialPageRoute(builder: (c) => QuizTopicDetailPage(data: data)));
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 30),
         decoration: BoxDecoration(

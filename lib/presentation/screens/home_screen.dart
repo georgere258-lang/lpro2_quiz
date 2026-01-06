@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:ui';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/sound_manager.dart';
 import 'quiz_screen.dart';
 import 'master_plan_screen.dart';
 
@@ -29,39 +29,14 @@ class _HomeScreenState extends State<HomeScreen>
   final List<String> dailyTips = [
     "العقارات هي الملاذ الآمن تاريخياً ضد التضخم. راجع اليوم مشروعين بالتفصيل.. القادم أجمل! 🏠",
     "تحديد احتياج العميل بدقة يوفر 70% من مجهود الإقناع. اسمع أكثر مما تتكلم اليوم.. أنت مستشار محترف! 🤝",
-    "الموقع هو العامل الأول in تقييم سعر إعادة البيع. ادرس اليوم خارطة الطرق الجديدة.. ذكاؤك هو رأس مالك! 📍",
-    "الثقة هي العملة الحقيقية في سوق العقارات. اتصل بعميل سابق للاطمئنان عليه فقط.. الأمانة تبني إمبراطوريات! 💎",
-    "الاستثمار في العقار التجاري يتطلب حساب العائد الإيجاري (ROI) بدقة. حلل اليوم أرقام منطقة حيوية.. أنت مبدع! 📊",
-    "العميل لا يشتري جدراناً، بل يشتري مستقبلاً. ركز اليوم على قصة المكان وليس فقط المواصفات.. أبدع في وصفك! ✨",
-    "العقار يمرض ولا يموت. ذكر عملاءك اليوم بقيمة الاستثمار طويل الأمد.. الصبر مفتاح الأرباح! 🔑",
-    "المتابعة (Follow-up) هي سر إغلاق الصفقة. راجع اليوم قائمة عملائك المهتمين.. النجاح يطرق باب المثابرين! 🚀",
-    "أسعار الفائدة تؤثر مباشرة على القوة الشرائية. تابع اليوم تحديثات البنك المركزي.. كن خبيراً يثق به الناس! 📈",
-    "المساحات الصغيرة (Studios) هي الأكثر طلباً للإيجار حالياً. ابحث اليوم عن وحدات مميزة بهذا النمط.. اصطاد الفرص! 🏗️",
-    "المعرفة بالقوانين العقارية تحميك وتحمي عميلك. اقرأ اليوم مادة واحدة من قانون التمويل.. حمايتك للعميل فخر! ⚖️",
-    "أول 7 ثوانٍ في المكالمة تحدد انطباع العميل عنك. تدرب اليوم على نبرة صوت واثقة.. أنت واجهة النجاح! 📞",
-    "التنوع في المحفظة العقارية يقلل المخاطر. اقترح اليوم على مستثمريك مناطق جديدة واعدة.. رؤيتك تصنع الفارق! 🌍",
-    "العقارات تحت الإنشاء (Off-plan) توفر أعلى ربحية عند الاستلام. ادرس جداول الاستلام لعام 2026.. خطط للمستقبل! 🏗️",
-    "الصدق في عيوب الوحدة قبل ميزاتها يبني ولاءً أبدياً. كن شفافاً اليوم في كل معلومة.. نزاهتك هي علامتك التجارية! 🤝",
-    "السوق العقاري موسمي بطبعه. استعد اليوم لموسم الإجازات بخطة تسويق ذكية.. كن دائماً خطوة للأمام! 📅",
-    "التشطيب الراقي يرفع قيمة العقار بنسبة تصل لـ 20%. قارن اليوم بين أسعار نصف التشطيب والكامل.. عينك خبيرة! 🎨",
-    "لغة الجسد في المعاينات تعطي رسائل أقوى من الكلام. حافظ اليوم على تواصل بصري واثق.. الحضور هو نصف البيعة! 👔",
-    "الأحياء القريبة من الجامعات والمستشفيات هي الأعلى استدامة إيجارية. ابحث عن هذه النقاط اليوم.. تفكيرك استراتيجي! 🏫",
-    "السعر العادل هو الذي يرضي البائع ويجذب المشتري. قم اليوم بعمل مقارنة أسعار (CMA) دقيقة.. أنت ضابط الإيقاع! ⚖️",
-    "الرقمنة (PropTech) هي مستقبل المهنة. جرب اليوم تطبيقاً جديداً للتنظيم أو التصوير.. واكب التطور! 📱",
-    "العميل المتردد يحتاج لـ خبير وليس لـ بائع. قدم اليوم تحليلاً اقتصادياً بدل الضغط للبيع.. أنت مستشار حقيقي! 🧠",
-    "البيوت الذكية (Smart Homes) تزيد من سرعة البيع. ابرز هذه الميزات في عرضك اليوم.. التكنولوجيا هي لغة العصر! 🏠",
-    "الاستثمار في نفسك هو أفضل استثمار عقاري. خصص اليوم 15 دقيقة لتعلم مهارة تفاوض جديدة.. نموك لا يتوقف! 📚",
-    "الكلمات الإيجابية تفتح الأبواب المغلقة. ابدأ مكالماتك اليوم بابتسامة تظهر في صوتك.. طاقتك سر نجاحك! 😊",
-    "المنافسة الشريفة ترفع مستوى السوق. تعلم اليوم من زميل متميز وشاركه نجاحك.. العظمة في التعاون! 🤝",
-    "العائد على السعادة لا يقل عن العائد على المال. ابحث لعميلك عن بيت يحبه فعلاً.. أنت صانع أحلام! 🏡",
-    "الأزمات تخلق الفرص للمستثمر الذكي. طمئن عملائك اليوم بتحليل واقعي للسوق.. كن منارة في العاصفة! ⛈️",
-    "التفاصيل الصغيرة في العقد هي ما تمنع المشاكل الكبيرة. راجع بنود التعاقد بدقة اليوم.. دقة ملاحظتك تنقذ صفقات! 📝",
     "النجاح هو مجموع محاولات صغيرة تتكرر كل يوم. احتفل اليوم بإنجازاتك مهما كانت بسيطة.. أنت Pro حقيقي! 🏆",
   ];
 
   @override
   void initState() {
     super.initState();
+    SoundManager.init(); // تهيئة الصوت
+
     _newsController =
         AnimationController(duration: const Duration(seconds: 55), vsync: this)
           ..repeat();
@@ -105,14 +80,11 @@ class _HomeScreenState extends State<HomeScreen>
                     Padding(
                       padding: const EdgeInsets.only(top: 12, bottom: 18),
                       child: Center(
-                        child: Text(
-                          "من يملك المعلومة.. يملك القوة",
-                          style: GoogleFonts.cairo(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w900,
-                            color: deepTeal.withOpacity(0.85),
-                          ),
-                        ),
+                        child: Text("من يملك المعلومة.. يملك القوة",
+                            style: GoogleFonts.cairo(
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w900,
+                                color: deepTeal.withOpacity(0.85))),
                       ),
                     ),
                     _buildLProGrid(),
@@ -130,104 +102,30 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildDynamicInfoCard() {
-    DateTime now = DateTime.now();
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
           .collection('daily_tips')
           .where('isActive', isEqualTo: true)
-          .where('startDate', isLessThanOrEqualTo: now)
-          .orderBy('startDate', descending: true)
-          .limit(1)
           .snapshots(),
       builder: (context, snapshot) {
-        String factToShow = _fallbackFact;
         if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-          var data = snapshot.data!.docs.first.data() as Map<String, dynamic>;
-          factToShow = data['content'] ?? _fallbackFact;
+          var docs = snapshot.data!.docs;
+          docs.sort((a, b) {
+            var tA = a['createdAt'] as Timestamp? ?? Timestamp.now();
+            var tB = b['createdAt'] as Timestamp? ?? Timestamp.now();
+            return tB.compareTo(tA);
+          });
+          var data = docs.first.data() as Map<String, dynamic>;
+          Timestamp? createdAt = data['createdAt'] as Timestamp?;
+          if (createdAt != null &&
+              DateTime.now().difference(createdAt.toDate()).inHours < 24) {
+            return InfoCardWidget(content: data['content'] ?? "");
+          }
         }
-        return InfoCardWidget(content: factToShow);
+        return InfoCardWidget(content: _fallbackFact);
       },
     );
   }
-
-  Widget _buildCrystalClearTicker() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('news').snapshots(),
-      builder: (context, snapshot) {
-        String arMotto = "⚡ تعلم مستمر.. تطور كبير.. نجاح اكيد 💪";
-        String enMotto = "⚡ LEARN.. GROWTH.. SUCCESS 🚀";
-        List<String> combinedList = [];
-        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-          var newsItems =
-              snapshot.data!.docs.map((doc) => "⚡ ${doc['content']}").toList();
-          combinedList = [arMotto, ...newsItems, enMotto];
-        } else {
-          combinedList = [arMotto, enMotto];
-        }
-        return Container(
-          height: 38,
-          width: double.infinity,
-          color: safetyOrange,
-          alignment: Alignment.center,
-          child: SlideTransition(
-            position: _newsAnimation,
-            child: IntrinsicWidth(
-              child: Text(combinedList.join("      "),
-                  style: GoogleFonts.cairo(
-                      color: Colors.white,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.bold),
-                  softWrap: false,
-                  overflow: TextOverflow.visible),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildUserGreetingStream() {
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('users')
-          .doc(user?.uid)
-          .snapshots(),
-      builder: (context, snapshot) {
-        String name = "عضو L Pro";
-        if (snapshot.hasData && snapshot.data!.exists) {
-          name = snapshot.data!['name'] ?? "عضو L Pro";
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("أهلاً بك، $name ✨",
-                style: GoogleFonts.cairo(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w900,
-                    color: deepTeal)),
-            Row(children: [
-              _miniMotto("تعلم مستمر"),
-              _customHandDrawnArrow(),
-              _miniMotto("تطور كبير"),
-              _customHandDrawnArrow(),
-              _miniMotto("نجاح اكيد"),
-              const Text(" 💪", style: TextStyle(fontSize: 14))
-            ]),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _miniMotto(String text) => Text(text,
-      style: GoogleFonts.cairo(
-          fontSize: 11.5, color: safetyOrange, fontWeight: FontWeight.w800));
-
-  Widget _customHandDrawnArrow() => Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 5),
-      child: CustomPaint(
-          size: const Size(11, 9),
-          painter: SolidTrianglePainter(turquoiseCyan)));
 
   Widget _buildLProGrid() {
     return GridView.count(
@@ -287,12 +185,16 @@ class _HomeScreenState extends State<HomeScreen>
       Widget icon, String category, bool showBadge,
       {required bool isQuiz, bool isMasterPlan = false}) {
     return _AnimatedPremiumCard(
-      onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (c) => isMasterPlan
-                  ? const MasterPlanScreen()
-                  : QuizScreen(categoryTitle: category, isTopicMode: !isQuiz))),
+      onTap: () {
+        SoundManager.playTap(); // تشغيل الصوت المباشر
+        Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (c) => isMasterPlan
+                    ? const MasterPlanScreen()
+                    : QuizScreen(
+                        categoryTitle: category, isTopicMode: !isQuiz)));
+      },
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -310,50 +212,92 @@ class _HomeScreenState extends State<HomeScreen>
               ])),
           if (showBadge)
             Positioned(
-              top: 10,
-              right: -14,
-              child: Transform.rotate(
-                angle: 0.55,
-                child: Container(
-                  width: 90,
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  decoration: BoxDecoration(
-                      color: badgeColor,
-                      boxShadow: const [
-                        BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 4,
-                            offset: Offset(0, 2))
-                      ]),
-                  child: Center(
-                    child: Text(badge,
-                        style: GoogleFonts.cairo(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900)),
-                  ),
-                ),
-              ),
-            ),
+                top: 10,
+                right: -14,
+                child: Transform.rotate(
+                    angle: 0.55,
+                    child: Container(
+                        width: 90,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        decoration: BoxDecoration(
+                            color: badgeColor,
+                            boxShadow: const [
+                              BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 4,
+                                  offset: Offset(0, 2))
+                            ]),
+                        child: Center(
+                            child: Text(badge,
+                                style: GoogleFonts.cairo(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w900)))))),
         ],
       ),
     );
   }
 
-  // --- تم تعديل ترتيب العناصر هنا لتظهر Learn في اليسار و Success في اليمين ---
+  Widget _buildCrystalClearTicker() {
+    return Container(
+        height: 38,
+        width: double.infinity,
+        color: safetyOrange,
+        alignment: Alignment.center,
+        child: SlideTransition(
+            position: _newsAnimation,
+            child: const Text("⚡ تعلم مستمر.. تطور كبير.. نجاح اكيد 💪",
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold))));
+  }
+
+  Widget _buildUserGreetingStream() {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(user?.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        String name = "عضو L Pro";
+        if (snapshot.hasData && snapshot.data!.exists) {
+          name = snapshot.data!['name'] ?? name;
+        }
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text("أهلاً بك، $name ✨",
+              style: GoogleFonts.cairo(
+                  fontSize: 21, fontWeight: FontWeight.w900, color: deepTeal)),
+          Row(children: [
+            _miniMotto("تعلم مستمر"),
+            _customHandDrawnArrow(),
+            _miniMotto("تطور كبير"),
+            _customHandDrawnArrow(),
+            _miniMotto("نجاح اكيد"),
+            const Text(" 💪")
+          ]),
+        ]);
+      },
+    );
+  }
+
+  Widget _miniMotto(String text) => Text(text,
+      style: GoogleFonts.cairo(
+          fontSize: 11.5, color: safetyOrange, fontWeight: FontWeight.w800));
+  Widget _customHandDrawnArrow() => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      child: CustomPaint(
+          size: const Size(11, 9),
+          painter: SolidTrianglePainter(turquoiseCyan)));
   Widget _buildModernEncouragement() =>
       Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         _engWord("Success"),
         _customCyanArrowEn(),
         _engWord("Growth"),
         _customCyanArrowEn(),
-        _engWord("Learn"),
+        _engWord("Learn")
       ]);
-
   Widget _engWord(String text) => Text(text,
       style: GoogleFonts.cairo(
           color: lightTeal, fontSize: 15, fontWeight: FontWeight.w900));
-
   Widget _customCyanArrowEn() => Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10),
       child: CustomPaint(
@@ -361,74 +305,59 @@ class _HomeScreenState extends State<HomeScreen>
           painter: SolidTrianglePainter(turquoiseCyan, isLeft: false)));
 }
 
+// --- الكلاسات المساعدة (Painters, Widgets) ---
+
 class InfoCardWidget extends StatelessWidget {
   final String content;
   const InfoCardWidget({super.key, required this.content});
-
   @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.07),
-              blurRadius: 25,
-              offset: const Offset(0, 10)),
-        ],
-        border: Border.all(
-            color: AppColors.primaryDeepTeal.withOpacity(0.1), width: 1.2),
-      ),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.07),
+                blurRadius: 25,
+                offset: const Offset(0, 10))
+          ],
+          border: Border.all(
+              color: AppColors.primaryDeepTeal.withOpacity(0.1), width: 1.2)),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(22),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
               decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppColors.primaryDeepTeal, Color(0xFF006D77)],
-                  begin: Alignment.centerRight,
-                  end: Alignment.centerLeft,
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.tips_and_updates_rounded,
-                      color: AppColors.secondaryOrange, size: 20),
-                  const SizedBox(width: 10),
-                  Text(
-                    "معلومة L Pro",
+                  gradient: LinearGradient(
+                      colors: [AppColors.primaryDeepTeal, Color(0xFF006D77)],
+                      begin: Alignment.centerRight,
+                      end: Alignment.centerLeft)),
+              child: Row(children: [
+                const Icon(Icons.tips_and_updates_rounded,
+                    color: AppColors.secondaryOrange, size: 20),
+                const SizedBox(width: 10),
+                Text("معلومة L Pro",
                     style: GoogleFonts.cairo(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 14.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Container(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14.5))
+              ])),
+          Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               color: Colors.white,
-              child: Text(
-                content,
-                textAlign: TextAlign.right,
-                style: GoogleFonts.cairo(
-                  fontSize: 15,
-                  height: 1.7,
-                  color: const Color(0xFF2D3142),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
+              child: Text(content,
+                  textAlign: TextAlign.right,
+                  style: GoogleFonts.cairo(
+                      fontSize: 15,
+                      height: 1.7,
+                      color: const Color(0xFF2D3142),
+                      fontWeight: FontWeight.w600))),
+        ]),
       ),
     );
   }

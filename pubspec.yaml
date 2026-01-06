@@ -38,8 +38,10 @@ dependencies:
   # المكتبة المطلوبة للطريقة الجديدة V1
   googleapis_auth: ^2.0.0
 
-  # --- إضافة مكتبة الأصوات ---
+  # --- إضافة مكتبة الأصوات والتأثيرات ---
   audioplayers: ^6.1.0
+  confetti: ^0.7.0
+  lottie: ^3.1.2
 
   # تحسين أداء الصور
   cached_network_image: ^3.3.1
@@ -49,10 +51,10 @@ dependencies:
 
   # أدوات المشاركة والوقت
   share_plus: ^10.0.0
-  intl: 0.20.2
+  intl: ^0.20.2
   
   # لإرسال طلبات الـ HTTP
-  http: ^1.6.0
+  http: ^1.2.1
 
 dev_dependencies:
   flutter_test:
@@ -72,12 +74,14 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
 
-  # تعريف المجلدات والملفات
   assets:
     - assets/
     - assets/logo.svg
     - assets/top_brand.png
     - assets/icon.png
     - assets/service_account.json
-    # إضافة مجلد الأصوات
-    - assets/sounds/
+    # تعريف المسارات لضمان وصول المكتبات للملفات
+    - assets/sounds/click.mp3
+    - assets/sounds/success.mp3
+    - assets/sounds/wrong.mp3
+    - assets/lottie/

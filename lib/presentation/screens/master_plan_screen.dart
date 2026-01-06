@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/sound_manager.dart'; // استدعاء مدير الصوت
 
 class MasterPlanScreen extends StatefulWidget {
   const MasterPlanScreen({super.key});
@@ -50,7 +51,7 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
             _buildSliverAppBar(),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                padding: const EdgeInsets.fromLTRB(20, 25, 20, 10),
                 child: Column(
                   children: [
                     _buildIntroText(),
@@ -66,14 +67,19 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return const SliverToBoxAdapter(
-                      child: Center(child: Text("خطأ في تحميل البيانات")));
+                    child: Center(
+                        child: Padding(
+                            padding: EdgeInsets.all(20),
+                            child: Text("خطأ في تحميل البيانات"))),
+                  );
                 }
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const SliverToBoxAdapter(
-                      child: Center(
-                          child: Padding(
-                              padding: EdgeInsets.all(40),
-                              child: CircularProgressIndicator())));
+                    child: Center(
+                        child: Padding(
+                            padding: EdgeInsets.all(40),
+                            child: CircularProgressIndicator())),
+                  );
                 }
 
                 final docs = snapshot.data?.docs.where((doc) {
@@ -83,8 +89,9 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
                     }).toList() ??
                     [];
 
-                if (docs.isEmpty)
+                if (docs.isEmpty) {
                   return const SliverToBoxAdapter(child: SizedBox());
+                }
 
                 return SliverPadding(
                   padding:
@@ -125,23 +132,36 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
 
   Widget _buildSliverAppBar() {
     return SliverAppBar(
-      expandedHeight: 100,
+      expandedHeight: 110,
       pinned: true,
-      backgroundColor: deepTeal,
       elevation: 0,
-      title: Text("اعرف عميلك",
-          style: GoogleFonts.cairo(
-              fontWeight: FontWeight.w900, fontSize: 18, color: Colors.white)),
-      centerTitle: true,
+      backgroundColor: deepTeal,
+      flexibleSpace: FlexibleSpaceBar(
+        centerTitle: true,
+        title: Text("اعرف عميلك",
+            style: GoogleFonts.cairo(
+                fontWeight: FontWeight.w900,
+                fontSize: 18,
+                color: Colors.white)),
+        background: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+              colors: [deepTeal, deepTeal.withOpacity(0.8)],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
   Widget _buildIntroText() {
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
                 color: safetyOrange.withOpacity(0.15),
@@ -164,10 +184,10 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(
-                color: safetyOrange.withOpacity(0.25),
+                color: safetyOrange.withOpacity(0.2),
                 offset: const Offset(3, 3),
                 blurRadius: 0),
           ],
@@ -182,6 +202,7 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
+        SoundManager.playTap(); // تشغيل صوت النقر عند الدخول للموضوع
         Navigator.of(context).push(MaterialPageRoute(
             builder: (_) => MasterPlanDetailPage(data: data)));
       },
@@ -209,6 +230,7 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
                   height: 180,
                   width: double.infinity,
                   fit: BoxFit.cover,
+                  memCacheWidth: 400, // تحسين الذاكرة: فك ضغط الصورة بحجم أصغر
                 ),
               ),
             Padding(
@@ -216,7 +238,6 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // العنوان المجسم بالظل البرتقالي
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
@@ -290,6 +311,7 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
+        SoundManager.playTap();
         Navigator.of(context).push(MaterialPageRoute(
             builder: (_) => MasterPlanDetailPage(data: topic)));
       },
@@ -358,16 +380,17 @@ class MasterPlanDetailPage extends StatelessWidget {
             children: [
               if (data['imageUrl'] != null && data['imageUrl'] != "")
                 CachedNetworkImage(
-                    imageUrl: data['imageUrl'],
-                    width: double.infinity,
-                    height: 250,
-                    fit: BoxFit.cover),
+                  imageUrl: data['imageUrl'],
+                  width: double.infinity,
+                  height: 280,
+                  fit: BoxFit.cover,
+                  memCacheWidth: 800, // دقة أعلى لصفحة التفاصيل
+                ),
               Padding(
                 padding: const EdgeInsets.all(25),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // العنوان المجسم داخل صفحة التفاصيل أيضاً
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 8),
