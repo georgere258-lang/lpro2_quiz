@@ -1,0 +1,93 @@
+name: lpro2_quiz
+description: "تطبيق L Pro العقاري المطور - نسخة بريميوم"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  flutter_localizations:
+    sdk: flutter
+
+  # --- مكتبة التخزين المحلي (تمت إضافتها لحل مشكلة كسر التشغيل) ---
+  shared_preferences: ^2.2.2
+
+  # الخطوط وتنسيق النصوص
+  google_fonts: ^6.2.1
+  
+  # شريط الأخبار السريع
+  marquee: ^2.2.3
+
+  # الأيقونات
+  cupertino_icons: ^1.0.6
+  font_awesome_flutter: ^10.7.0
+  
+  # تشغيل ملفات SVG
+  flutter_svg: ^2.0.10+1
+
+  # منظومة الفايربيز
+  firebase_core: ^3.1.0
+  cloud_firestore: ^5.0.2
+  firebase_auth: ^5.1.0
+  firebase_storage: ^12.0.1
+
+  # --- منظومة الإشعارات والتفاعل ---
+  firebase_messaging: ^15.1.3
+  flutter_local_notifications: ^17.2.1
+  permission_handler: ^11.3.1
+
+  # المكتبة (قيد المراجعة والعزل أمنياً)
+  googleapis_auth: ^2.0.0
+
+  # --- إضافة مكتبة الأصوات والتأثيرات ---
+  audioplayers: ^6.1.0
+  confetti: ^0.7.0
+  lottie: ^3.1.2
+
+  # تحسين أداء الصور
+  cached_network_image: ^3.3.1
+
+  # أدوات اختيار الصور من الموبايل
+  image_picker: ^1.0.7
+
+  # أدوات المشاركة والوقت
+  share_plus: ^10.0.0
+  intl: ^0.20.2
+  
+  # لإرسال طلبات الـ HTTP
+  http: ^1.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  # أداة بناء الأيقونات (Dev Only)
+  flutter_launcher_icons: ^0.13.1
+
+# إعدادات أيقونة التطبيق
+flutter_launcher_icons:
+  android: true 
+  ios: true
+  image_path: "assets/icon.png"
+  min_sdk_android: 21 
+  adaptive_icon_background: "#1B4D57" 
+  adaptive_icon_foreground: "assets/icon.png"
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/
+    - assets/logo.svg
+    - assets/top_brand.png
+    - assets/icon.png
+    # تم حذف الـ service_account.json نهائياً لأسباب أمنية
+    - assets/sounds/click.mp3
+    - assets/sounds/success.mp3
+    - assets/sounds/wrong.mp3
+    - assets/lottie/
