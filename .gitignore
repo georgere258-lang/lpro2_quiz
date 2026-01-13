@@ -52,3 +52,4 @@ android/app/google-services.json
 
 # ملفات متغيرات البيئة
 .env
+tools/firestore_upload/serviceAccountKey.json

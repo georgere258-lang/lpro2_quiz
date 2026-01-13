@@ -1,5 +1,9 @@
+// PATH: lib/features/unit_flow/screens/insight_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../controller/unit_flow_bloc.dart';
 
 class InsightScreen extends StatefulWidget {
   final String insightText;

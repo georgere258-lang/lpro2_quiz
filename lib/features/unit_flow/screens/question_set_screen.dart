@@ -1,6 +1,9 @@
+// PATH: lib/features/unit_flow/screens/question_set_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/curriculum/unit_model.dart';
+import '../controller/unit_flow_bloc.dart';
 
 class QuestionSetScreen extends StatefulWidget {
   final List<Question> questions;
@@ -15,17 +18,15 @@ class QuestionSetScreen extends StatefulWidget {
 }
 
 class _QuestionSetScreenState extends State<QuestionSetScreen> {
-  // تخزين الإجابات المؤقتة: {معرف السؤال: معرف الخيار المختار}
   final Map<String, int> _selectedAnswers = {};
 
-  // التحقق من اكتمال الإجابة على جميع الأسئلة لتفعيل الزر
   bool get _isFormComplete =>
+      widget.questions.isNotEmpty &&
       _selectedAnswers.length == widget.questions.length;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // تم إزالة الـ AppBar بالكامل لضمان الصمت البصري
       body: SafeArea(
         child: Column(
           children: [
@@ -77,7 +78,6 @@ class _QuestionSetScreenState extends State<QuestionSetScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  // الزر معطل حتى اكتمال جميع الإجابات
                   onPressed: _isFormComplete
                       ? () {
                           context

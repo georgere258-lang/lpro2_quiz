@@ -1,5 +1,9 @@
+// PATH: lib/features/unit_flow/screens/silence_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../controller/unit_flow_bloc.dart';
 
 class SilenceScreen extends StatefulWidget {
   const SilenceScreen({super.key});
@@ -21,7 +25,7 @@ class _SilenceScreenState extends State<SilenceScreen> {
     Future.delayed(const Duration(seconds: 4), () {
       if (mounted) {
         // إرسال حدث الإنهاء للمتحكم (Bloc)
-        // ملاحظة: سيقوم الـ Bloc هنا بتبديل الحالة إلى UnitCompleted
+        // سيقوم الـ Bloc هنا بتبديل الحالة إلى UnitCompleted
         context.read<UnitFlowBloc>().add(NextStep());
       }
     });

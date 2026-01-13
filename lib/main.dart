@@ -1,3 +1,6 @@
+// PATH: lib/main.dart
+// (تعديل ملف كامل لإضافة RepositoryProvider فقط — بدون تغيير UI)
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -6,6 +9,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:lpro2_quiz/firebase_options.dart';
 import 'package:lpro2_quiz/core/theme/app_theme.dart';
@@ -17,6 +21,8 @@ import 'package:lpro2_quiz/presentation/screens/complete_profile_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/main_wrapper.dart';
 import 'package:lpro2_quiz/presentation/screens/about_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/admin_panel.dart';
+
+import 'core/curriculum/unit_repository.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -75,7 +81,12 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  runApp(const LProApp());
+  runApp(
+    RepositoryProvider<UnitRepository>(
+      create: (_) => LocalUnitRepository(),
+      child: const LProApp(),
+    ),
+  );
 }
 
 void _subscribeToNotificationTopics() {
