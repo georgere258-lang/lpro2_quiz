@@ -1,3 +1,6 @@
+// PATH: lib/presentation/screens/profile_screen.dart
+// STATUS: Full File – "اعرف عميلك" button added under "حول L Pro" (direct navigation)
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,9 +13,11 @@ import 'package:lpro2_quiz/core/data/models/user_model.dart';
 import 'about_screen.dart';
 import 'login_screen.dart';
 import 'admin_panel.dart';
+import 'know_client_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onSupportPressed;
+
   const ProfileScreen({super.key, this.onSupportPressed});
 
   @override
@@ -58,7 +63,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             }
 
             final data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
-
             final userModel = UserModel.fromMap(data, user?.uid ?? '');
 
             return ListView(
@@ -71,6 +75,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   userModel.avatarIndex,
                 ),
                 const SizedBox(height: 25),
+
+                // (اختياري) زر الدعم لو موجود callback
+                if (widget.onSupportPressed != null)
+                  _buildProfileBtn(
+                    "الدعم الفني",
+                    Icons.support_agent_outlined,
+                    () {
+                      SoundManager.playTap();
+                      widget.onSupportPressed?.call();
+                    },
+                  ),
+
                 if (userModel.role == 'admin')
                   _buildProfileBtn(
                     "لوحة التحكم (Admin)",
@@ -86,10 +102,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     },
                     iconColor: safetyOrange,
                   ),
+
                 _buildProfileBtn(
                   "حول L Pro",
                   Icons.info_outline_rounded,
                   () {
+                    SoundManager.playTap();
                     Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -98,12 +116,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     );
                   },
                 ),
+
+                // ✅ NEW: اعرف عميلك (مباشرة تحت "حول L Pro")
+                _buildProfileBtn(
+                  "اعرف عميلك",
+                  Icons.psychology_alt_outlined,
+                  () {
+                    SoundManager.playTap();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const KnowClientScreen(),
+                      ),
+                    );
+                  },
+                  iconColor: safetyOrange,
+                ),
+
                 _buildProfileBtn(
                   "تسجيل الخروج",
                   Icons.logout_rounded,
                   _handleLogout,
                   isExit: true,
                 ),
+
                 const SizedBox(height: 30),
               ],
             );

@@ -1,3 +1,6 @@
+// PATH: lib/presentation/screens/main_wrapper.dart
+// STATUS: Full File – Stable Navigation (Support via tab switch, KnowClient via push from Profile)
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -20,7 +23,7 @@ class MainWrapper extends StatefulWidget {
 class _MainWrapperState extends State<MainWrapper> {
   int _currentIndex = 0;
 
-  // القائمة تحتوي على الشاشات الأربعة، شاشة الدعم في الفهرس رقم 3
+  // القائمة تحتوي على الشاشات الأربعة فقط
   late final List<Widget> _pages;
 
   @override
@@ -29,17 +32,20 @@ class _MainWrapperState extends State<MainWrapper> {
     _pages = [
       const HomeScreen(),
       const LeaderboardScreen(),
-      // نمرر وظيفة تغيير التبويب لصفحة البروفايل لكي تتمكن من فتح الدعم
-      ProfileScreen(onSupportPressed: () {
-        setState(() => _currentIndex = 3);
-      }),
+
+      // ✅ البروفايل فقط يقدر يفتح الدعم بتبديل التبويب
+      ProfileScreen(
+        onSupportPressed: () {
+          setState(() => _currentIndex = 3);
+        },
+      ),
+
       const ChatSupportScreen(),
     ];
   }
 
   @override
   Widget build(BuildContext context) {
-    // دالة لتحديد عنوان الـ AppBar بناءً على الفهرس الحالي
     Widget getAppBarTitle() {
       if (_currentIndex == 0) {
         return Image.asset(
@@ -56,16 +62,19 @@ class _MainWrapperState extends State<MainWrapper> {
         );
       }
 
-      // المسميات الجديدة المعتمدة لهوية Pro
-      List<String> titles = [
+      final List<String> titles = [
         "",
-        "دوري المحترفين 🏆", // العنوان العلوي لصفحة الدوري
+        "دوري المحترفين 🏆",
         "ملفي الشخصي",
         "الدعم الفني المباشر",
       ];
 
+      final safeIndex = (_currentIndex >= 0 && _currentIndex < titles.length)
+          ? _currentIndex
+          : 2;
+
       return Text(
-        titles[_currentIndex],
+        titles[safeIndex],
         style: GoogleFonts.cairo(
           fontWeight: FontWeight.w900,
           color: Colors.white,
@@ -82,7 +91,8 @@ class _MainWrapperState extends State<MainWrapper> {
         centerTitle: true,
         automaticallyImplyLeading: false,
         title: getAppBarTitle(),
-        // زر الرجوع يعيد المستخدم للرئيسية
+
+        // زر الرجوع يرجع للرئيسية
         leading: _currentIndex != 0
             ? IconButton(
                 icon: const Icon(
@@ -109,7 +119,7 @@ class _MainWrapperState extends State<MainWrapper> {
           ],
         ),
         child: BottomNavigationBar(
-          // إذا كنا في صفحة الدعم (3)، يظل زر الحساب (2) هو المضاء
+          // ✅ لو في الدعم (3)، يفضل زر "حسابي" هو المضاء
           currentIndex: _currentIndex >= 3 ? 2 : _currentIndex,
           onTap: (i) => setState(() => _currentIndex = i),
           selectedItemColor: AppColors.secondaryOrange,
@@ -130,7 +140,7 @@ class _MainWrapperState extends State<MainWrapper> {
             BottomNavigationBarItem(
               icon: Icon(Icons.emoji_events_outlined),
               activeIcon: Icon(Icons.emoji_events),
-              label: "دوري Pro", // المسمى المعتمد في الشريط السفلي
+              label: "دوري Pro",
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),

@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/quiz_screen.dart
-// STATUS: Updated Full File – Smaller intro button + locked text fix + NO repeat last question on next round
+// STATUS: Updated Full File – Free Play "جولة أخرى" + Fix last-question repeat + Result buttons layout
 
 import 'dart:async';
 import 'dart:ui';
@@ -60,9 +60,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
   // Free play
   bool _isFreePlaySession = false;
-
-  // ✅ لمنع تكرار آخر سؤال عند بدء جولة جديدة
-  int? _lastEndedQuestionIndex;
 
   late AnimationController _glowController;
 
@@ -163,16 +160,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     });
   }
 
-  void _ensureNotRepeatLastQuestion() {
-    if (_questions.isEmpty) return;
-
-    // لو نفس السؤال اللي خلصنا عليه، نزق واحد لقدّام
-    if (_lastEndedQuestionIndex != null &&
-        _currentQuestionIndex == _lastEndedQuestionIndex) {
-      _currentQuestionIndex = (_currentQuestionIndex + 1) % _questions.length;
-    }
-  }
-
   void _startRound({required bool freePlay}) {
     if (_questions.isEmpty) return;
 
@@ -186,9 +173,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       _roundScore = 0;
 
       if (_currentQuestionIndex >= _questions.length) _currentQuestionIndex = 0;
-
-      // ✅ ضمان إضافي لمنع تكرار آخر سؤال
-      _ensureNotRepeatLastQuestion();
     });
 
     _startTimer();
@@ -226,7 +210,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       }
     });
 
-    Future.delayed(const Duration(milliseconds: 850), () {
+    Future.delayed(const Duration(milliseconds: 900), () {
       if (!mounted) return;
 
       if (_questionIndexInRound + 1 >= _questionsPerRound) {
@@ -254,19 +238,23 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     _startTimer();
   }
 
+  void _advanceIndexAfterRound() {
+    // ✅ يمنع تكرار آخر سؤال عند بدء جولة جديدة
+    if (_questions.isEmpty) return;
+
+    _currentQuestionIndex++;
+
+    if (_currentQuestionIndex >= _questions.length) {
+      _questions.shuffle();
+      _currentQuestionIndex = 0;
+    }
+  }
+
   Future<void> _finishRound() async {
-    // ✅ سجل آخر سؤال خلصنا عليه
-    _lastEndedQuestionIndex = _currentQuestionIndex;
+    // ✅ جهّز السؤال التالي قبل ما تفتح النتيجة (عشان الجولة الجديدة ما تبدأش بنفس آخر سؤال)
+    _advanceIndexAfterRound();
 
-    // ✅ جهّز السؤال التالي مباشرةً (قبل الـ sheet) + منع تكرار
-    setState(() {
-      if (_questions.isNotEmpty) {
-        _currentQuestionIndex = (_currentQuestionIndex + 1) % _questions.length;
-        _ensureNotRepeatLastQuestion();
-      }
-    });
-
-    // ✅ Free Play: تدريب فقط
+    // ✅ Free Play: تدريب فقط – بدون تأثير على النقاط / الليدر بورد / الحد اليومي
     if (_isFreePlaySession) {
       _showResultSheet();
       return;
@@ -378,94 +366,60 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-
-                // الخيارات + التوقيع في نص الفراغ
+                const SizedBox(height: 14),
                 Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        child: ConstrainedBox(
-                          constraints:
-                              BoxConstraints(minHeight: constraints.maxHeight),
-                          child: IntrinsicHeight(
-                            child: Column(
-                              children: [
-                                const SizedBox(height: 6),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 18),
-                                  child: Column(
-                                    children:
-                                        List.generate(options.length, (i) {
-                                      final opt = options[i];
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(18, 6, 18, 16),
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: options.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, i) {
+                      final opt = options[i];
 
-                                      Color bg = Colors.white;
-                                      Color fg = primaryColor;
+                      Color bg = Colors.white;
+                      Color fg = primaryColor;
 
-                                      if (_showFeedback &&
-                                          correct != null &&
-                                          opt == correct) {
-                                        bg = Colors.green;
-                                        fg = Colors.white;
-                                      }
-                                      if (_showFeedback &&
-                                          opt == _selectedOption &&
-                                          opt != correct) {
-                                        bg = Colors.red;
-                                        fg = Colors.white;
-                                      }
+                      if (_showFeedback && correct != null && opt == correct) {
+                        bg = Colors.green;
+                        fg = Colors.white;
+                      }
+                      if (_showFeedback &&
+                          opt == _selectedOption &&
+                          opt != correct) {
+                        bg = Colors.red;
+                        fg = Colors.white;
+                      }
 
-                                      return Padding(
-                                        padding:
-                                            const EdgeInsets.only(bottom: 12),
-                                        child: GestureDetector(
-                                          onTap: () => _handleAnswer(opt),
-                                          child: AnimatedContainer(
-                                            duration: const Duration(
-                                                milliseconds: 180),
-                                            padding: const EdgeInsets.all(16),
-                                            decoration: BoxDecoration(
-                                              color: bg,
-                                              borderRadius:
-                                                  BorderRadius.circular(18),
-                                              border: Border.all(
-                                                color: bg == Colors.white
-                                                    ? primaryColor
-                                                        .withOpacity(0.14)
-                                                    : Colors.transparent,
-                                              ),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.black
-                                                      .withOpacity(0.04),
-                                                  blurRadius: 12,
-                                                  offset: const Offset(0, 7),
-                                                ),
-                                              ],
-                                            ),
-                                            child: Center(
-                                              child: Text(
-                                                opt,
-                                                textAlign: TextAlign.center,
-                                                style: GoogleFonts.cairo(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w900,
-                                                  color: fg,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    }),
-                                  ),
-                                ),
-                                const Spacer(),
-                                _signatureFooter(),
-                                const Spacer(),
-                              ],
+                      return GestureDetector(
+                        onTap: () => _handleAnswer(opt),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: bg,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: bg == Colors.white
+                                  ? primaryColor.withOpacity(0.14)
+                                  : Colors.transparent,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.04),
+                                blurRadius: 12,
+                                offset: const Offset(0, 7),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Text(
+                              opt,
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.cairo(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                color: fg,
+                              ),
                             ),
                           ),
                         ),
@@ -473,6 +427,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                     },
                   ),
                 ),
+                _signatureFooter(),
               ],
             ),
           ],
@@ -587,40 +542,22 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                       ),
                     ),
                     const SizedBox(height: 16),
-
-                    // ✅ زر أصغر + نص ما يتقصش
-                    Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 280),
-                        child: SizedBox(
-                          height: 48,
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              SoundManager.playTap();
-                              _openDailyChallengeSheet();
-                            },
-                            style: ElevatedButton.styleFrom(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 14),
-                            ),
-                            child: Text(
-                              _enterButtonText,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.cairo(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 13, // ✅ أصغر عشان ما يتقصش
-                              ),
-                            ),
-                          ),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          SoundManager.playTap();
+                          _openDailyChallengeSheet();
+                        },
+                        child: Text(
+                          _enterButtonText,
+                          style: GoogleFonts.cairo(fontWeight: FontWeight.w900),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 10),
                     TextButton(
                       onPressed: () => Navigator.pop(context),
@@ -698,7 +635,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                   const SizedBox(height: 10),
                   Text(
                     locked
-                        ? "خلصت تحدي اليوم ✅"
+                        ? "أنت خلصت 4 جوالات النهاردة ✅"
                         : "جولتك الحالية: $currentRound/$_roundsPerDay",
                     style: GoogleFonts.cairo(
                       fontSize: 13,
@@ -709,7 +646,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                   const SizedBox(height: 16),
                   SizedBox(
                     width: double.infinity,
-                    height: 52,
+                    height: 54,
                     child: ElevatedButton(
                       onPressed: locked
                           ? null
@@ -721,17 +658,14 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                         locked ? "تم إنهاء تحدي اليوم" : "ابدأ الجولة الآن",
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.cairo(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 13,
-                        ),
+                        style: GoogleFonts.cairo(fontWeight: FontWeight.w900),
                       ),
                     ),
                   ),
                   const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
-                    height: 52,
+                    height: 54,
                     child: OutlinedButton(
                       onPressed: () {
                         Navigator.pop(context);
@@ -747,7 +681,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                         style: GoogleFonts.cairo(
                           fontWeight: FontWeight.w900,
                           color: primaryColor,
-                          fontSize: 13,
                         ),
                       ),
                     ),
@@ -769,163 +702,142 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       isDismissible: false,
       enableDrag: false,
       backgroundColor: Colors.transparent,
-      builder: (_) {
-        final canContinueDaily =
-            (!_isFreePlaySession && _roundsDoneToday < _roundsPerDay);
+      builder: (_) => Container(
+        padding: const EdgeInsets.all(22),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _isFreePlaySession
+                  ? "Free Play ✅"
+                  : "نتيجة الجولة ${_roundsDoneToday.clamp(1, _roundsPerDay)}/$_roundsPerDay",
+              style: GoogleFonts.cairo(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: primaryColor,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              "حصلت على $_roundScore نقطة ⭐",
+              style: GoogleFonts.cairo(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: accentColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (_isFreePlaySession)
+              Text(
+                "دي نقاط تدريب فقط — مش بتتحسب في الليدر بورد.",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.cairo(
+                  fontSize: 12,
+                  height: 1.6,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black54,
+                ),
+              ),
+            const SizedBox(height: 16),
 
-        return Container(
-          padding: const EdgeInsets.all(22),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                _isFreePlaySession
-                    ? "Free Play ✅"
-                    : "نتيجة الجولة $_roundsDoneToday/$_roundsPerDay",
-                style: GoogleFonts.cairo(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
-                  color: primaryColor,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                "حصلت على $_roundScore نقطة ⭐",
-                style: GoogleFonts.cairo(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: accentColor,
-                ),
-              ),
-              const SizedBox(height: 12),
-              if (_isFreePlaySession)
-                Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 300),
-                    child: SizedBox(
-                      height: 46,
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          setState(() {
-                            _showFeedback = false;
-                            _selectedOption = null;
-                          });
-                          _startRound(freePlay: true);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 18),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: Text(
-                          "جولة تانية (Free Play)",
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.cairo(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 13,
-                            height: 1.2,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              if (canContinueDaily) ...[
-                const SizedBox(height: 10),
-                Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 300),
-                    child: SizedBox(
-                      height: 46,
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          setState(() {
-                            _showFeedback = false;
-                            _selectedOption = null;
-                            _isFreePlaySession = false;
-                          });
-                          _startRound(freePlay: false);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 18),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: Text(
-                          "استكمال الجولة التالية",
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.cairo(
-                            fontWeight: FontWeight.w900,
-                            fontSize: 13,
-                            height: 1.2,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 10),
+            // ✅ Free Play: زر جولة أخرى (بدون خروج)
+            if (_isFreePlaySession)
               Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 260),
+                  constraints: const BoxConstraints(maxWidth: 280),
                   child: SizedBox(
-                    height: 44,
-                    child: OutlinedButton(
+                    height: 46,
+                    child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(context);
+                        // نفس وضع Free Play + يبدأ فورًا
                         setState(() {
-                          _gameStarted = false;
                           _showFeedback = false;
                           _selectedOption = null;
-                          _isFreePlaySession = false;
+                          _questionIndexInRound = 0;
+                          _roundScore = 0;
                         });
+                        _startRound(freePlay: true);
                       },
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: primaryColor.withOpacity(0.25)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.secondaryOrange,
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
                       child: Text(
-                        "رجوع لصفحة البداية",
+                        "جولة أخرى (Free Play)",
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.cairo(
                           fontWeight: FontWeight.w900,
                           fontSize: 13,
                           height: 1.2,
-                          color: primaryColor,
+                          color: Colors.white,
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
-                child: Text(
-                  "العودة للرئيسية",
-                  style: GoogleFonts.cairo(fontWeight: FontWeight.w800),
+
+            if (_isFreePlaySession) const SizedBox(height: 10),
+
+            // ✅ رجوع أصغر + نص واضح
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 260),
+                child: SizedBox(
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      setState(() {
+                        _gameStarted = false;
+                        _showFeedback = false;
+                        _selectedOption = null;
+                        _isFreePlaySession = false;
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      "رجوع لصفحة البداية",
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.cairo(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                        height: 1.2,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ],
-          ),
-        );
-      },
+            ),
+
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () => Navigator.popUntil(context, (r) => r.isFirst),
+              child: Text(
+                "العودة للرئيسية",
+                style: GoogleFonts.cairo(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

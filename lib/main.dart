@@ -1,5 +1,5 @@
 // PATH: lib/main.dart
-// (تعديل ملف كامل لإضافة RepositoryProvider فقط — بدون تغيير UI)
+// STATUS: Full File – Added KnowClient route
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,6 +21,7 @@ import 'package:lpro2_quiz/presentation/screens/complete_profile_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/main_wrapper.dart';
 import 'package:lpro2_quiz/presentation/screens/about_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/admin_panel.dart';
+import 'package:lpro2_quiz/presentation/screens/know_client_screen.dart'; // ✅ NEW
 
 import 'core/curriculum/unit_repository.dart';
 
@@ -144,6 +145,9 @@ class _LProAppState extends State<LProApp> {
         '/home': (_) => const MainWrapper(),
         '/about': (_) => const AboutScreen(),
         '/admin': (_) => const AdminPanel(),
+
+        // ✅ NEW ROUTE
+        '/know_client': (_) => const KnowClientScreen(),
       },
     );
   }

@@ -10,8 +10,8 @@ import '../home/widgets/home_pro_card_container.dart';
 import '../../features/news_ticker/presentation/news_ticker_widget.dart';
 
 import 'quiz_screen.dart';
-import 'master_plan_screen.dart';
 import 'fact_screen.dart';
+import 'know_client_screen.dart'; // ✅ اعرف عميلك (القائمة + الفلترة + البحث)
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -145,6 +145,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
 class _HomeGrid extends StatelessWidget {
   const _HomeGrid();
+
   @override
   Widget build(BuildContext context) {
     return GridView(
@@ -178,10 +179,12 @@ class _HomeGrid extends StatelessWidget {
           icon: Icons.lightbulb_outline,
           target: FactScreen(),
         ),
+
+        // ✅ التعديل الوحيد: اعرف عميلك يفتح KnowClientScreen
         _GridCard(
           title: "اعرف عميلك",
           icon: Icons.groups_outlined,
-          target: MasterPlanScreen(),
+          target: KnowClientScreen(),
         ),
       ],
     );
@@ -221,7 +224,9 @@ class _GridCardState extends State<_GridCard> {
       onTap: () {
         SoundManager.playTap();
         Navigator.push(
-            context, MaterialPageRoute(builder: (_) => widget.target));
+          context,
+          MaterialPageRoute(builder: (_) => widget.target),
+        );
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
@@ -257,9 +262,10 @@ class _GridCardState extends State<_GridCard> {
                     Text(
                       widget.title,
                       style: GoogleFonts.cairo(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                          color: const Color(0xFF003D3D)),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: const Color(0xFF003D3D),
+                      ),
                     ),
                   ],
                 ),
@@ -277,25 +283,29 @@ class _GridCardState extends State<_GridCard> {
                         color: widget.badgeColor,
                         boxShadow: const [
                           BoxShadow(
-                              color: Colors.black12,
-                              blurRadius: 4,
-                              offset: Offset(0, 2))
+                            color: Colors.black12,
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
+                          )
                         ],
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           if (widget.badgeIcon != null) ...[
-                            Text(widget.badgeIcon!,
-                                style: const TextStyle(fontSize: 10)),
+                            Text(
+                              widget.badgeIcon!,
+                              style: const TextStyle(fontSize: 10),
+                            ),
                             const SizedBox(width: 4),
                           ],
                           Text(
                             widget.badgeText!,
                             style: GoogleFonts.cairo(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900),
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ],
                       ),
@@ -316,6 +326,7 @@ class _GridCardState extends State<_GridCard> {
 
 class _UserHeader extends StatelessWidget {
   const _UserHeader();
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -338,22 +349,27 @@ class _UserHeader extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("أهلاً بك، $name ✨",
-                    style: GoogleFonts.cairo(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: const Color(0xFF003D3D))),
+                Text(
+                  "أهلاً بك، $name ✨",
+                  style: GoogleFonts.cairo(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF003D3D),
+                  ),
+                ),
                 _PointsBadge(points: points),
               ],
             ),
             const SizedBox(height: 4),
-            const Row(children: [
-              _MiniMotto("تعلم مستمر"),
-              _ArrowArabic(),
-              _MiniMotto("تطور كبير"),
-              _ArrowArabic(),
-              _MiniMotto("نجاح أكيد 💪")
-            ]),
+            const Row(
+              children: [
+                _MiniMotto("تعلم مستمر"),
+                _ArrowArabic(),
+                _MiniMotto("تطور كبير"),
+                _ArrowArabic(),
+                _MiniMotto("نجاح أكيد 💪")
+              ],
+            ),
           ],
         );
       },
@@ -364,6 +380,7 @@ class _UserHeader extends StatelessWidget {
 class _PointsBadge extends StatelessWidget {
   final int points;
   const _PointsBadge({required this.points});
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -372,22 +389,30 @@ class _PointsBadge extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-            color: const Color(0xFFFF8C00).withOpacity(0.3), width: 1.0),
+          color: const Color(0xFFFF8C00).withOpacity(0.3),
+          width: 1.0,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text("$points",
-              style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w900,
-                  color: const Color(0xFF003D3D),
-                  fontSize: 12)),
+          Text(
+            "$points",
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w900,
+              color: const Color(0xFF003D3D),
+              fontSize: 12,
+            ),
+          ),
           const SizedBox(width: 4),
-          Text("نقطة",
-              style: GoogleFonts.cairo(
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFFFF8C00),
-                  fontSize: 10)),
+          Text(
+            "نقطة",
+            style: GoogleFonts.cairo(
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFFFF8C00),
+              fontSize: 10,
+            ),
+          ),
         ],
       ),
     );
@@ -396,15 +421,17 @@ class _PointsBadge extends StatelessWidget {
 
 class _PowerSentence extends StatelessWidget {
   const _PowerSentence();
+
   @override
   Widget build(BuildContext context) {
     return Center(
       child: RichText(
         text: TextSpan(
           style: GoogleFonts.cairo(
-              fontSize: 14,
-              fontWeight: FontWeight.w900,
-              color: const Color(0xFF003D3D)),
+            fontSize: 14,
+            fontWeight: FontWeight.w900,
+            color: const Color(0xFF003D3D),
+          ),
           children: const [
             TextSpan(text: "من يملك المعلومة"),
             TextSpan(text: " • ", style: TextStyle(color: Color(0xFFFF8C00))),
@@ -418,6 +445,7 @@ class _PowerSentence extends StatelessWidget {
 
 class _EnglishMotto extends StatelessWidget {
   const _EnglishMotto();
+
   @override
   Widget build(BuildContext context) {
     return const Row(
@@ -436,50 +464,64 @@ class _EnglishMotto extends StatelessWidget {
 class _MiniMotto extends StatelessWidget {
   final String text;
   const _MiniMotto(this.text);
+
   @override
   Widget build(BuildContext context) {
-    return Text(text,
-        style: GoogleFonts.cairo(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            color: const Color(0xFFFF8C00)));
+    return Text(
+      text,
+      style: GoogleFonts.cairo(
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        color: const Color(0xFFFF8C00),
+      ),
+    );
   }
 }
 
 class _EnglishWord extends StatelessWidget {
   final String text;
   const _EnglishWord(this.text);
+
   @override
   Widget build(BuildContext context) {
-    return Text(text,
-        style: GoogleFonts.cairo(
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-            color: const Color(0xFF4FA8A8)));
+    return Text(
+      text,
+      style: GoogleFonts.cairo(
+        fontSize: 14,
+        fontWeight: FontWeight.w900,
+        color: const Color(0xFF4FA8A8),
+      ),
+    );
   }
 }
 
 class _ArrowArabic extends StatelessWidget {
   const _ArrowArabic();
+
   @override
   Widget build(BuildContext context) {
     return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 5),
-        child: CustomPaint(
-            size: Size(11, 9),
-            painter: _SolidTrianglePainter(Color(0xFF4FA8A8), isLeft: true)));
+      padding: EdgeInsets.symmetric(horizontal: 5),
+      child: CustomPaint(
+        size: Size(11, 9),
+        painter: _SolidTrianglePainter(Color(0xFF4FA8A8), isLeft: true),
+      ),
+    );
   }
 }
 
 class _ArrowEnglish extends StatelessWidget {
   const _ArrowEnglish();
+
   @override
   Widget build(BuildContext context) {
     return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 5),
-        child: CustomPaint(
-            size: Size(11, 9),
-            painter: _SolidTrianglePainter(Color(0xFF4FA8A8), isLeft: false)));
+      padding: EdgeInsets.symmetric(horizontal: 5),
+      child: CustomPaint(
+        size: Size(11, 9),
+        painter: _SolidTrianglePainter(Color(0xFF4FA8A8), isLeft: false),
+      ),
+    );
   }
 }
 
@@ -487,6 +529,7 @@ class _SolidTrianglePainter extends CustomPainter {
   final Color color;
   final bool isLeft;
   const _SolidTrianglePainter(this.color, {required this.isLeft});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()

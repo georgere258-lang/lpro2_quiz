@@ -1,107 +1,62 @@
-// PATH: lib/presentation/screens/fact_screen.dart
-// STATUS: Full File – Firestore Topics (pro_insight) + Fixed Sections Plan
-//         + Favorites (SharedPreferences) + Last Seen Badge
-//         + Tag Normalization (fix: "سيستم الشركة" => "سيستم الشركات")
+// PATH: lib/presentation/screens/know_client_screen.dart
+// STATUS: Full File – ✅ Admin can see scheduled topics before publishAt, users only see published.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // ✅ NEW
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/app_colors.dart';
-import 'fact_articles_screen.dart';
+import 'know_client_articles_screen.dart';
 
-class FactScreen extends StatefulWidget {
-  const FactScreen({super.key});
+class KnowClientScreen extends StatefulWidget {
+  const KnowClientScreen({super.key});
 
   @override
-  State<FactScreen> createState() => _FactScreenState();
+  State<KnowClientScreen> createState() => _KnowClientScreenState();
 }
 
-class _FactScreenState extends State<FactScreen> {
-  static const String _collectionName = 'pro_insight';
+class _KnowClientScreenState extends State<KnowClientScreen> {
+  static const String _collectionName = 'know_your_client';
 
+  // ✅ أقسام ثابتة (خطة القسم) - الفلترة تعتمد على tags
   static const List<String> _sectionsPlan = [
     'كل المواضيع',
-    'المفضلة',
-    'البداية الصح',
-    'لغة العقارات',
-    'سيستم السوق',
-    'سيستم الشركات',
-    'التعاقدات والإجراءات',
-    'دراسة المشاريع',
+    'أساسيات العميل',
+    'أنماط الشخصيات',
+    'الدوافع والاحتياجات',
+    'الاعتراضات والردود',
+    'التفاوض',
+    'إغلاق الصفقة',
+    'متابعة وما بعد البيع',
   ];
 
-  static const String _prefsFavKey = 'pro_insight_fav_titles';
-  static const String _prefsLastSeenKey = 'pro_insight_last_seen_title';
-
   String _selectedSection = 'كل المواضيع';
-  Set<String> _favoriteTitles = {};
-  String _lastSeenTitle = '';
+
+  // ✅ Admin flag (from users/{uid}.isAdmin)
+  bool _isAdmin = false;
 
   @override
   void initState() {
     super.initState();
-    _loadLocalState();
+    _listenAdminFlag();
   }
 
-  // ✅ Normalize tags to match the content plan sections
-  String _normalizeTag(String raw) {
-    final t = raw.trim();
-    if (t.isEmpty) return t;
+  void _listenAdminFlag() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
 
-    // أهم تصحيح عندك:
-    if (t == 'سيستم الشركة') return 'سيستم الشركات';
-
-    // ممكن توسّع هنا لاحقًا لو ظهر اختلافات كتابة
-    return t;
+    FirebaseFirestore.instance.collection('users').doc(uid).snapshots().listen(
+      (doc) {
+        final data = doc.data();
+        final isAdmin = (data?['isAdmin'] == true);
+        if (mounted) {
+          setState(() => _isAdmin = isAdmin);
+        }
+      },
+      onError: (_) {},
+    );
   }
-
-  Future<void> _loadLocalState() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final fav = prefs.getStringList(_prefsFavKey) ?? <String>[];
-      final last = prefs.getString(_prefsLastSeenKey) ?? '';
-      if (!mounted) return;
-      setState(() {
-        _favoriteTitles =
-            fav.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
-        _lastSeenTitle = last.trim();
-      });
-    } catch (_) {}
-  }
-
-  Future<void> _setLastSeen(String title) async {
-    final t = title.trim();
-    if (t.isEmpty) return;
-    _lastSeenTitle = t;
-    if (mounted) setState(() {});
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_prefsLastSeenKey, t);
-    } catch (_) {}
-  }
-
-  Future<void> _toggleFavorite(String title) async {
-    final t = title.trim();
-    if (t.isEmpty) return;
-
-    final next = Set<String>.from(_favoriteTitles);
-    if (next.contains(t)) {
-      next.remove(t);
-    } else {
-      next.add(t);
-    }
-
-    setState(() => _favoriteTitles = next);
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList(_prefsFavKey, _favoriteTitles.toList());
-    } catch (_) {}
-  }
-
-  bool _isFavorite(String title) => _favoriteTitles.contains(title.trim());
 
   @override
   Widget build(BuildContext context) {
@@ -112,7 +67,9 @@ class _FactScreenState extends State<FactScreen> {
         foregroundColor: Colors.white,
         centerTitle: true,
         title: Text(
-          'المعلومة بتفرق',
+          'سيكولوجية القرار العقاري',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 18),
         ),
       ),
@@ -122,7 +79,7 @@ class _FactScreenState extends State<FactScreen> {
           children: [
             const SizedBox(height: 14),
 
-            // ===== Header Row =====
+            // ===== Header Row (Sections + Selected + Search) =====
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -173,21 +130,7 @@ class _FactScreenState extends State<FactScreen> {
                       if (!mounted) return;
                       showSearch(
                         context: context,
-                        delegate: _FactSearchDelegate(
-                          items: items,
-                          onOpen: (title) async {
-                            await _setLastSeen(title);
-                            if (!mounted) return;
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    FactArticlesScreen(title: title),
-                              ),
-                            );
-                            await _loadLocalState();
-                          },
-                        ),
+                        delegate: _KnowClientSearchDelegate(items),
                       );
                     },
                   ),
@@ -205,6 +148,7 @@ class _FactScreenState extends State<FactScreen> {
 
             const SizedBox(height: 10),
 
+            // ===== Topics List =====
             Expanded(child: _topicsList()),
           ],
         ),
@@ -229,18 +173,18 @@ class _FactScreenState extends State<FactScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            "بوابة المعلومة اللي بتفرق",
+            "العميل لا يشتري عقارًا… هو يشتري أمانًا أو هروبًا أو مكانة.",
             textAlign: TextAlign.right,
             style: GoogleFonts.cairo(
-              fontSize: 13,
-              height: 1.5,
+              fontSize: 12.8,
+              height: 1.55,
               fontWeight: FontWeight.w900,
               color: AppColors.primaryDeepTeal,
             ),
           ),
           const SizedBox(height: 6),
           Text(
-            "مواضيع قصيرة، مركزة، وفي نهايتها سلوك عملي.",
+            "هنا هتفهم دوافعه، قلقه، اعتراضاته… وتعرف إمتى تقفل وإمتى تسيب القرار ينضج.",
             textAlign: TextAlign.right,
             style: GoogleFonts.cairo(
               fontSize: 12,
@@ -261,7 +205,8 @@ class _FactScreenState extends State<FactScreen> {
       builder: (context, snap) {
         if (snap.hasError) {
           return _centerMsg(
-              "حصل خطأ في تحميل المواضيع.\nراجع Rules أو ترتيب الحقول.");
+            "حصل خطأ في تحميل المواضيع.\nراجع Rules أو أسماء الحقول.",
+          );
         }
         if (!snap.hasData) {
           return const Center(
@@ -273,37 +218,34 @@ class _FactScreenState extends State<FactScreen> {
           );
         }
 
-        final docs = snap.data!.docs;
+        final nowMs = DateTime.now().millisecondsSinceEpoch;
 
-        final items = docs
-            .map((d) => _FactTopicItem.fromDoc(
-                  d.id,
-                  d.data(),
-                  normalizeTag: _normalizeTag,
-                ))
-            .where((e) => e.isActive == true && e.title.trim().isNotEmpty)
-            .toList();
+        final items = snap.data!.docs
+            .map((d) => _KycTopicItem.fromDoc(d.id, d.data()))
+            .where((e) {
+          if (e.isActive != true) return false;
+          if (e.title.trim().isEmpty) return false;
 
+          // ✅ scheduled logic
+          final isScheduledFuture =
+              (e.publishAtMs > 0 && e.publishAtMs > nowMs);
+
+          // user: hide scheduled
+          // admin: show scheduled
+          if (!_isAdmin && isScheduledFuture) return false;
+
+          return true;
+        }).toList();
+
+        // ✅ ترتيب محلي حسب createdAt (الأحدث أولاً)
         items.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
 
-        List<_FactTopicItem> filtered;
-
-        if (_selectedSection == 'كل المواضيع') {
-          filtered = items;
-        } else if (_selectedSection == 'المفضلة') {
-          filtered = items.where((e) => _isFavorite(e.title)).toList();
-        } else {
-          filtered = items
-              .where((e) => e.tags.contains(_normalizeTag(_selectedSection)))
-              .toList();
-        }
+        final filtered = _selectedSection == 'كل المواضيع'
+            ? items
+            : items.where((e) => e.tags.contains(_selectedSection)).toList();
 
         if (filtered.isEmpty) {
-          return _centerMsg(
-            _selectedSection == 'المفضلة'
-                ? "لا توجد مواضيع في المفضلة الآن."
-                : "لا توجد مواضيع في هذا القسم الآن.",
-          );
+          return _centerMsg("لا توجد مواضيع في هذا القسم الآن.");
         }
 
         return ListView.separated(
@@ -313,28 +255,21 @@ class _FactScreenState extends State<FactScreen> {
           separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
             final item = filtered[index];
-            final isLastSeen = item.title.trim() == _lastSeenTitle.trim();
-            final isFav = _isFavorite(item.title);
 
             return GestureDetector(
-              onTap: () async {
-                await _setLastSeen(item.title);
-                if (!mounted) return;
-                await Navigator.push(
+              onTap: () {
+                Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => FactArticlesScreen(title: item.title),
+                    // ✅ safer: open by docId
+                    builder: (_) => KnowClientArticlesScreen(
+                      docId: item.id,
+                      title: item.title,
+                    ),
                   ),
                 );
-                await _loadLocalState();
               },
-              child: _topicCard(
-                item: item,
-                index: index,
-                isLastSeen: isLastSeen,
-                isFavorite: isFav,
-                onToggleFavorite: () => _toggleFavorite(item.title),
-              ),
+              child: _topicCard(item: item, index: index, nowMs: nowMs),
             );
           },
         );
@@ -343,15 +278,16 @@ class _FactScreenState extends State<FactScreen> {
   }
 
   Widget _topicCard({
-    required _FactTopicItem item,
+    required _KycTopicItem item,
     required int index,
-    required bool isLastSeen,
-    required bool isFavorite,
-    required VoidCallback onToggleFavorite,
+    required int nowMs,
   }) {
     final shadowTint = index.isEven
         ? AppColors.primaryDeepTeal.withOpacity(0.08)
         : AppColors.secondaryOrange.withOpacity(0.08);
+
+    final isScheduledFuture =
+        (item.publishAtMs > 0 && item.publishAtMs > nowMs);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -369,54 +305,16 @@ class _FactScreenState extends State<FactScreen> {
       ),
       child: Row(
         children: [
-          InkWell(
-            onTap: onToggleFavorite,
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.all(6),
-              child: Icon(
-                isFavorite
-                    ? Icons.bookmark_rounded
-                    : Icons.bookmark_border_rounded,
-                color: isFavorite
-                    ? AppColors.secondaryOrange
-                    : AppColors.primaryDeepTeal,
-              ),
-            ),
+          const Icon(
+            Icons.arrow_forward_ios,
+            size: 16,
+            color: AppColors.secondaryOrange,
           ),
-          const SizedBox(width: 6),
-          const Icon(Icons.arrow_forward_ios,
-              size: 16, color: AppColors.secondaryOrange),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                if (isLastSeen) ...[
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.secondaryOrange.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: AppColors.secondaryOrange.withOpacity(0.22),
-                        ),
-                      ),
-                      child: Text(
-                        "آخر مرة كنت هنا",
-                        style: GoogleFonts.cairo(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.secondaryOrange,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
                 Text(
                   item.title,
                   textAlign: TextAlign.right,
@@ -428,6 +326,33 @@ class _FactScreenState extends State<FactScreen> {
                     color: AppColors.primaryDeepTeal,
                   ),
                 ),
+
+                // ✅ Admin only badge for scheduled
+                if (_isAdmin && isScheduledFuture) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondaryOrange.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: AppColors.secondaryOrange.withOpacity(0.25),
+                        ),
+                      ),
+                      child: Text(
+                        "مجدول",
+                        style: GoogleFonts.cairo(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.secondaryOrange,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -455,7 +380,7 @@ class _FactScreenState extends State<FactScreen> {
     );
   }
 
-  Future<List<_FactTopicItem>> _fetchOnceItems() async {
+  Future<List<_KycTopicItem>> _fetchOnceItems() async {
     try {
       final snap = await FirebaseFirestore.instance
           .collection(_collectionName)
@@ -463,14 +388,19 @@ class _FactScreenState extends State<FactScreen> {
           .limit(900)
           .get();
 
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+
       final items = snap.docs
-          .map((d) => _FactTopicItem.fromDoc(
-                d.id,
-                d.data(),
-                normalizeTag: _normalizeTag,
-              ))
-          .where((e) => e.title.trim().isNotEmpty)
-          .toList();
+          .map((d) => _KycTopicItem.fromDoc(d.id, d.data()))
+          .where((e) {
+        if (e.title.trim().isEmpty) return false;
+
+        final isScheduledFuture = (e.publishAtMs > 0 && e.publishAtMs > nowMs);
+
+        if (!_isAdmin && isScheduledFuture) return false;
+
+        return true;
+      }).toList();
 
       items.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
       return items;
@@ -624,11 +554,9 @@ class _SectionsSheet extends StatelessWidget {
   }
 }
 
-class _FactSearchDelegate extends SearchDelegate {
-  final List<_FactTopicItem> items;
-  final Future<void> Function(String title) onOpen;
-
-  _FactSearchDelegate({required this.items, required this.onOpen});
+class _KnowClientSearchDelegate extends SearchDelegate {
+  final List<_KycTopicItem> items;
+  _KnowClientSearchDelegate(this.items);
 
   @override
   String? get searchFieldLabel => 'ابحث عن موضوع…';
@@ -663,8 +591,10 @@ class _FactSearchDelegate extends SearchDelegate {
 
     if (results.isEmpty) {
       return Center(
-        child: Text("لا نتائج.",
-            style: GoogleFonts.cairo(fontWeight: FontWeight.w900)),
+        child: Text(
+          "لا نتائج.",
+          style: GoogleFonts.cairo(fontWeight: FontWeight.w900),
+        ),
       );
     }
 
@@ -680,9 +610,17 @@ class _FactSearchDelegate extends SearchDelegate {
             textAlign: TextAlign.right,
             style: GoogleFonts.cairo(fontWeight: FontWeight.w900),
           ),
-          onTap: () async {
+          onTap: () {
             close(context, null);
-            await onOpen(item.title);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => KnowClientArticlesScreen(
+                  docId: item.id,
+                  title: item.title,
+                ),
+              ),
+            );
           },
         );
       },
@@ -693,32 +631,30 @@ class _FactSearchDelegate extends SearchDelegate {
   Widget buildSuggestions(BuildContext context) => buildResults(context);
 }
 
-class _FactTopicItem {
+class _KycTopicItem {
   final String id;
   final String title;
   final int createdAtMs;
+  final int publishAtMs; // ✅ NEW
   final List<String> tags;
   final bool isActive;
 
-  _FactTopicItem({
+  _KycTopicItem({
     required this.id,
     required this.title,
     required this.createdAtMs,
+    required this.publishAtMs,
     required this.tags,
     required this.isActive,
   });
 
-  factory _FactTopicItem.fromDoc(
-    String id,
-    Map<String, dynamic> data, {
-    required String Function(String raw) normalizeTag,
-  }) {
+  factory _KycTopicItem.fromDoc(String id, Map<String, dynamic> data) {
     final rawTags = data['tags'];
     final tags = <String>[];
     if (rawTags is List) {
       for (final t in rawTags) {
-        final s = normalizeTag(t.toString());
-        if (s.trim().isNotEmpty) tags.add(s.trim());
+        final s = t.toString().trim();
+        if (s.isNotEmpty) tags.add(s);
       }
     }
 
@@ -726,10 +662,15 @@ class _FactTopicItem {
     final ts = data['createdAt'];
     if (ts is Timestamp) createdAtMs = ts.millisecondsSinceEpoch;
 
-    return _FactTopicItem(
+    int publishAtMs = 0;
+    final pub = data['publishAt'];
+    if (pub is Timestamp) publishAtMs = pub.millisecondsSinceEpoch;
+
+    return _KycTopicItem(
       id: id,
       title: (data['title'] ?? '').toString(),
       createdAtMs: createdAtMs,
+      publishAtMs: publishAtMs,
       tags: tags,
       isActive: data['isActive'] == true,
     );
