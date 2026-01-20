@@ -334,25 +334,24 @@ class _FactScreenState extends State<FactScreen> {
           );
         }
 
+        // Section preview lookup
+        const String previewSectionName = 'البداية الصح';
+        final previewItems = allItems
+            .where((e) => e.tags.contains(_normalizeTag(previewSectionName)))
+            .take(3)
+            .toList();
+
         return Column(
           children: [
-            // ✅ تابع من حيث توقفت
+            // ✅ تابع من حيث توقفت (single card)
             if (_lastSeenTitle.trim().isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-                child: _blockHeader(
-                  title: "تابع من حيث توقفت",
-                  subtitle: "آخر موضوع فتحته",
-                  icon: Icons.history_rounded,
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
                 child: GestureDetector(
                   onTap: () => _openTopic(_lastSeenTitle),
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(18),
@@ -365,79 +364,180 @@ class _FactScreenState extends State<FactScreen> {
                         ),
                       ],
                     ),
-                    child: Text(
-                      _lastSeenTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.cairo(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.primaryDeepTeal,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.history_rounded, size: 16, color: AppColors.secondaryOrange),
+                            const SizedBox(width: 6),
+                            Text(
+                              "تابع من حيث توقفت",
+                              style: GoogleFonts.cairo(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _lastSeenTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.cairo(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primaryDeepTeal,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
               const SizedBox(height: 4),
             ],
+
+            // ✅ ترشيحات Pro (single card with vertical list)
             if (featured.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-                child: _blockHeader(
-                  title: "ترشيحات Pro",
-                  subtitle: "مواضيع مثبتة من أقسام مختلفة",
-                  icon: Icons.star_rounded,
-                ),
-              ),
-              SizedBox(
-                height: 108,
-                child: ListView.separated(
-                  physics: const BouncingScrollPhysics(),
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-                  itemCount: featured.length > 5 ? 5 : featured.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 10),
-                  itemBuilder: (context, i) {
-                    final item = featured[i];
-                    return _miniTopicCard(
-                      item: item,
-                      isFavorite: _isFavorite(item.title),
-                      onToggleFavorite: () => _toggleFavorite(item.title),
-                      onTap: () => _openTopic(item.title),
-                      badgeText: item.firstTagOrEmpty,
-                    );
-                  },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.star_rounded, size: 18, color: AppColors.secondaryOrange),
+                          const SizedBox(width: 8),
+                          Text(
+                            "ترشيحات Pro",
+                            style: GoogleFonts.cairo(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.primaryDeepTeal,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ...featured.take(5).map((item) => _verticalTopicRow(item)),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 4),
             ],
+
+            // ✅ جديد Pro (single card with vertical list)
             if (recent.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-                child: _blockHeader(
-                  title: "جديد Pro",
-                  subtitle: "آخر ما تم إضافته",
-                  icon: Icons.new_releases_rounded,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.new_releases_rounded, size: 18, color: AppColors.secondaryOrange),
+                          const SizedBox(width: 8),
+                          Text(
+                            "جديد Pro",
+                            style: GoogleFonts.cairo(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.primaryDeepTeal,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ...recent.take(5).map((item) => _verticalTopicRow(item)),
+                    ],
+                  ),
                 ),
               ),
-              SizedBox(
-                height: 108,
-                child: ListView.separated(
-                  physics: const BouncingScrollPhysics(),
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-                  itemCount: recent.length > 5 ? 5 : recent.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 10),
-                  itemBuilder: (context, i) {
-                    final item = recent[i];
-                    return _miniTopicCard(
-                      item: item,
-                      isFavorite: _isFavorite(item.title),
-                      onToggleFavorite: () => _toggleFavorite(item.title),
-                      onTap: () => _openTopic(item.title),
-                      badgeText: item.firstTagOrEmpty,
-                    );
-                  },
+              const SizedBox(height: 4),
+            ],
+
+            // ✅ Section preview (البداية الصح)
+            if (previewItems.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              previewSectionName,
+                              style: GoogleFonts.cairo(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.primaryDeepTeal,
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => _openSectionsSheet(context),
+                            child: const Icon(
+                              Icons.grid_view_rounded,
+                              size: 20,
+                              color: AppColors.secondaryOrange,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ...previewItems.map((item) => _verticalTopicRow(item)),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 4),
@@ -777,6 +877,37 @@ class _FactScreenState extends State<FactScreen> {
             fontWeight: FontWeight.w900,
             color: AppColors.primaryDeepTeal,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _verticalTopicRow(_FactTopicItem item) {
+    return GestureDetector(
+      onTap: () => _openTopic(item.title),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                item.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.cairo(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primaryDeepTeal,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 12,
+              color: Colors.black26,
+            ),
+          ],
         ),
       ),
     );
