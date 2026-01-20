@@ -1,38 +1,54 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/firestore_paths.dart';
 
-/// مصدر واحد: home_pro_card/current. لا list ولا history ولا archive.
-///
-/// يرجّع text فقط لو:
-///   isActive && (publishAt == null || publishAt <= now) && (expireAt == null || now < expireAt)
-/// لو الشرط false أو text فاضي => null.
 class HomeProCardService {
   final FirebaseFirestore _db;
   HomeProCardService({FirebaseFirestore? db})
       : _db = db ?? FirebaseFirestore.instance;
+
+  static const _cacheKey = 'cached_home_pro_card_text';
 
   Stream<String?> streamText() {
     return _db
         .collection(FirestorePaths.proCardCurrent)
         .doc(FirestorePaths.currentDoc)
         .snapshots()
-        .map((snap) {
+        .asyncMap((snap) async {
       final d = snap.data();
-      if (d == null) return null;
+
+      // لو الدوك مش موجود → رجّع المخزن
+      if (d == null) {
+        return _readCached();
+      }
 
       final isActive = d['isActive'] == true;
       final publishAt = _asDateTime(d['publishAt']);
       final expireAt = _asDateTime(d['expireAt']);
       final now = DateTime.now();
 
-      if (!isActive) return null;
-      if (publishAt != null && now.isBefore(publishAt)) return null;
-      if (expireAt != null && !now.isBefore(expireAt)) return null;
+      if (!isActive) return _readCached();
+      if (publishAt != null && now.isBefore(publishAt)) return _readCached();
+      if (expireAt != null && !now.isBefore(expireAt)) return _readCached();
 
       final text = (d['text'] ?? '').toString().trim();
-      return text.isEmpty ? null : text;
+      if (text.isEmpty) return _readCached();
+
+      // ✅ خزّن آخر قيمة صحيحة
+      await _cache(text);
+      return text;
     });
+  }
+
+  Future<void> _cache(String text) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_cacheKey, text);
+  }
+
+  Future<String?> _readCached() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getString(_cacheKey);
   }
 
   DateTime? _asDateTime(dynamic v) {
