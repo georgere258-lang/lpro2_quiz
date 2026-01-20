@@ -324,64 +324,56 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _pill(
-                        icon: Icons.timer_outlined,
-                        text: "$_timeLeft ث",
-                        color: accentColor,
-                      ),
-                      const SizedBox(width: 10),
+                      // ترتيب معكوس: سؤال (يمين) - العداد (وسط) - Free Play (يسار)
                       _pill(
                         icon: Icons.quiz_outlined,
-                        text:
-                            "سؤال ${_questionIndexInRound + 1}/$_questionsPerRound",
+                        text: "سؤال ${_questionIndexInRound + 1}/$_questionsPerRound",
                         color: primaryColor,
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 12),
+                      _counterPill(_timeLeft.toString()),
+                      const SizedBox(width: 12),
                       _pill(
                         icon: Icons.emoji_events_outlined,
-                        text: _isFreePlaySession
-                            ? "Free Play"
-                            : "اليوم: $_roundsDoneToday/$_roundsPerDay",
+                        text: _isFreePlaySession ? "Free Play" : "اليوم",
                         color: primaryColor,
                       ),
                     ],
                   ),
                 ),
-                LinearProgressIndicator(
-                  value: _timeLeft / _secondsPerQuestion,
-                  color: accentColor,
-                  backgroundColor: Colors.black.withValues(alpha: 0.06),
-                  minHeight: 6,
-                ),
 
-                // ✅ نزلنا بلوك السؤال والإجابات لتحت بمسافة أوضح
-                const SizedBox(height: 26),
-
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  child: _glassCard(
-                    child: Text(
-                      (q['question'] ?? '').toString(),
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.cairo(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        height: 1.7,
-                        color: primaryColor,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
+                // ✅ بلوك السؤال والإجابات (top align مع padding 24)
                 Expanded(
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(18, 4, 18, 18),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 24),
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: _questionCard(
+                            child: Text(
+                              (q['question'] ?? '').toString(),
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.cairo(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                                height: 1.6,
+                                color: primaryColor,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Expanded(
+                          child: ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                     physics: const BouncingScrollPhysics(),
                     itemCount: options.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (context, i) {
                       final opt = options[i];
 
@@ -403,20 +395,20 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                         onTap: () => _handleAnswer(opt),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           decoration: BoxDecoration(
                             color: bg,
-                            borderRadius: BorderRadius.circular(18),
+                            borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: bg == Colors.white
-                                  ? primaryColor.withValues(alpha: 0.14)
+                                  ? primaryColor.withValues(alpha: 0.10)
                                   : Colors.transparent,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.04),
-                                blurRadius: 12,
-                                offset: const Offset(0, 7),
+                                color: Colors.black.withValues(alpha: 0.03),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
                               ),
                             ],
                           ),
@@ -425,15 +417,19 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                               opt,
                               textAlign: TextAlign.center,
                               style: GoogleFonts.cairo(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w900,
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
                                 color: fg,
                               ),
                             ),
                           ),
                         ),
                       );
-                    },
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
 
@@ -458,155 +454,156 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             textDirection: TextDirection.rtl,
             child: SafeArea(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 12, 18, 14),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 8),
-                    Text(
-                      "الدوريات",
-                      style: GoogleFonts.cairo(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        color: primaryColor,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Stack(
-                      children: [
-                        SectionIdentityCard(
-                          sectionKey: widget.categoryTitle,
-                          icon: _isStars
-                              ? Icons.auto_awesome_rounded
-                              : Icons.workspace_premium,
-                          title: widget.categoryTitle,
-                          description: _isStars
-                              ? "تثبيت الأساس… وتطوير يومي بدون ضغط."
-                              : "اختبار حقيقي… يقتل الحفظ ويقوّي الفهم.",
-                          benefits: _isStars
-                              ? const [
-                                  "مناسب للفريش",
-                                  "يزود ثقتك خطوة بخطوة",
-                                  "يخليك ثابت وسط ضغط السوق"
-                                ]
-                              : const [
-                                  "مناسب للمحترفين",
-                                  "يختبر الفهم مش المعلومات",
-                                  "يرفع مستوى القرار تحت الضغط"
-                                ],
+                padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+                child: Transform.translate(
+                  offset: const Offset(0, -32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "الدوريات",
+                        style: GoogleFonts.cairo(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: primaryColor,
                         ),
-                        Positioned(
-                          top: 18,
-                          left: 18,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _badgeColor,
-                              borderRadius: BorderRadius.circular(14),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black12,
-                                  blurRadius: 8,
-                                  offset: Offset(0, 4),
-                                )
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(_badgeEmoji,
-                                    style: const TextStyle(fontSize: 12)),
-                                const SizedBox(width: 6),
-                                Text(
-                                  _badgeText,
-                                  style: GoogleFonts.cairo(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    _glassCard(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      const SizedBox(height: 14),
+                      Stack(
                         children: [
-                          Icon(
-                            Icons.emoji_events_outlined,
-                            color: primaryColor,
-                            size: 18,
+                          SectionIdentityCard(
+                            sectionKey: widget.categoryTitle,
+                            icon: _isStars
+                                ? Icons.auto_awesome_rounded
+                                : Icons.workspace_premium,
+                            title: widget.categoryTitle,
+                            description: _isStars
+                                ? "تثبيت الأساس… وتطوير يومي بدون ضغط."
+                                : "اختبار حقيقي… يقتل الحفظ ويقوّي الفهم.",
+                            benefits: _isStars
+                                ? const [
+                                    "مناسب للفريش",
+                                    "يزود ثقتك خطوة بخطوة",
+                                    "يخليك ثابت وسط ضغط السوق"
+                                  ]
+                                : const [
+                                    "مناسب للمحترفين",
+                                    "يختبر الفهم مش المعلومات",
+                                    "يرفع مستوى القرار تحت الضغط"
+                                  ],
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            "تحدي اليوم: $_roundsDoneToday/$_roundsPerDay جوالات",
-                            style: GoogleFonts.cairo(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                              color: primaryColor,
+                          Positioned(
+                            top: 18,
+                            left: 18,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _badgeColor,
+                                borderRadius: BorderRadius.circular(14),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black12,
+                                    blurRadius: 8,
+                                    offset: Offset(0, 4),
+                                  )
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(_badgeEmoji,
+                                      style: const TextStyle(fontSize: 12)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _badgeText,
+                                    style: GoogleFonts.cairo(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // ✅ تصغير زر "انت نجم..." (ممنوع full width)
-                    Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 320),
-                        child: SizedBox(
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              SoundManager.playTap();
-                              _openDailyChallengeSheet();
-                            },
-                            style: ElevatedButton.styleFrom(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 18),
+                      const SizedBox(height: 14),
+                      _glassCard(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.emoji_events_outlined,
+                              color: primaryColor,
+                              size: 18,
                             ),
-                            child: Text(
-                              _enterButtonText,
+                            const SizedBox(width: 8),
+                            Text(
+                              "تحدي اليوم: $_roundsDoneToday/$_roundsPerDay جوالات",
                               style: GoogleFonts.cairo(
-                                  fontWeight: FontWeight.w900),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                                color: primaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // ✅ تصغير زر "انت نجم..." (ممنوع full width)
+                      Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 320),
+                          child: SizedBox(
+                            height: 50,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                SoundManager.playTap();
+                                _openDailyChallengeSheet();
+                              },
+                              style: ElevatedButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 18),
+                              ),
+                              child: Text(
+                                _enterButtonText,
+                                style: GoogleFonts.cairo(
+                                    fontWeight: FontWeight.w900),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
 
-                    const SizedBox(height: 10),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(
-                        "رجوع",
-                        style: GoogleFonts.cairo(
-                          fontWeight: FontWeight.w800,
-                          color: Colors.blueGrey,
+                      const SizedBox(height: 10),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(
+                          "رجوع",
+                          style: GoogleFonts.cairo(
+                            fontWeight: FontWeight.w800,
+                            color: Colors.blueGrey,
+                          ),
                         ),
                       ),
-                    ),
 
-                    // ✅ شيلنا اللوجو والجمل من أسفل صفحات الدوريات
-                    const Spacer(),
-                    const SizedBox(height: 10),
-                  ],
+                      // ✅ شيلنا اللوجو والجمل من أسفل صفحات الدوريات
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1021,34 +1018,82 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.18)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.15)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 6),
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
           )
         ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 6),
+          Icon(icon, size: 15, color: color),
+          const SizedBox(width: 5),
           Text(
             text,
             style: GoogleFonts.cairo(
               fontSize: 11,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w800,
               color: Colors.black87,
             ),
           ),
         ],
       ),
+    );
+  }
+
+  // Counter pill for timer (centered large number)
+  Widget _counterPill(String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: accentColor.withValues(alpha: 0.25)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          )
+        ],
+      ),
+      child: Text(
+        value,
+        style: GoogleFonts.poppins(
+          fontSize: 22,
+          fontWeight: FontWeight.w800,
+          color: accentColor,
+        ),
+      ),
+    );
+  }
+
+  // Question card (cleaner style)
+  Widget _questionCard({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: primaryColor.withValues(alpha: 0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: child,
     );
   }
 }
