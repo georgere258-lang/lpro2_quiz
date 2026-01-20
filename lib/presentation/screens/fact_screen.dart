@@ -560,7 +560,7 @@ class _FactScreenState extends State<FactScreen> {
                     child: _topicCard(
                       item: item,
                       index: index,
-                      isLastSeen: isLastSeen,
+                      isLastSeen: false,
                       isFavorite: isFav,
                       onToggleFavorite: () => _toggleFavorite(item.title),
                       showFavorite: false,
