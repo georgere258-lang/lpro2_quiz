@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/models/pro_insight_model.dart';
 
 class ProInsightService {
-  final _collection = FirebaseFirestore.instance.collection('pro_insights');
+  final _collection = FirebaseFirestore.instance.collection('pro_insight');
 
   Stream<List<ProInsightModel>> streamActiveInsights() {
     return _collection
