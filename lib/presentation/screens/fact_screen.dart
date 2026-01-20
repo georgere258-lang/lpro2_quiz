@@ -563,6 +563,7 @@ class _FactScreenState extends State<FactScreen> {
                       isLastSeen: isLastSeen,
                       isFavorite: isFav,
                       onToggleFavorite: () => _toggleFavorite(item.title),
+                      showFavorite: false,
                     ),
                   );
                 },
@@ -733,6 +734,7 @@ class _FactScreenState extends State<FactScreen> {
     required bool isLastSeen,
     required bool isFavorite,
     required VoidCallback onToggleFavorite,
+    bool showFavorite = true,
   }) {
     final shadowTint = index.isEven
         ? AppColors.primaryDeepTeal.withValues(alpha: 0.08)
@@ -754,22 +756,24 @@ class _FactScreenState extends State<FactScreen> {
       ),
       child: Row(
         children: [
-          InkWell(
-            onTap: onToggleFavorite,
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.all(6),
-              child: Icon(
-                isFavorite
-                    ? Icons.bookmark_rounded
-                    : Icons.bookmark_border_rounded,
-                color: isFavorite
-                    ? AppColors.secondaryOrange
-                    : AppColors.primaryDeepTeal,
+          if (showFavorite) ...[
+            InkWell(
+              onTap: onToggleFavorite,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Icon(
+                  isFavorite
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_border_rounded,
+                  color: isFavorite
+                      ? AppColors.secondaryOrange
+                      : AppColors.primaryDeepTeal,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 6),
+            const SizedBox(width: 6),
+          ],
           const Icon(Icons.arrow_forward_ios,
               size: 16, color: AppColors.secondaryOrange),
           const SizedBox(width: 10),
