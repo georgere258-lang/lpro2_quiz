@@ -523,13 +523,49 @@ class _AdminPanelState extends State<AdminPanel>
     );
   }
 
+  // ✅ UPDATED: Fix cut text + huge button + overflow
   Widget _buildQuizTab() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(children: [
-        _tf(_batchJson, "JSON Array...", maxLines: 6),
-        ElevatedButton(onPressed: _uploadBatchJson, child: _btnText("رفع الكل"))
-      ]),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _tf(_batchJson, "JSON Array…", maxLines: 10),
+                    const SizedBox(height: 10),
+                    Text(
+                      "ألصق JSON Array (List) للأسئلة ثم اضغط رفع.",
+                      style: GoogleFonts.cairo(fontSize: 12),
+                      textAlign: TextAlign.right,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 44,
+              child: ElevatedButton(
+                onPressed: _uploadBatchJson,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryDeepTeal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _btnText("رفع الكل", size: 12.5),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
