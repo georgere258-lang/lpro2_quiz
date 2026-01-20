@@ -336,11 +336,55 @@ class _FactScreenState extends State<FactScreen> {
 
         return Column(
           children: [
+            // ✅ تابع من حيث توقفت
+            if (_lastSeenTitle.trim().isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+                child: _blockHeader(
+                  title: "تابع من حيث توقفت",
+                  subtitle: "آخر موضوع فتحته",
+                  icon: Icons.history_rounded,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                child: GestureDetector(
+                  onTap: () => _openTopic(_lastSeenTitle),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      _lastSeenTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.cairo(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primaryDeepTeal,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+            ],
             if (featured.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
                 child: _blockHeader(
-                  title: "مختارات اليوم",
+                  title: "ترشيحات Pro",
                   subtitle: "مواضيع مثبتة من أقسام مختلفة",
                   icon: Icons.star_rounded,
                 ),
@@ -351,7 +395,7 @@ class _FactScreenState extends State<FactScreen> {
                   physics: const BouncingScrollPhysics(),
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-                  itemCount: featured.length > 10 ? 10 : featured.length,
+                  itemCount: featured.length > 5 ? 5 : featured.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 10),
                   itemBuilder: (context, i) {
                     final item = featured[i];
@@ -371,7 +415,7 @@ class _FactScreenState extends State<FactScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
                 child: _blockHeader(
-                  title: "حديثًا",
+                  title: "جديد Pro",
                   subtitle: "آخر ما تم إضافته",
                   icon: Icons.new_releases_rounded,
                 ),
@@ -382,7 +426,7 @@ class _FactScreenState extends State<FactScreen> {
                   physics: const BouncingScrollPhysics(),
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-                  itemCount: recent.length > 10 ? 10 : recent.length,
+                  itemCount: recent.length > 5 ? 5 : recent.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 10),
                   itemBuilder: (context, i) {
                     final item = recent[i];
