@@ -1,54 +1,58 @@
+// PATH: lib/core/services/home_pro_card_service.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/firestore_paths.dart';
 
+/// مصدر واحد: home_pro_card/current
+/// يُرجِع نصًا صالحًا لو:
+/// isActive && (publishAt == null || publishAt <= now) && (expireAt == null || now < expireAt)
+/// مع Cache محلي لمنع الوميض والاختفاء المؤقت.
 class HomeProCardService {
   final FirebaseFirestore _db;
   HomeProCardService({FirebaseFirestore? db})
       : _db = db ?? FirebaseFirestore.instance;
 
-  static const _cacheKey = 'cached_home_pro_card_text';
+  static const _cacheKey = 'home_pro_card_last_text';
 
-  Stream<String?> streamText() {
-    return _db
+  Stream<String?> streamText() async* {
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getString(_cacheKey);
+
+    // بثّ القيمة المخزنة فورًا (إن وُجدت) لمنع الوميض
+    if (cached != null && cached.trim().isNotEmpty) {
+      yield cached;
+    }
+
+    yield* _db
         .collection(FirestorePaths.proCardCurrent)
         .doc(FirestorePaths.currentDoc)
         .snapshots()
-        .asyncMap((snap) async {
+        .map((snap) {
       final d = snap.data();
-
-      // لو الدوك مش موجود → رجّع المخزن
-      if (d == null) {
-        return _readCached();
-      }
+      if (d == null) return null;
 
       final isActive = d['isActive'] == true;
       final publishAt = _asDateTime(d['publishAt']);
       final expireAt = _asDateTime(d['expireAt']);
       final now = DateTime.now();
 
-      if (!isActive) return _readCached();
-      if (publishAt != null && now.isBefore(publishAt)) return _readCached();
-      if (expireAt != null && !now.isBefore(expireAt)) return _readCached();
+      if (!isActive) return null;
+      if (publishAt != null && now.isBefore(publishAt)) return null;
+      if (expireAt != null && !now.isBefore(expireAt)) return null;
 
       final text = (d['text'] ?? '').toString().trim();
-      if (text.isEmpty) return _readCached();
-
-      // ✅ خزّن آخر قيمة صحيحة
-      await _cache(text);
-      return text;
+      return text.isEmpty ? null : text;
+    }).asyncMap((text) async {
+      // تحديث الكاش عند وجود نص صالح
+      if (text != null && text.trim().isNotEmpty) {
+        await prefs.setString(_cacheKey, text);
+        return text;
+      }
+      // fallback: رجّع آخر قيمة محفوظة بدل الاختفاء
+      return cached;
     });
-  }
-
-  Future<void> _cache(String text) async {
-    final p = await SharedPreferences.getInstance();
-    await p.setString(_cacheKey, text);
-  }
-
-  Future<String?> _readCached() async {
-    final p = await SharedPreferences.getInstance();
-    return p.getString(_cacheKey);
   }
 
   DateTime? _asDateTime(dynamic v) {

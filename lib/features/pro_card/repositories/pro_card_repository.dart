@@ -1,5 +1,6 @@
 // PATH: lib/features/pro_card/repositories/pro_card_repository.dart
-// Pro Card = single live message (home_pro_card/current). No list, history, or archive.
+// Pro Card = single live message (home_pro_card/current).
+// No list, history, or archive.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -11,7 +12,8 @@ class ProCardRepository {
   ProCardRepository([FirebaseFirestore? firestore])
       : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  /// Stream of the single current document. Null if it does not exist yet.
+  /// Stream of the single current document.
+  /// Returns null if the document does not exist yet.
   Stream<Map<String, dynamic>?> watchCurrent() {
     return _firestore
         .collection(FirestorePaths.proCardCurrent)
@@ -20,31 +22,43 @@ class ProCardRepository {
         .map((s) => s.data());
   }
 
-  /// Overwrites home_pro_card/current with the given fields. Creates the doc if it does not exist.
+  /// Overwrites home_pro_card/current with the given fields.
+  /// Creates the doc if it does not exist.
+  ///
+  /// SAFETY:
+  /// - Prevents saving empty text.
   Future<void> setCurrent({
     required String text,
     required bool isActive,
     DateTime? publishAt,
     DateTime? expireAt,
   }) async {
-    final m = <String, dynamic>{
-      'text': text,
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      throw Exception('Pro Card text cannot be empty');
+    }
+
+    final Map<String, dynamic> data = {
+      'text': trimmed,
       'isActive': isActive,
       'updatedAt': FieldValue.serverTimestamp(),
     };
+
     if (publishAt != null) {
-      m['publishAt'] = Timestamp.fromDate(publishAt);
+      data['publishAt'] = Timestamp.fromDate(publishAt);
     } else {
-      m['publishAt'] = FieldValue.delete();
+      data['publishAt'] = FieldValue.delete();
     }
+
     if (expireAt != null) {
-      m['expireAt'] = Timestamp.fromDate(expireAt);
+      data['expireAt'] = Timestamp.fromDate(expireAt);
     } else {
-      m['expireAt'] = FieldValue.delete();
+      data['expireAt'] = FieldValue.delete();
     }
+
     await _firestore
         .collection(FirestorePaths.proCardCurrent)
         .doc(FirestorePaths.currentDoc)
-        .set(m);
+        .set(data);
   }
 }
