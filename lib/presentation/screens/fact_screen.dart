@@ -136,7 +136,7 @@ class _FactScreenState extends State<FactScreen> {
         textDirection: TextDirection.rtl,
         child: Column(
           children: [
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
 
             // ===== Header Row =====
             Padding(
@@ -200,7 +200,7 @@ class _FactScreenState extends State<FactScreen> {
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
             // ===== Intro Card =====
             Padding(
@@ -208,7 +208,7 @@ class _FactScreenState extends State<FactScreen> {
               child: _introCard(),
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
 
             Expanded(child: _topicsList()),
           ],
@@ -338,7 +338,7 @@ class _FactScreenState extends State<FactScreen> {
           children: [
             if (featured.isNotEmpty) ...[
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
                 child: _blockHeader(
                   title: "مختارات اليوم",
                   subtitle: "مواضيع مثبتة من أقسام مختلفة",
@@ -346,11 +346,11 @@ class _FactScreenState extends State<FactScreen> {
                 ),
               ),
               SizedBox(
-                height: 112,
+                height: 108,
                 child: ListView.separated(
                   physics: const BouncingScrollPhysics(),
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
                   itemCount: featured.length > 10 ? 10 : featured.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 10),
                   itemBuilder: (context, i) {
@@ -365,11 +365,11 @@ class _FactScreenState extends State<FactScreen> {
                   },
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
             ],
             if (recent.isNotEmpty) ...[
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
                 child: _blockHeader(
                   title: "حديثًا",
                   subtitle: "آخر ما تم إضافته",
@@ -377,11 +377,11 @@ class _FactScreenState extends State<FactScreen> {
                 ),
               ),
               SizedBox(
-                height: 112,
+                height: 108,
                 child: ListView.separated(
                   physics: const BouncingScrollPhysics(),
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
                   itemCount: recent.length > 10 ? 10 : recent.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 10),
                   itemBuilder: (context, i) {
@@ -396,14 +396,14 @@ class _FactScreenState extends State<FactScreen> {
                   },
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
             ],
 
             // ✅ Main filtered list
             Expanded(
               child: ListView.separated(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 itemCount: filtered.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
