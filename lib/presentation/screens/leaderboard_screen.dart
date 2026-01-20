@@ -55,7 +55,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           indicatorColor: AppColors.secondaryOrange,
           indicatorWeight: 4,
           labelColor: Colors.white,
-          unselectedLabelColor: Colors.white.withOpacity(0.5),
+          unselectedLabelColor: Colors.white.withValues(alpha: 0.5),
           labelStyle:
               GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
           tabs: const [
@@ -175,7 +175,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                       Border.all(color: medalColor, width: rank == 1 ? 4 : 2)),
               child: CircleAvatar(
                   radius: size / 2,
-                  backgroundColor: Colors.white.withOpacity(0.1),
+                  backgroundColor: Colors.white.withValues(alpha: 0.1),
                   child: Icon(
                       avatars[user.avatarIndex < avatars.length
                           ? user.avatarIndex
@@ -220,12 +220,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.02),
+                color: Colors.black.withValues(alpha: 0.02),
                 blurRadius: 10,
                 offset: const Offset(0, 4))
           ],
           border:
-              Border.all(color: AppColors.primaryDeepTeal.withOpacity(0.05))),
+              Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.05))),
       child: Row(
         children: [
           SizedBox(
@@ -237,7 +237,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                       fontSize: 15))),
           CircleAvatar(
               radius: 22,
-              backgroundColor: AppColors.primaryDeepTeal.withOpacity(0.05),
+              backgroundColor: AppColors.primaryDeepTeal.withValues(alpha: 0.05),
               child: Icon(
                   avatars[
                       user.avatarIndex < avatars.length ? user.avatarIndex : 0],
@@ -257,7 +257,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                  color: AppColors.primaryDeepTeal.withOpacity(0.05),
+                  color: AppColors.primaryDeepTeal.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(12)),
               child: Text("${_getPointsValue(user, field)} ن",
                   style: GoogleFonts.poppins(

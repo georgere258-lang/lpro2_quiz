@@ -72,8 +72,8 @@ class _HookCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         gradient: LinearGradient(
           colors: [
-            const Color(0xFF003D3D).withOpacity(0.10),
-            const Color(0xFFFF8C00).withOpacity(0.12),
+            const Color(0xFF003D3D).withValues(alpha: 0.10),
+            const Color(0xFFFF8C00).withValues(alpha: 0.12),
           ],
         ),
       ),
@@ -109,12 +109,12 @@ class _InsightCard extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: highlight
-            ? const Color(0xFF003D3D).withOpacity(0.06)
+            ? const Color(0xFF003D3D).withValues(alpha: 0.06)
             : Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 14,
             offset: const Offset(0, 8),
           ),

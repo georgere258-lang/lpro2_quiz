@@ -2,6 +2,7 @@
 // STATUS: Full File – Firestore Topics (pro_insight) + Fixed Sections Plan
 //         + Favorites (SharedPreferences) + Last Seen Badge
 //         + Tag Normalization (fix: "سيستم الشركة" => "سيستم الشركات")
+//         + ✅ NEW: Top Blocks (Zero Cost): Featured "مختارات اليوم" + Recent "حديثًا"
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -34,6 +35,9 @@ class _FactScreenState extends State<FactScreen> {
 
   static const String _prefsFavKey = 'pro_insight_fav_titles';
   static const String _prefsLastSeenKey = 'pro_insight_last_seen_title';
+
+  // ✅ Recent window (feel free to change later)
+  static const int _recentDaysWindow = 7;
 
   String _selectedSection = 'كل المواضيع';
   Set<String> _favoriteTitles = {};
@@ -103,6 +107,18 @@ class _FactScreenState extends State<FactScreen> {
 
   bool _isFavorite(String title) => _favoriteTitles.contains(title.trim());
 
+  Future<void> _openTopic(String title) async {
+    await _setLastSeen(title);
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => FactArticlesScreen(title: title),
+      ),
+    );
+    await _loadLocalState();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -141,11 +157,11 @@ class _FactScreenState extends State<FactScreen> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: AppColors.primaryDeepTeal.withOpacity(0.10),
+                          color: AppColors.primaryDeepTeal.withValues(alpha: 0.10),
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 10,
                             offset: const Offset(0, 6),
                           ),
@@ -175,18 +191,7 @@ class _FactScreenState extends State<FactScreen> {
                         context: context,
                         delegate: _FactSearchDelegate(
                           items: items,
-                          onOpen: (title) async {
-                            await _setLastSeen(title);
-                            if (!mounted) return;
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    FactArticlesScreen(title: title),
-                              ),
-                            );
-                            await _loadLocalState();
-                          },
+                          onOpen: (title) async => _openTopic(title),
                         ),
                       );
                     },
@@ -219,11 +224,11 @@ class _FactScreenState extends State<FactScreen> {
         borderRadius: BorderRadius.circular(18),
         gradient: LinearGradient(
           colors: [
-            AppColors.primaryDeepTeal.withOpacity(0.10),
-            AppColors.secondaryOrange.withOpacity(0.10),
+            AppColors.primaryDeepTeal.withValues(alpha: 0.10),
+            AppColors.secondaryOrange.withValues(alpha: 0.10),
           ],
         ),
-        border: Border.all(color: Colors.black.withOpacity(0.04)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -275,7 +280,7 @@ class _FactScreenState extends State<FactScreen> {
 
         final docs = snap.data!.docs;
 
-        final items = docs
+        final allItems = docs
             .map((d) => _FactTopicItem.fromDoc(
                   d.id,
                   d.data(),
@@ -284,16 +289,39 @@ class _FactScreenState extends State<FactScreen> {
             .where((e) => e.isActive == true && e.title.trim().isNotEmpty)
             .toList();
 
-        items.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
+        // ✅ Base ordering for normal list
+        allItems.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
 
+        // ✅ Featured (مختارات اليوم) – always show on top (from ANY section)
+        final now = DateTime.now();
+        final featured = allItems
+            .where((e) => e.isFeatured == true && e.isFeaturedValid(now))
+            .toList();
+        featured.sort((a, b) {
+          final byOrder = a.featuredOrder.compareTo(b.featuredOrder);
+          if (byOrder != 0) return byOrder;
+          return b.createdAtMs.compareTo(a.createdAtMs);
+        });
+
+        // ✅ Recent (حديثًا) – always show on top (from ANY section)
+        final recentCutoff =
+            now.subtract(const Duration(days: _recentDaysWindow));
+        final recent = allItems
+            .where((e) =>
+                e.createdAtMs > 0 &&
+                DateTime.fromMillisecondsSinceEpoch(e.createdAtMs)
+                    .isAfter(recentCutoff))
+            .take(12)
+            .toList();
+
+        // ✅ Filter list by selected section (but keep top blocks independent)
         List<_FactTopicItem> filtered;
-
         if (_selectedSection == 'كل المواضيع') {
-          filtered = items;
+          filtered = allItems;
         } else if (_selectedSection == 'المفضلة') {
-          filtered = items.where((e) => _isFavorite(e.title)).toList();
+          filtered = allItems.where((e) => _isFavorite(e.title)).toList();
         } else {
-          filtered = items
+          filtered = allItems
               .where((e) => e.tags.contains(_normalizeTag(_selectedSection)))
               .toList();
         }
@@ -306,39 +334,252 @@ class _FactScreenState extends State<FactScreen> {
           );
         }
 
-        return ListView.separated(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-          itemCount: filtered.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final item = filtered[index];
-            final isLastSeen = item.title.trim() == _lastSeenTitle.trim();
-            final isFav = _isFavorite(item.title);
-
-            return GestureDetector(
-              onTap: () async {
-                await _setLastSeen(item.title);
-                if (!mounted) return;
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => FactArticlesScreen(title: item.title),
-                  ),
-                );
-                await _loadLocalState();
-              },
-              child: _topicCard(
-                item: item,
-                index: index,
-                isLastSeen: isLastSeen,
-                isFavorite: isFav,
-                onToggleFavorite: () => _toggleFavorite(item.title),
+        return Column(
+          children: [
+            if (featured.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                child: _blockHeader(
+                  title: "مختارات اليوم",
+                  subtitle: "مواضيع مثبتة من أقسام مختلفة",
+                  icon: Icons.star_rounded,
+                ),
               ),
-            );
-          },
+              SizedBox(
+                height: 112,
+                child: ListView.separated(
+                  physics: const BouncingScrollPhysics(),
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                  itemCount: featured.length > 10 ? 10 : featured.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  itemBuilder: (context, i) {
+                    final item = featured[i];
+                    return _miniTopicCard(
+                      item: item,
+                      isFavorite: _isFavorite(item.title),
+                      onToggleFavorite: () => _toggleFavorite(item.title),
+                      onTap: () => _openTopic(item.title),
+                      badgeText: item.firstTagOrEmpty,
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 6),
+            ],
+            if (recent.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                child: _blockHeader(
+                  title: "حديثًا",
+                  subtitle: "آخر ما تم إضافته",
+                  icon: Icons.new_releases_rounded,
+                ),
+              ),
+              SizedBox(
+                height: 112,
+                child: ListView.separated(
+                  physics: const BouncingScrollPhysics(),
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                  itemCount: recent.length > 10 ? 10 : recent.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  itemBuilder: (context, i) {
+                    final item = recent[i];
+                    return _miniTopicCard(
+                      item: item,
+                      isFavorite: _isFavorite(item.title),
+                      onToggleFavorite: () => _toggleFavorite(item.title),
+                      onTap: () => _openTopic(item.title),
+                      badgeText: item.firstTagOrEmpty,
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 6),
+            ],
+
+            // ✅ Main filtered list
+            Expanded(
+              child: ListView.separated(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                itemCount: filtered.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final item = filtered[index];
+                  final isLastSeen = item.title.trim() == _lastSeenTitle.trim();
+                  final isFav = _isFavorite(item.title);
+
+                  return GestureDetector(
+                    onTap: () => _openTopic(item.title),
+                    child: _topicCard(
+                      item: item,
+                      index: index,
+                      isLastSeen: isLastSeen,
+                      isFavorite: isFav,
+                      onToggleFavorite: () => _toggleFavorite(item.title),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         );
       },
+    );
+  }
+
+  Widget _blockHeader({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.08)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.secondaryOrange, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  title,
+                  textAlign: TextAlign.right,
+                  style: GoogleFonts.cairo(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.primaryDeepTeal,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  textAlign: TextAlign.right,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.cairo(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black54,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _miniTopicCard({
+    required _FactTopicItem item,
+    required bool isFavorite,
+    required VoidCallback onToggleFavorite,
+    required VoidCallback onTap,
+    required String badgeText,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Container(
+        width: 260,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border:
+              Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.08)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.secondaryOrange.withValues(alpha: 0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            InkWell(
+              onTap: onToggleFavorite,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Icon(
+                  isFavorite
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_border_rounded,
+                  color: isFavorite
+                      ? AppColors.secondaryOrange
+                      : AppColors.primaryDeepTeal,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (badgeText.trim().isNotEmpty)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryDeepTeal.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.primaryDeepTeal.withValues(alpha: 0.12),
+                          ),
+                        ),
+                        child: Text(
+                          badgeText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.cairo(
+                            fontSize: 10.8,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.primaryDeepTeal,
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  Text(
+                    item.title,
+                    textAlign: TextAlign.right,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.cairo(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.primaryDeepTeal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.arrow_forward_ios,
+                size: 16, color: AppColors.secondaryOrange),
+          ],
+        ),
+      ),
     );
   }
 
@@ -350,15 +591,15 @@ class _FactScreenState extends State<FactScreen> {
     required VoidCallback onToggleFavorite,
   }) {
     final shadowTint = index.isEven
-        ? AppColors.primaryDeepTeal.withOpacity(0.08)
-        : AppColors.secondaryOrange.withOpacity(0.08);
+        ? AppColors.primaryDeepTeal.withValues(alpha: 0.08)
+        : AppColors.secondaryOrange.withValues(alpha: 0.08);
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.primaryDeepTeal.withOpacity(0.08)),
+        border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
             color: shadowTint,
@@ -399,10 +640,10 @@ class _FactScreenState extends State<FactScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AppColors.secondaryOrange.withOpacity(0.12),
+                        color: AppColors.secondaryOrange.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: AppColors.secondaryOrange.withOpacity(0.22),
+                          color: AppColors.secondaryOrange.withValues(alpha: 0.22),
                         ),
                       ),
                       child: Text(
@@ -520,10 +761,10 @@ class _PillButton extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border:
-              Border.all(color: AppColors.primaryDeepTeal.withOpacity(0.10)),
+              Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 6),
             ),
@@ -700,13 +941,29 @@ class _FactTopicItem {
   final List<String> tags;
   final bool isActive;
 
+  // ✅ Featured controls (from Firestore)
+  final bool isFeatured;
+  final int featuredOrder;
+  final DateTime? featuredUntil;
+
   _FactTopicItem({
     required this.id,
     required this.title,
     required this.createdAtMs,
     required this.tags,
     required this.isActive,
+    required this.isFeatured,
+    required this.featuredOrder,
+    required this.featuredUntil,
   });
+
+  String get firstTagOrEmpty => tags.isEmpty ? '' : tags.first.trim();
+
+  bool isFeaturedValid(DateTime now) {
+    if (!isFeatured) return false;
+    if (featuredUntil == null) return true;
+    return featuredUntil!.isAfter(now);
+  }
 
   factory _FactTopicItem.fromDoc(
     String id,
@@ -726,12 +983,25 @@ class _FactTopicItem {
     final ts = data['createdAt'];
     if (ts is Timestamp) createdAtMs = ts.millisecondsSinceEpoch;
 
+    final isFeatured = data['isFeatured'] == true;
+
+    final foRaw = data['featuredOrder'];
+    final featuredOrder =
+        (foRaw is int) ? foRaw : int.tryParse((foRaw ?? '0').toString()) ?? 0;
+
+    DateTime? featuredUntil;
+    final fu = data['featuredUntil'];
+    if (fu is Timestamp) featuredUntil = fu.toDate();
+
     return _FactTopicItem(
       id: id,
       title: (data['title'] ?? '').toString(),
       createdAtMs: createdAtMs,
       tags: tags,
       isActive: data['isActive'] == true,
+      isFeatured: isFeatured,
+      featuredOrder: featuredOrder,
+      featuredUntil: featuredUntil,
     );
   }
 }

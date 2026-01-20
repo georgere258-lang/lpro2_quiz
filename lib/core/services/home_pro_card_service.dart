@@ -1,59 +1,40 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class HomeProCardService {
-  static const String _collection = 'home_pro_cards';
+import '../constants/firestore_paths.dart';
 
+/// مصدر واحد: home_pro_card/current. لا list ولا history ولا archive.
+///
+/// يرجّع text فقط لو:
+///   isActive && (publishAt == null || publishAt <= now) && (expireAt == null || now < expireAt)
+/// لو الشرط false أو text فاضي => null.
+class HomeProCardService {
   final FirebaseFirestore _db;
   HomeProCardService({FirebaseFirestore? db})
       : _db = db ?? FirebaseFirestore.instance;
 
-  /// Stream النص "الحالي" الذي يجب أن يظهر في الكارت الآن.
-  ///
-  /// ✅ لا يحتاج أي تعديل في HomeProCardContainer.
-  /// ✅ يدعم: publishAt / expireAt / pinned / priority / isActive
   Stream<String?> streamText() {
-    // نقرأ فقط العناصر الفعالة
-    // ترتيب أولي: pinned ثم priority ثم publishAt (الأحدث أولاً)
-    // ⚠️ قد تحتاج Index في Firestore للترتيب (لو طلبه منك Firebase Console اعمله).
-    final q = _db
-        .collection(_collection)
-        .where('isActive', isEqualTo: true)
-        .orderBy('pinned', descending: true)
-        .orderBy('priority', descending: true)
-        .orderBy('publishAt', descending: true)
-        .limit(50);
+    return _db
+        .collection(FirestorePaths.proCardCurrent)
+        .doc(FirestorePaths.currentDoc)
+        .snapshots()
+        .map((snap) {
+      final d = snap.data();
+      if (d == null) return null;
 
-    return q.snapshots().map((snap) {
+      final isActive = d['isActive'] == true;
+      final publishAt = _asDateTime(d['publishAt']);
+      final expireAt = _asDateTime(d['expireAt']);
       final now = DateTime.now();
 
-      // فلترة محلية دقيقة حسب publishAt/expireAt
-      for (final doc in snap.docs) {
-        final data = doc.data();
+      if (!isActive) return null;
+      if (publishAt != null && now.isBefore(publishAt)) return null;
+      if (expireAt != null && !now.isBefore(expireAt)) return null;
 
-        final text = (data['text'] ?? '').toString().trim();
-        if (text.isEmpty) continue;
-
-        final publishAt = _asDateTime(data['publishAt']);
-        final expireAt = _asDateTime(data['expireAt']);
-
-        // لو publishAt موجودة ولسه مجتش → تجاهل
-        if (publishAt != null && now.isBefore(publishAt)) continue;
-
-        // لو expireAt موجودة وعدّت → تجاهل
-        if (expireAt != null && !now.isBefore(expireAt)) continue;
-
-        // ✅ أول عنصر يطابق الشروط هو "المعلومة الحالية"
-        return text;
-      }
-
-      // مفيش شيء مناسب الآن
-      return null;
+      final text = (d['text'] ?? '').toString().trim();
+      return text.isEmpty ? null : text;
     });
   }
 
-  // =========================
-  // Helpers
-  // =========================
   DateTime? _asDateTime(dynamic v) {
     if (v == null) return null;
     if (v is Timestamp) return v.toDate();

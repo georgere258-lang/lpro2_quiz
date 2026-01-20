@@ -51,22 +51,28 @@ class _QuestionSetScreenState extends State<QuestionSetScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      ...List.generate(question.options.length, (optionIndex) {
-                        return RadioListTile<int>(
-                          title: Text(
-                            question.options[optionIndex],
-                            style: const TextStyle(fontSize: 16),
-                          ),
-                          value: optionIndex,
-                          groupValue: _selectedAnswers[question.id],
-                          contentPadding: EdgeInsets.zero,
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedAnswers[question.id] = value!;
-                            });
-                          },
-                        );
-                      }),
+                      RadioGroup<int>(
+                        groupValue: _selectedAnswers[question.id],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() {
+                            _selectedAnswers[question.id] = value;
+                          });
+                        },
+                        child: Column(
+                          children: List.generate(question.options.length,
+                              (optionIndex) {
+                            return RadioListTile<int>(
+                              title: Text(
+                                question.options[optionIndex],
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                              value: optionIndex,
+                              contentPadding: EdgeInsets.zero,
+                            );
+                          }),
+                        ),
+                      ),
                     ],
                   );
                 },

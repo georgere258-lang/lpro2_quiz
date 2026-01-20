@@ -156,7 +156,7 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
           border:
-              Border.all(color: AppColors.primaryDeepTeal.withOpacity(0.1))),
+              Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.1))),
       child: Text(title,
           style: GoogleFonts.cairo(
               fontSize: 16,
@@ -179,7 +179,7 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: 0.06),
                 blurRadius: 20,
                 offset: const Offset(0, 10))
           ],
@@ -250,7 +250,7 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           border:
-              Border.all(color: AppColors.primaryDeepTeal.withOpacity(0.08)),
+              Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.08)),
         ),
         child: Row(
           children: [
@@ -258,7 +258,7 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
               width: 45,
               height: 45,
               decoration: BoxDecoration(
-                  color: AppColors.primaryDeepTeal.withOpacity(0.05),
+                  color: AppColors.primaryDeepTeal.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(12)),
               child: Icon(topic['icon'] ?? Icons.lightbulb_outline,
                   color: AppColors.secondaryOrange, size: 24),
@@ -271,7 +271,7 @@ class _MasterPlanScreenState extends State<MasterPlanScreen> {
                         fontWeight: FontWeight.bold,
                         color: AppColors.primaryDeepTeal))),
             Icon(Icons.chevron_left_rounded,
-                color: AppColors.secondaryOrange.withOpacity(0.5)),
+                color: AppColors.secondaryOrange.withValues(alpha: 0.5)),
           ],
         ),
       ),

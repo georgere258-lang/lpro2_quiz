@@ -1,8 +1,13 @@
 // PATH: lib/presentation/screens/fact_articles_screen.dart
-// STATUS: Full File – Stable Navigation (normalize titles) + Small Share Button + AppBar long title fit
-//         + Firestore fetch by title with fallback + Favorites + Last seen
+// STATUS: Full File – Stable Navigation + Share + Favorites + Last seen
+//         + ✅ Admin Tools (role-based)
+//         + ✅ Improved Admin UI (compact chips, readable text)
+//         + ✅ Featured control: isFeatured + featuredOrder + featuredUntil
+//         + ✅ Section control: sectionKey + orderInSection (with dropdown + arrows)
+//         + ✅ FIX: bottom favorite now clickable
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,11 +31,15 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
 
   bool _isFavorite = false;
 
+  // ✅ Admin state (role from users/{uid}.role)
+  String _role = 'user'; // user / moderator / admin
+  bool get _canAdmin => _role == 'admin' || _role == 'moderator';
+
   // Navigation (local sort)
   List<_NavItem> _nav = [];
   int _currentIndex = -1;
 
-  // Article payload (loaded once with stream fallback)
+  // Article payload
   bool _loadingArticle = true;
   String _hook = '';
   String _reset = '';
@@ -38,6 +47,28 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
   String _example = '';
   String _lock = '';
   bool _articleExists = true;
+
+  // ✅ keep docId (needed for admin actions)
+  String _docId = '';
+
+  // ✅ Control fields (stored in Firestore)
+  bool _isActive = true;
+  bool _isFeatured = false; // مختارات اليوم
+  int _featuredOrder = 0; // ترتيب داخل مختارات اليوم
+  DateTime? _featuredUntil; // انتهاء التثبيت (اختياري)
+  String _sectionKey = ''; // داخل "المعلومة بتفرق"
+  int _orderInSection = 0; // ترتيب داخل القسم
+
+  // ✅ Known section keys (adjust anytime later)
+  static const List<String> _sectionKeys = [
+    'start',
+    'language',
+    'market_system',
+    'company_system',
+    'projects',
+    'contracts',
+    'broker',
+  ];
 
   String get _rawTitle => widget.title;
   String get _normTitle => _norm(widget.title);
@@ -50,17 +81,46 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
     super.initState();
     _markLastSeen();
     _loadFavoriteState();
-    _loadNavOrderLocal(); // ✅ بدون orderBy (مستقر)
-    _loadArticleOnceWithFallback(); // ✅ حل قوي لمشكلة التطابق
+    _loadRole(); // ✅ admin tools
+    _loadNavOrderLocal();
+    _loadArticleOnceWithFallback();
   }
 
   // =========================
-  // Normalization (critical)
+  // Helpers
   // =========================
-  String _norm(String s) {
-    // trim + collapse spaces + remove extra newlines/tabs
-    final x = s.replaceAll(RegExp(r'\s+'), ' ').trim();
-    return x;
+  String _norm(String s) => s.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  String _fmtDt(DateTime dt) {
+    final y = dt.year.toString().padLeft(4, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    final d = dt.day.toString().padLeft(2, '0');
+    final hh = dt.hour.toString().padLeft(2, '0');
+    final mm = dt.minute.toString().padLeft(2, '0');
+    return "$y-$m-$d  $hh:$mm";
+  }
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  // =========================
+  // Role (Admin / Moderator)
+  // =========================
+  Future<void> _loadRole() async {
+    try {
+      final u = FirebaseAuth.instance.currentUser;
+      if (u == null) return;
+
+      final snap =
+          await FirebaseFirestore.instance.collection('users').doc(u.uid).get();
+      final data = snap.data() ?? {};
+      final r = (data['role'] ?? 'user').toString().trim().toLowerCase();
+
+      if (!mounted) return;
+      setState(() => _role = r.isEmpty ? 'user' : r);
+    } catch (_) {}
   }
 
   // =========================
@@ -91,9 +151,11 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
 
       if (fav.contains(_normTitle)) {
         fav.remove(_normTitle);
+        if (!mounted) return;
         setState(() => _isFavorite = false);
       } else {
         fav.add(_normTitle);
+        if (!mounted) return;
         setState(() => _isFavorite = true);
       }
 
@@ -108,10 +170,11 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
     setState(() {
       _loadingArticle = true;
       _articleExists = true;
+      _docId = '';
     });
 
     try {
-      // محاولة مباشرة بـ where title == rawTitle
+      // 1) direct by raw title
       final direct = await FirebaseFirestore.instance
           .collection(_collectionName)
           .where('title', isEqualTo: _rawTitle.trim())
@@ -119,11 +182,13 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
           .get();
 
       if (direct.docs.isNotEmpty) {
-        _applyArticleFromMap(direct.docs.first.data());
+        final doc = direct.docs.first;
+        _docId = doc.id;
+        _applyArticleFromMap(doc.data());
         return;
       }
 
-      // fallback: نقرأ مجموعة كبيرة ونطابق بالـ normalize (عشان اختلاف مسافات)
+      // 2) fallback: scan active and match normalized title
       final snap = await FirebaseFirestore.instance
           .collection(_collectionName)
           .where('isActive', isEqualTo: true)
@@ -149,6 +214,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
         return;
       }
 
+      _docId = found.id;
       _applyArticleFromMap(found.data());
     } catch (_) {
       if (!mounted) return;
@@ -161,12 +227,40 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
 
   void _applyArticleFromMap(Map<String, dynamic> data) {
     if (!mounted) return;
+
+    final isActive = (data['isActive'] != false);
+    final isFeatured = (data['isFeatured'] == true);
+
+    final featuredOrderRaw = data['featuredOrder'];
+    final featuredOrder = (featuredOrderRaw is int)
+        ? featuredOrderRaw
+        : int.tryParse((featuredOrderRaw ?? '0').toString()) ?? 0;
+
+    DateTime? featuredUntil;
+    final fu = data['featuredUntil'];
+    if (fu is Timestamp) featuredUntil = fu.toDate();
+
+    final sectionKey = (data['sectionKey'] ?? '').toString();
+
+    final orderRaw = data['orderInSection'];
+    final orderInSection = (orderRaw is int)
+        ? orderRaw
+        : int.tryParse((orderRaw ?? '0').toString()) ?? 0;
+
     setState(() {
       _hook = (data['hook'] ?? '').toString();
       _reset = (data['reset'] ?? '').toString();
       _core = (data['core'] ?? '').toString();
       _example = (data['example'] ?? '').toString();
       _lock = (data['lock'] ?? '').toString();
+
+      _isActive = isActive;
+      _isFeatured = isFeatured;
+      _featuredOrder = featuredOrder;
+      _featuredUntil = featuredUntil;
+      _sectionKey = sectionKey;
+      _orderInSection = orderInSection;
+
       _loadingArticle = false;
       _articleExists = true;
     });
@@ -191,20 +285,19 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
         if (ts is Timestamp) createdAtMs = ts.millisecondsSinceEpoch;
 
         list.add(_NavItem(
-            titleNorm: title,
-            titleRaw: (data['title'] ?? '').toString(),
-            createdAtMs: createdAtMs));
+          titleNorm: title,
+          titleRaw: (data['title'] ?? '').toString(),
+          createdAtMs: createdAtMs,
+        ));
       }
 
-      // ✅ ترتيب محلي (الأحدث أولاً)
       list.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
-
       final idx = list.indexWhere((e) => e.titleNorm == _normTitle);
 
       if (!mounted) return;
       setState(() {
         _nav = list;
-        _currentIndex = idx; // الآن هيتظبط حتى لو العنوان فيه اختلاف مسافات
+        _currentIndex = idx;
       });
     } catch (_) {
       if (!mounted) return;
@@ -233,6 +326,734 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
   }
 
   // =========================
+  // ✅ Admin Tools
+  // =========================
+  DocumentReference<Map<String, dynamic>> get _docRef =>
+      FirebaseFirestore.instance.collection(_collectionName).doc(_docId);
+
+  Future<DateTime?> _pickDateTime({DateTime? initial}) async {
+    final now = DateTime.now();
+    final init = initial ?? now;
+
+    final date = await showDatePicker(
+      context: context,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 3),
+      initialDate: DateTime(init.year, init.month, init.day),
+    );
+    if (date == null) return null;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(init),
+    );
+    if (time == null) return null;
+
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  }
+
+  Future<void> _confirmDelete() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("حذف الموضوع", textAlign: TextAlign.right),
+        content: const Text(
+          "هل تريد حذف هذا الموضوع نهائيًا؟",
+          textAlign: TextAlign.right,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("إلغاء"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("حذف"),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    try {
+      if (_docId.isEmpty) {
+        _snack("لا يوجد docId للموضوع.");
+        return;
+      }
+
+      await _docRef.delete();
+      if (!mounted) return;
+      _snack("تم الحذف ✅");
+      Navigator.pop(context);
+    } catch (_) {
+      _snack("فشل الحذف. راجع Rules.");
+    }
+  }
+
+  Future<void> _toggleActive(bool value) async {
+    try {
+      if (_docId.isEmpty) {
+        _snack("لا يوجد docId للموضوع.");
+        return;
+      }
+
+      await _docRef.update({
+        'isActive': value,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+      setState(() => _isActive = value);
+
+      _snack(value ? "تم الإظهار ✅" : "تم الإخفاء ✅");
+    } catch (_) {
+      _snack("فشل التحديث. راجع Rules.");
+    }
+  }
+
+  Future<void> _publishNow() async {
+    try {
+      if (_docId.isEmpty) {
+        _snack("لا يوجد docId للموضوع.");
+        return;
+      }
+
+      await _docRef.update({
+        'isActive': true,
+        'publishAt': Timestamp.fromDate(DateTime.now()),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+      setState(() => _isActive = true);
+
+      _snack("تم النشر الآن ✅");
+    } catch (_) {
+      _snack("فشل النشر. راجع Rules.");
+    }
+  }
+
+  Future<void> _schedulePublishAt() async {
+    final dt = await _pickDateTime(
+      initial: DateTime.now().add(const Duration(minutes: 10)),
+    );
+    if (dt == null) return;
+
+    try {
+      if (_docId.isEmpty) {
+        _snack("لا يوجد docId للموضوع.");
+        return;
+      }
+
+      await _docRef.update({
+        'publishAt': Timestamp.fromDate(dt),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      _snack("تمت جدولة وقت النشر ✅");
+    } catch (_) {
+      _snack("فشل الجدولة. راجع Rules.");
+    }
+  }
+
+  // ✅ Featured + Ordering + Section control (compact + no red screen)
+  Future<void> _openFeaturedControl() async {
+    if (_docId.isEmpty) {
+      _snack("لا يوجد docId للموضوع.");
+      return;
+    }
+
+    bool isFeaturedLocal = _isFeatured;
+    int featuredOrderLocal = _featuredOrder;
+    DateTime? untilLocal = _featuredUntil;
+
+    String sectionKeyLocal = _sectionKey.isEmpty
+        ? (_sectionKeys.isNotEmpty ? _sectionKeys.first : '')
+        : _sectionKey;
+
+    // لو sectionKey غير موجود في القائمة (لسبب ما)، نخليه موجود كـ custom
+    final sectionOptions = <String>{
+      ..._sectionKeys,
+      if (_sectionKey.isNotEmpty) _sectionKey,
+    }.toList();
+
+    int orderInSectionLocal = _orderInSection;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (_) {
+        return StatefulBuilder(
+          builder: (context, setLocal) {
+            Widget stepperRow({
+              required String label,
+              required int value,
+              required VoidCallback onDown,
+              required VoidCallback onUp,
+              String? hint,
+            }) {
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        hint == null
+                            ? "$label: $value"
+                            : "$label: $value\n$hint",
+                        textAlign: TextAlign.right,
+                        style: GoogleFonts.cairo(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12.5,
+                          height: 1.4,
+                          color: AppColors.primaryDeepTeal,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: "تقليل",
+                      onPressed: onDown,
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                    ),
+                    IconButton(
+                      tooltip: "زيادة",
+                      onPressed: onUp,
+                      icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 12,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 14,
+                ),
+                child: Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 42,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          "تحكم التثبيت والترتيب",
+                          textAlign: TextAlign.right,
+                          style: GoogleFonts.cairo(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 14.5,
+                            color: AppColors.primaryDeepTeal,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Featured toggle
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  "مختارات اليوم (Featured)",
+                                  textAlign: TextAlign.right,
+                                  style: GoogleFonts.cairo(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 12.8,
+                                    color: AppColors.primaryDeepTeal,
+                                  ),
+                                ),
+                              ),
+                              Switch(
+                                value: isFeaturedLocal,
+                                onChanged: (v) =>
+                                    setLocal(() => isFeaturedLocal = v),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Featured order stepper
+                        stepperRow(
+                          label: "ترتيب داخل المختارات",
+                          value: featuredOrderLocal,
+                          hint: "استخدم الأسهم ↑ ↓ بدل كتابة رقم",
+                          onDown: () => setLocal(() {
+                            if (featuredOrderLocal > 0) featuredOrderLocal--;
+                          }),
+                          onUp: () => setLocal(() => featuredOrderLocal++),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Featured until
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  untilLocal == null
+                                      ? "انتهاء التثبيت: غير محدد (اختياري)"
+                                      : "انتهاء التثبيت: ${_fmtDt(untilLocal!)}",
+                                  textAlign: TextAlign.right,
+                                  style: GoogleFonts.cairo(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 12.5,
+                                    color: AppColors.primaryDeepTeal,
+                                  ),
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: () async {
+                                  final picked = await _pickDateTime(
+                                    initial: untilLocal ??
+                                        DateTime.now()
+                                            .add(const Duration(days: 1)),
+                                  );
+                                  if (picked == null) return;
+                                  setLocal(() => untilLocal = picked);
+                                },
+                                icon:
+                                    const Icon(Icons.timer_outlined, size: 18),
+                                label: Text(
+                                  "تحديد",
+                                  style: GoogleFonts.cairo(
+                                      fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                              if (untilLocal != null)
+                                IconButton(
+                                  tooltip: "مسح",
+                                  onPressed: () =>
+                                      setLocal(() => untilLocal = null),
+                                  icon: const Icon(Icons.close_rounded),
+                                ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 14),
+                        Text(
+                          "نقل/ترتيب داخل الأقسام",
+                          textAlign: TextAlign.right,
+                          style: GoogleFonts.cairo(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12.5,
+                            color: AppColors.secondaryOrange,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // section dropdown
+                        DropdownButtonFormField<String>(
+                          initialValue:
+                              sectionKeyLocal.isEmpty ? null : sectionKeyLocal,
+                          items: sectionOptions
+                              .map((k) => DropdownMenuItem(
+                                    value: k,
+                                    child: Text(
+                                      k,
+                                      style: GoogleFonts.cairo(
+                                          fontWeight: FontWeight.w800),
+                                    ),
+                                  ))
+                              .toList(),
+                          onChanged: (v) =>
+                              setLocal(() => sectionKeyLocal = v ?? ''),
+                          decoration: InputDecoration(
+                            hintText: "اختر القسم (sectionKey)",
+                            filled: true,
+                            fillColor: Colors.grey[100],
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // orderInSection stepper
+                        stepperRow(
+                          label: "ترتيب داخل القسم",
+                          value: orderInSectionLocal,
+                          hint: "استخدم الأسهم ↑ ↓ لترتيبه داخل نفس القسم",
+                          onDown: () => setLocal(() {
+                            if (orderInSectionLocal > 0) orderInSectionLocal--;
+                          }),
+                          onUp: () => setLocal(() => orderInSectionLocal++),
+                        ),
+
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          height: 46,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.secondaryOrange,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            onPressed: () async {
+                              try {
+                                await _docRef.update({
+                                  'isFeatured': isFeaturedLocal,
+                                  'featuredOrder': featuredOrderLocal,
+                                  'featuredUntil': untilLocal == null
+                                      ? FieldValue.delete()
+                                      : Timestamp.fromDate(untilLocal!),
+                                  'sectionKey': sectionKeyLocal.trim(),
+                                  'orderInSection': orderInSectionLocal,
+                                  'updatedAt': FieldValue.serverTimestamp(),
+                                });
+
+                                if (!mounted) return;
+                                setState(() {
+                                  _isFeatured = isFeaturedLocal;
+                                  _featuredOrder = featuredOrderLocal;
+                                  _featuredUntil = untilLocal;
+                                  _sectionKey = sectionKeyLocal.trim();
+                                  _orderInSection = orderInSectionLocal;
+                                });
+
+                                Navigator.pop(context);
+                                _snack("تم حفظ التحكم ✅");
+                              } catch (_) {
+                                _snack("فشل الحفظ. راجع Rules.");
+                              }
+                            },
+                            child: Text(
+                              "حفظ",
+                              style: GoogleFonts.cairo(
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _openEditor() async {
+    if (_docId.isEmpty) {
+      _snack("لا يوجد docId للموضوع.");
+      return;
+    }
+
+    final titleC = TextEditingController(text: _rawTitle);
+    final hookC = TextEditingController(text: _hook);
+    final resetC = TextEditingController(text: _reset);
+    final coreC = TextEditingController(text: _core);
+    final exampleC = TextEditingController(text: _example);
+    final lockC = TextEditingController(text: _lock);
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 12,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 14,
+            ),
+            child: Directionality(
+              textDirection: TextDirection.rtl,
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 42,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      "تعديل الموضوع",
+                      textAlign: TextAlign.right,
+                      style: GoogleFonts.cairo(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14.5,
+                        color: AppColors.primaryDeepTeal,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _tf(titleC, "العنوان (إلزامي)", maxLines: 2),
+                    const SizedBox(height: 10),
+                    _tf(hookC, "Hook", maxLines: 3),
+                    const SizedBox(height: 10),
+                    _tf(resetC, "تصحيح المفهوم (reset)", maxLines: 5),
+                    const SizedBox(height: 10),
+                    _tf(coreC, "المعلومة الأساسية (core)", maxLines: 6),
+                    const SizedBox(height: 10),
+                    _tf(exampleC, "مثال واقعي (example)", maxLines: 5),
+                    const SizedBox(height: 10),
+                    _tf(lockC, "إغلاق/سلوك عملي (lock)", maxLines: 4),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 46,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.secondaryOrange,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: () async {
+                          final t = titleC.text.trim();
+                          if (t.isEmpty) {
+                            _snack("العنوان مطلوب.");
+                            return;
+                          }
+
+                          try {
+                            await _docRef.update({
+                              'title': t,
+                              'hook': hookC.text.trim(),
+                              'reset': resetC.text.trim(),
+                              'core': coreC.text.trim(),
+                              'example': exampleC.text.trim(),
+                              'lock': lockC.text.trim(),
+                              'updatedAt': FieldValue.serverTimestamp(),
+                            });
+
+                            if (!mounted) return;
+                            setState(() {
+                              _hook = hookC.text.trim();
+                              _reset = resetC.text.trim();
+                              _core = coreC.text.trim();
+                              _example = exampleC.text.trim();
+                              _lock = lockC.text.trim();
+                            });
+
+                            Navigator.pop(context);
+
+                            if (t != widget.title.trim()) {
+                              if (!mounted) return;
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => FactArticlesScreen(title: t),
+                                ),
+                              );
+                            } else {
+                              _snack("تم التحديث ✅");
+                            }
+                          } catch (_) {
+                            _snack("فشل التحديث. راجع Rules.");
+                          }
+                        },
+                        child: Text(
+                          "حفظ",
+                          style: GoogleFonts.cairo(
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    titleC.dispose();
+    hookC.dispose();
+    resetC.dispose();
+    coreC.dispose();
+    exampleC.dispose();
+    lockC.dispose();
+  }
+
+  void _openAdminToolsSheet() {
+    if (!_canAdmin) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (_) {
+        Widget chip({
+          required IconData icon,
+          required String text,
+          required VoidCallback onTap,
+          required Color color,
+        }) {
+          return ActionChip(
+            onPressed: onTap,
+            avatar: Icon(icon, size: 18, color: color),
+            label: Text(
+              text,
+              style: GoogleFonts.cairo(
+                fontWeight: FontWeight.w900,
+                fontSize: 12.5,
+                color: color,
+              ),
+            ),
+            backgroundColor: color.withValues(alpha: 0.08),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          );
+        }
+
+        return SafeArea(
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    "أدوات الأدمن",
+                    textAlign: TextAlign.right,
+                    style: GoogleFonts.cairo(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14.5,
+                      color: AppColors.primaryDeepTeal,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      chip(
+                        icon: Icons.star_outline_rounded,
+                        text: "تثبيت/ترتيب/نقل",
+                        color: AppColors.secondaryOrange,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _openFeaturedControl();
+                        },
+                      ),
+                      chip(
+                        icon: Icons.edit_outlined,
+                        text: "تعديل",
+                        color: AppColors.primaryDeepTeal,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _openEditor();
+                        },
+                      ),
+                      chip(
+                        icon: _isActive
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        text: _isActive ? "إخفاء" : "إظهار",
+                        color: _isActive ? Colors.redAccent : Colors.green,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _toggleActive(!_isActive);
+                        },
+                      ),
+                      chip(
+                        icon: Icons.publish_rounded,
+                        text: "نشر الآن",
+                        color: AppColors.secondaryOrange,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _publishNow();
+                        },
+                      ),
+                      chip(
+                        icon: Icons.schedule_send,
+                        text: "جدولة نشر",
+                        color: Colors.black87,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _schedulePublishAt();
+                        },
+                      ),
+                      chip(
+                        icon: Icons.delete_outline,
+                        text: "حذف نهائي",
+                        color: Colors.red,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _confirmDelete();
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // =========================
   // UI
   // =========================
   @override
@@ -257,6 +1078,13 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
           ),
         ),
         actions: [
+          if (_canAdmin)
+            IconButton(
+              tooltip: 'أدوات الأدمن',
+              onPressed: _openAdminToolsSheet,
+              icon: const Icon(Icons.admin_panel_settings_rounded,
+                  color: Colors.white),
+            ),
           IconButton(
             tooltip: _isFavorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة',
             onPressed: _toggleFavorite,
@@ -290,20 +1118,14 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                       children: [
                         _infoBox(_hook.isEmpty ? "—" : _hook),
                         const SizedBox(height: 14),
-
                         _sectionBox(title: 'تصحيح المفهوم', body: _reset),
                         const SizedBox(height: 14),
-
                         _sectionBox(title: 'المعلومة اللي بتفرق', body: _core),
                         const SizedBox(height: 14),
-
                         _sectionBox(title: 'مثال واقعي', body: _example),
                         const SizedBox(height: 16),
-
                         _lockBox(_lock),
                         const SizedBox(height: 14),
-
-                        // ✅ small actions row (no big orange full width)
                         Row(
                           children: [
                             _pillAction(
@@ -313,49 +1135,52 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                               onTap: _shareTopic,
                             ),
                             const SizedBox(width: 10),
+
+                            // ✅ FIX: make bottom favorite clickable
                             Expanded(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: AppColors.primaryDeepTeal
-                                        .withOpacity(0.10),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      _isFavorite
-                                          ? Icons.bookmark_rounded
-                                          : Icons.bookmark_border_rounded,
-                                      size: 18,
-                                      color: AppColors.primaryDeepTeal,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(14),
+                                onTap: _toggleFavorite,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: AppColors.primaryDeepTeal
+                                          .withValues(alpha: 0.10),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      _isFavorite
-                                          ? "في المفضلة"
-                                          : "أضف للمفضلة",
-                                      style: GoogleFonts.cairo(
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 12.5,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        _isFavorite
+                                            ? Icons.bookmark_rounded
+                                            : Icons.bookmark_border_rounded,
+                                        size: 18,
                                         color: AppColors.primaryDeepTeal,
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        _isFavorite
+                                            ? "في المفضلة"
+                                            : "أضف للمفضلة",
+                                        style: GoogleFonts.cairo(
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 12.5,
+                                          color: AppColors.primaryDeepTeal,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
                           ],
                         ),
-
                         const SizedBox(height: 16),
-
-                        // ✅ Navigation row (always visible)
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -470,11 +1295,11 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
         borderRadius: BorderRadius.circular(18),
         gradient: LinearGradient(
           colors: [
-            AppColors.primaryDeepTeal.withOpacity(0.10),
-            AppColors.secondaryOrange.withOpacity(0.10),
+            AppColors.primaryDeepTeal.withValues(alpha: 0.10),
+            AppColors.secondaryOrange.withValues(alpha: 0.10),
           ],
         ),
-        border: Border.all(color: Colors.black.withOpacity(0.04)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
       ),
       child: Text(
         text,
@@ -495,10 +1320,10 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.primaryDeepTeal.withOpacity(0.08)),
+        border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 6),
           ),
@@ -539,11 +1364,11 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
         borderRadius: BorderRadius.circular(18),
         gradient: LinearGradient(
           colors: [
-            AppColors.primaryDeepTeal.withOpacity(0.10),
-            AppColors.secondaryOrange.withOpacity(0.10),
+            AppColors.primaryDeepTeal.withValues(alpha: 0.10),
+            AppColors.secondaryOrange.withValues(alpha: 0.10),
           ],
         ),
-        border: Border.all(color: Colors.black.withOpacity(0.04)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
       ),
       child: Text(
         text.isEmpty ? "—" : text,
@@ -553,6 +1378,23 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
           height: 1.7,
           fontWeight: FontWeight.w900,
           color: AppColors.primaryDeepTeal,
+        ),
+      ),
+    );
+  }
+
+  Widget _tf(TextEditingController c, String hint, {int maxLines = 1}) {
+    return TextField(
+      controller: c,
+      maxLines: maxLines,
+      textAlign: TextAlign.right,
+      decoration: InputDecoration(
+        hintText: hint,
+        filled: true,
+        fillColor: Colors.grey[100],
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide.none,
         ),
       ),
     );

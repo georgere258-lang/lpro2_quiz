@@ -289,12 +289,12 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 6),
           ),
         ],
-        border: Border.all(color: AppColors.primaryDeepTeal.withOpacity(0.06)),
+        border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.06)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -330,12 +330,12 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 6),
           ),
         ],
-        border: Border.all(color: AppColors.primaryDeepTeal.withOpacity(0.06)),
+        border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.06)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -395,9 +395,9 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
+        color: Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.black.withOpacity(0.04)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -7,18 +7,13 @@ class HomeProCardContainer extends StatelessWidget {
 
   final HomeProCardService _service = HomeProCardService();
 
-  static const String _fallback =
-      "المعلومة قوة… وكل يوم تفهم أكتر، تقرّب خطوة من الاحتراف.";
-
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<String?>(
       stream: _service.streamText(),
       builder: (context, snapshot) {
-        final text = snapshot.data != null && snapshot.data!.isNotEmpty
-            ? snapshot.data!
-            : _fallback;
-
+        final text = snapshot.data;
+        if (text == null || text.isEmpty) return const SizedBox.shrink();
         return InfoCardWidget(text: text);
       },
     );

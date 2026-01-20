@@ -86,11 +86,11 @@ class LproTheme {
             const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: deepTeal.withOpacity(0.1)),
+          borderSide: BorderSide(color: deepTeal.withValues(alpha: 0.1)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: deepTeal.withOpacity(0.1)),
+          borderSide: BorderSide(color: deepTeal.withValues(alpha: 0.1)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),

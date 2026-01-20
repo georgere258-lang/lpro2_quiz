@@ -1,5 +1,9 @@
 // PATH: lib/presentation/screens/quiz_screen.dart
-// STATUS: Updated Full File – Free Play "جولة أخرى" + Fix last-question repeat + Result buttons layout
+// STATUS: Full File – ✅ Apply requested changes ONLY:
+//        1) Remove logo + sentences footer from ALL quiz/league pages (no signature/footer)
+//        2) Intro: shrink "انت نجم Pro ⭐ / ملعبك يا Pro 🔥" button (NOT full width)
+//        3) BottomSheet: shrink "ابدأ الجولة الآن" button (NOT full width) + keep all buttons not full width
+//        4) Quiz question+answers block moved DOWN with better spacing (no other UI changes)
 
 import 'dart:async';
 import 'dart:ui';
@@ -304,8 +308,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     return Scaffold(
       backgroundColor: const Color(0xFFFDFBF7),
       appBar: AppBar(
-        title: Text(widget.categoryTitle,
-            style: GoogleFonts.cairo(fontWeight: FontWeight.w900)),
+        title: Text(
+          widget.categoryTitle,
+          style: GoogleFonts.cairo(fontWeight: FontWeight.w900),
+        ),
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         centerTitle: true,
@@ -347,10 +353,13 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                 LinearProgressIndicator(
                   value: _timeLeft / _secondsPerQuestion,
                   color: accentColor,
-                  backgroundColor: Colors.black.withOpacity(0.06),
+                  backgroundColor: Colors.black.withValues(alpha: 0.06),
                   minHeight: 6,
                 ),
-                const SizedBox(height: 14),
+
+                // ✅ نزلنا بلوك السؤال والإجابات لتحت بمسافة أوضح
+                const SizedBox(height: 26),
+
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 18),
                   child: _glassCard(
@@ -366,10 +375,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
                 Expanded(
                   child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(18, 6, 18, 16),
+                    padding: const EdgeInsets.fromLTRB(18, 4, 18, 18),
                     physics: const BouncingScrollPhysics(),
                     itemCount: options.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -400,12 +409,12 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                             borderRadius: BorderRadius.circular(18),
                             border: Border.all(
                               color: bg == Colors.white
-                                  ? primaryColor.withOpacity(0.14)
+                                  ? primaryColor.withValues(alpha: 0.14)
                                   : Colors.transparent,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.04),
+                                color: Colors.black.withValues(alpha: 0.04),
                                 blurRadius: 12,
                                 offset: const Offset(0, 7),
                               ),
@@ -427,7 +436,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                     },
                   ),
                 ),
-                _signatureFooter(),
+
+                // ✅ شيلنا اللوجو والجمل من أسفل (مفيش Footer)
+                const SizedBox(height: 14),
               ],
             ),
           ],
@@ -488,7 +499,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                           left: 18,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: _badgeColor,
                               borderRadius: BorderRadius.circular(14),
@@ -523,12 +536,17 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                     const SizedBox(height: 14),
                     _glassCard(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 12),
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.emoji_events_outlined,
-                              color: primaryColor, size: 18),
+                          Icon(
+                            Icons.emoji_events_outlined,
+                            color: primaryColor,
+                            size: 18,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             "تحدي اليوم: $_roundsDoneToday/$_roundsPerDay جوالات",
@@ -542,22 +560,37 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          SoundManager.playTap();
-                          _openDailyChallengeSheet();
-                        },
-                        child: Text(
-                          _enterButtonText,
-                          style: GoogleFonts.cairo(fontWeight: FontWeight.w900),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+
+                    // ✅ تصغير زر "انت نجم..." (ممنوع full width)
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 320),
+                        child: SizedBox(
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              SoundManager.playTap();
+                              _openDailyChallengeSheet();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 18),
+                            ),
+                            child: Text(
+                              _enterButtonText,
+                              style: GoogleFonts.cairo(
+                                  fontWeight: FontWeight.w900),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ),
                       ),
                     ),
+
                     const SizedBox(height: 10),
                     TextButton(
                       onPressed: () => Navigator.pop(context),
@@ -569,8 +602,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                         ),
                       ),
                     ),
+
+                    // ✅ شيلنا اللوجو والجمل من أسفل صفحات الدوريات
                     const Spacer(),
-                    _signatureFooter(),
+                    const SizedBox(height: 10),
                   ],
                 ),
               ),
@@ -597,7 +632,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             child: Container(
               padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.92),
+                color: Colors.white.withValues(alpha: 0.92),
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(26)),
               ),
@@ -644,47 +679,73 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 54,
-                    child: ElevatedButton(
-                      onPressed: locked
-                          ? null
-                          : () {
-                              Navigator.pop(context);
-                              _startRound(freePlay: false);
-                            },
-                      child: Text(
-                        locked ? "تم إنهاء تحدي اليوم" : "ابدأ الجولة الآن",
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.cairo(fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 54,
-                    child: OutlinedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _startRound(freePlay: true);
-                      },
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: primaryColor.withOpacity(0.25)),
-                      ),
-                      child: Text(
-                        "Free Play — تدريب بدون نقاط",
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.cairo(
-                          fontWeight: FontWeight.w900,
-                          color: primaryColor,
+
+                  // ✅ تصغير زر "ابدأ الجولة الآن" (ممنوع full width)
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 320),
+                      child: SizedBox(
+                        height: 48,
+                        child: ElevatedButton(
+                          onPressed: locked
+                              ? null
+                              : () {
+                                  Navigator.pop(context);
+                                  _startRound(freePlay: false);
+                                },
+                          style: ElevatedButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
+                          ),
+                          child: Text(
+                            locked ? "تم إنهاء تحدي اليوم" : "ابدأ الجولة الآن",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                GoogleFonts.cairo(fontWeight: FontWeight.w900),
+                          ),
                         ),
                       ),
                     ),
                   ),
+
+                  const SizedBox(height: 10),
+
+                  // ✅ Free Play button (NOT full width)
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 320),
+                      child: SizedBox(
+                        height: 48,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _startRound(freePlay: true);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                                color: primaryColor.withValues(alpha: 0.25)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 18),
+                          ),
+                          child: Text(
+                            "Free Play — تدريب بدون نقاط",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.cairo(
+                              fontWeight: FontWeight.w900,
+                              color: primaryColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
                   const SizedBox(height: 6),
                 ],
               ),
@@ -744,7 +805,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
               ),
             const SizedBox(height: 16),
 
-            // ✅ Free Play: زر جولة أخرى (بدون خروج)
+            // ✅ Free Play: زر جولة أخرى (بدون خروج) — أصلاً مش full width
             if (_isFreePlaySession)
               Center(
                 child: ConstrainedBox(
@@ -754,7 +815,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(context);
-                        // نفس وضع Free Play + يبدأ فورًا
                         setState(() {
                           _showFeedback = false;
                           _selectedOption = null;
@@ -788,7 +848,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
             if (_isFreePlaySession) const SizedBox(height: 10),
 
-            // ✅ رجوع أصغر + نص واضح
             Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 260),
@@ -846,8 +905,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     return Scaffold(
       backgroundColor: const Color(0xFFFDFBF7),
       appBar: AppBar(
-        title: Text(widget.categoryTitle,
-            style: GoogleFonts.cairo(fontWeight: FontWeight.w900)),
+        title: Text(
+          widget.categoryTitle,
+          style: GoogleFonts.cairo(fontWeight: FontWeight.w900),
+        ),
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
         centerTitle: true,
@@ -895,8 +956,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      accentColor.withOpacity(0.10),
-                      accentColor.withOpacity(0.00),
+                      accentColor.withValues(alpha: 0.10),
+                      accentColor.withValues(alpha: 0.00),
                     ],
                   ),
                 ),
@@ -912,8 +973,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      primaryColor.withOpacity(0.10),
-                      primaryColor.withOpacity(0.00),
+                      primaryColor.withValues(alpha: 0.10),
+                      primaryColor.withValues(alpha: 0.00),
                     ],
                   ),
                 ),
@@ -937,12 +998,12 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           width: double.infinity,
           padding: padding,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.88),
+            color: Colors.white.withValues(alpha: 0.88),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.black.withOpacity(0.04)),
+            border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: 0.06),
                 blurRadius: 16,
                 offset: const Offset(0, 8),
               ),
@@ -962,12 +1023,12 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.92),
+        color: Colors.white.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.18)),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 6),
           )
@@ -985,42 +1046,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
               fontWeight: FontWeight.w900,
               color: Colors.black87,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _signatureFooter() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-      child: Column(
-        children: [
-          Text(
-            'من يملك المعلومة يملك القوة',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.cairo(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: primaryColor,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'المعلومة بتفرق',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.cairo(
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-              color: accentColor,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Image.asset(
-            'assets/icon2.png',
-            width: 54,
-            height: 54,
-            fit: BoxFit.contain,
           ),
         ],
       ),

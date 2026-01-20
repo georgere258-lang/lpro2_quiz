@@ -44,12 +44,12 @@ class _InfoCardWidgetState extends State<InfoCardWidget>
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: const Color(0xFF003D3D).withOpacity(0.08),
+          color: const Color(0xFF003D3D).withValues(alpha: 0.08),
           width: 0.8,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF003D3D).withOpacity(0.06),
+            color: const Color(0xFF003D3D).withValues(alpha: 0.06),
             blurRadius: 25,
             offset: const Offset(0, 12),
           ),
@@ -114,7 +114,7 @@ class _InfoCardWidgetState extends State<InfoCardWidget>
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.white,
-                    const Color(0xFFFDFBF7).withOpacity(0.3)
+                    const Color(0xFFFDFBF7).withValues(alpha: 0.3)
                   ],
                 ),
               ),
@@ -146,7 +146,7 @@ class _InfoCardWidgetState extends State<InfoCardWidget>
                         color: const Color(0xFFF8F4F0),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: AppColors.secondaryOrange.withOpacity(0.35),
+                          color: AppColors.secondaryOrange.withValues(alpha: 0.35),
                           width: 1.2,
                         ),
                       ),

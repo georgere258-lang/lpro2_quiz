@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/profile_screen.dart
-// STATUS: Full File – "اعرف عميلك" button added under "حول L Pro" (direct navigation)
+// STATUS: Full File – ✅ Removed "اعرف عميلك" button from Profile (as requested)
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,7 +13,6 @@ import 'package:lpro2_quiz/core/data/models/user_model.dart';
 import 'about_screen.dart';
 import 'login_screen.dart';
 import 'admin_panel.dart';
-import 'know_client_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onSupportPressed;
@@ -117,21 +116,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   },
                 ),
 
-                // ✅ NEW: اعرف عميلك (مباشرة تحت "حول L Pro")
-                _buildProfileBtn(
-                  "اعرف عميلك",
-                  Icons.psychology_alt_outlined,
-                  () {
-                    SoundManager.playTap();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const KnowClientScreen(),
-                      ),
-                    );
-                  },
-                  iconColor: safetyOrange,
-                ),
+                // ✅ REMOVED: "اعرف عميلك" was here (intentionally removed)
 
                 _buildProfileBtn(
                   "تسجيل الخروج",

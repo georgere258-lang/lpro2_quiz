@@ -98,11 +98,11 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: AppColors.primaryDeepTeal.withOpacity(0.10),
+                          color: AppColors.primaryDeepTeal.withValues(alpha: 0.10),
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 10,
                             offset: const Offset(0, 6),
                           ),
@@ -163,11 +163,11 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
         borderRadius: BorderRadius.circular(18),
         gradient: LinearGradient(
           colors: [
-            AppColors.primaryDeepTeal.withOpacity(0.10),
-            AppColors.secondaryOrange.withOpacity(0.10),
+            AppColors.primaryDeepTeal.withValues(alpha: 0.10),
+            AppColors.secondaryOrange.withValues(alpha: 0.10),
           ],
         ),
-        border: Border.all(color: Colors.black.withOpacity(0.04)),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -283,8 +283,8 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
     required int nowMs,
   }) {
     final shadowTint = index.isEven
-        ? AppColors.primaryDeepTeal.withOpacity(0.08)
-        : AppColors.secondaryOrange.withOpacity(0.08);
+        ? AppColors.primaryDeepTeal.withValues(alpha: 0.08)
+        : AppColors.secondaryOrange.withValues(alpha: 0.08);
 
     final isScheduledFuture =
         (item.publishAtMs > 0 && item.publishAtMs > nowMs);
@@ -294,7 +294,7 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.primaryDeepTeal.withOpacity(0.08)),
+        border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
             color: shadowTint,
@@ -336,10 +336,10 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.secondaryOrange.withOpacity(0.12),
+                        color: AppColors.secondaryOrange.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: AppColors.secondaryOrange.withOpacity(0.25),
+                          color: AppColors.secondaryOrange.withValues(alpha: 0.25),
                         ),
                       ),
                       child: Text(
@@ -450,10 +450,10 @@ class _PillButton extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border:
-              Border.all(color: AppColors.primaryDeepTeal.withOpacity(0.10)),
+              Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 6),
             ),

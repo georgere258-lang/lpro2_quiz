@@ -6,7 +6,14 @@ import '../../core/data/fact_articles_data.dart';
 import 'fact_articles_reader_screen.dart';
 
 class FactTopicsScreen extends StatelessWidget {
-  const FactTopicsScreen({super.key});
+  const FactTopicsScreen({
+    super.key,
+    required this.stageKey,
+    required this.stageTitle,
+  });
+
+  final String stageKey;
+  final String stageTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +23,7 @@ class FactTopicsScreen extends StatelessWidget {
       backgroundColor: const Color(0xFFFDFBF7),
       appBar: AppBar(
         title: Text(
-          'المعلومة بتفرق',
+          stageTitle,
           style: GoogleFonts.cairo(fontWeight: FontWeight.w900),
         ),
         centerTitle: true,
@@ -50,7 +57,7 @@ class FactTopicsScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 12,
                       offset: const Offset(0, 6),
                     ),

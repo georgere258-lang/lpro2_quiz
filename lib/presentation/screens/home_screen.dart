@@ -1,17 +1,32 @@
+// 🔒 HOME SCREEN FROZEN (Golden Screenshot approved) — Do not change without explicit approval.
+// PATH: lib/presentation/screens/home_screen.dart
+// STATUS: PREMIUM GLOBAL HOME (new layout + new card design)
+//         ✅ FINAL: NO header inside Home (Single real header is in MainWrapper AppBar)
+//         ✅ Keeps your improvements: micro-animations + performance + spacing + shadows
+//         ✅ No extra logo added
+//         ✅ No const issues
+
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:ui';
 
 import '../../core/utils/sound_manager.dart';
+import '../../core/constants/app_colors.dart';
 
 import '../home/widgets/home_pro_card_container.dart';
-import '../../features/news_ticker/presentation/news_ticker_widget.dart';
 
 import 'quiz_screen.dart';
 import 'fact_screen.dart';
-import 'know_client_screen.dart'; // ✅ اعرف عميلك (القائمة + الفلترة + البحث)
+import 'know_client_screen.dart';
+
+// ✅ New sections (make sure these files exist with same names/paths)
+import 'freelance_kit_screen.dart';
+import 'close_screen.dart';
+import 'market_radar_screen.dart';
+import 'money_economy_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,101 +37,220 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final User? user = FirebaseAuth.instance.currentUser;
-  late AnimationController _glowController;
+
+  late final AnimationController _bgController;
 
   @override
   void initState() {
     super.initState();
-    _glowController = AnimationController(
+    _bgController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 8),
+      duration: const Duration(seconds: 10),
     )..repeat(reverse: true);
   }
 
   @override
   void dispose() {
-    _glowController.dispose();
+    _bgController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
+      backgroundColor: const Color(0xFFFDFBF7),
       body: Stack(
         children: [
-          // 1. الخلفية الثابتة
-          Container(color: const Color(0xFFFDFBF7)),
-
-          // 2. الهالة الضوئية الديناميكية
-          AnimatedBuilder(
-            animation: _glowController,
-            builder: (context, child) {
-              return Positioned(
-                top: -80 + (40 * _glowController.value),
-                left: -80 + (80 * _glowController.value),
-                child: Container(
-                  width: 350,
-                  height: 350,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        const Color(0xFFFF8C00).withOpacity(0.08),
-                        const Color(0xFFFF8C00).withOpacity(0.0),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-
-          // 3. المحتوى الرئيسي
-          Directionality(
-            textDirection: TextDirection.rtl,
-            child: Column(
-              children: [
-                // شريط الأخبار الزجاجي العلوي
-                SafeArea(
-                  bottom: false,
-                  child: ClipRRect(
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                      child: Container(
-                        color: Colors.white.withOpacity(0.1),
-                        child: _buildNewsTicker(),
+          // ===== Premium background (animated blobs) =====
+          RepaintBoundary(
+            child: AnimatedBuilder(
+              animation: _bgController,
+              builder: (_, __) {
+                final v = _bgController.value;
+                return Stack(
+                  children: [
+                    Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color(0xFFFDFBF7),
+                            Color(0xFFF6EFE2),
+                          ],
+                        ),
                       ),
                     ),
+                    Positioned(
+                      top: -120 + (50 * v),
+                      right: -140 + (90 * v),
+                      child: _blob(
+                        size: 360,
+                        color: const Color(0xFFFF8C00).withValues(alpha: 0.10),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: -140 + (60 * v),
+                      left: -160 + (110 * v),
+                      child: _blob(
+                        size: 420,
+                        color: AppColors.primaryDeepTeal.withValues(alpha: 0.10),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+
+          // ===== Main content =====
+          Directionality(
+            textDirection: TextDirection.rtl,
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                // ✅ REMOVED: Home header (BrandHeader / pinned header)
+                // Header is now ONLY in MainWrapper AppBar.
+
+                // ===== كارت الترحيب =====
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                    child: RepaintBoundary(child: _WelcomeCard(user: user)),
                   ),
                 ),
 
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 22),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                // ===== كارت معلومة Pro =====
+                const SliverToBoxAdapter(child: SizedBox(height: 10)),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: RepaintBoundary(child: HomeProCardContainer()),
+                  ),
+                ),
+
+                // ===== Grid Cards =====
+                const SliverToBoxAdapter(child: SizedBox(height: 4)),
+
+                // Row 1: دوري المحترفين + دوري النجوم
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                    child: Row(
                       children: [
-                        const SizedBox(height: 15),
-                        const _UserHeader(),
-                        const SizedBox(height: 14),
-                        HomeProCardContainer(),
-                        const SizedBox(height: 25),
-                        const _PowerSentence(),
-                        const SizedBox(height: 20),
-                        const _HomeGrid(),
-                        const SizedBox(height: 40),
+                        Expanded(
+                          child: _SectionCard(
+                            title: "دوري النجوم",
+                            icon: Icons.auto_awesome_rounded,
+                            accent: const Color(0xFF3498DB),
+                            onTap: () => _go(
+                              context,
+                              const QuizScreen(categoryTitle: "دوري النجوم"),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _SectionCard(
+                            title: "دوري المحترفين",
+                            icon: Icons.workspace_premium_rounded,
+                            accent: const Color(0xFFFF8C00),
+                            onTap: () => _go(
+                              context,
+                              const QuizScreen(categoryTitle: "دوري المحترفين"),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ),
 
-                // التذييل الثابت
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 25, top: 10),
-                  child: _EnglishMotto(),
+                // Row 2: اعرف عميلك + المعلومة بتفرق
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _SectionCard(
+                            title: "المعلومة بتفرق",
+                            icon: Icons.lightbulb_outline,
+                            accent: AppColors.secondaryOrange,
+                            onTap: () => _go(context, const FactScreen()),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _SectionCard(
+                            title: "اعرف عميلك",
+                            icon: Icons.groups_outlined,
+                            accent: AppColors.primaryDeepTeal,
+                            onTap: () => _go(context, const KnowClientScreen()),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
+
+                // Row 3: CLOSE + Freelance Kit
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _SectionCard(
+                            title: "Freelance Kit",
+                            icon: Icons.handyman_outlined,
+                            accent: AppColors.secondaryOrange,
+                            onTap: () => _go(context, const FreelanceKitScreen()),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _SectionCard(
+                            title: "CLOSE",
+                            icon: Icons.lock_open_rounded,
+                            accent: AppColors.primaryDeepTeal,
+                            onTap: () => _go(context, const CloseScreen()),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Row 4: لغة المال + Radar
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _SectionCard(
+                            title: "Radar",
+                            icon: Icons.radar_rounded,
+                            accent: const Color(0xFF2ECC71),
+                            onTap: () => _go(context, const MarketRadarScreen()),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _SectionCard(
+                            title: "لغة المال",
+                            icon: Icons.attach_money_rounded,
+                            accent: const Color(0xFF9B59B6),
+                            onTap: () => _go(context, const MoneyEconomyScreen()),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SliverToBoxAdapter(child: SizedBox(height: 26)),
               ],
             ),
           ),
@@ -125,211 +259,34 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildNewsTicker() {
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('users')
-          .doc(user?.uid)
-          .snapshots(),
-      builder: (context, snapshot) {
-        String name = "Pro";
-        if (snapshot.hasData && snapshot.data!.exists) {
-          name =
-              (snapshot.data!.data() as Map<String, dynamic>)['name'] ?? "Pro";
-        }
-        return NewsTickerWidget(userName: name);
-      },
-    );
-  }
-}
-
-class _HomeGrid extends StatelessWidget {
-  const _HomeGrid();
-
-  @override
-  Widget build(BuildContext context) {
-    return GridView(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 18,
-        crossAxisSpacing: 18,
-        childAspectRatio: 1.15,
-      ),
-      children: const [
-        _GridCard(
-          title: "دوري النجوم",
-          icon: Icons.auto_awesome_rounded,
-          badgeText: "FRESH",
-          badgeIcon: "✨",
-          badgeColor: Color(0xFF3498DB),
-          target: QuizScreen(categoryTitle: "دوري النجوم"),
-        ),
-        _GridCard(
-          title: "دوري المحترفين",
-          icon: Icons.workspace_premium_rounded,
-          badgeText: "PRO",
-          badgeIcon: "🔥",
-          badgeColor: Color(0xFFFF8C00),
-          target: QuizScreen(categoryTitle: "دوري المحترفين"),
-        ),
-        _GridCard(
-          title: "المعلومة بتفرق",
-          icon: Icons.lightbulb_outline,
-          target: FactScreen(),
-        ),
-
-        // ✅ التعديل الوحيد: اعرف عميلك يفتح KnowClientScreen
-        _GridCard(
-          title: "اعرف عميلك",
-          icon: Icons.groups_outlined,
-          target: KnowClientScreen(),
-        ),
-      ],
-    );
-  }
-}
-
-class _GridCard extends StatefulWidget {
-  final String title;
-  final IconData icon;
-  final String? badgeText;
-  final String? badgeIcon;
-  final Color? badgeColor;
-  final Widget target;
-
-  const _GridCard({
-    required this.title,
-    required this.icon,
-    this.badgeText,
-    this.badgeIcon,
-    this.badgeColor,
-    required this.target,
-  });
-
-  @override
-  State<_GridCard> createState() => _GridCardState();
-}
-
-class _GridCardState extends State<_GridCard> {
-  bool _isPressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
-      onTapCancel: () => setState(() => _isPressed = false),
-      onTap: () {
-        SoundManager.playTap();
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => widget.target),
-        );
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        transform: Matrix4.identity()..scale(_isPressed ? 0.96 : 1.0),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(_isPressed ? 0.08 : 0.05),
-              blurRadius: _isPressed ? 8 : 15,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
-          child: Stack(
-            children: [
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    ShaderMask(
-                      shaderCallback: (bounds) => const LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Color(0xFF4FA8A8), Color(0xFF003D3D)],
-                      ).createShader(bounds),
-                      child: Icon(widget.icon, size: 38, color: Colors.white),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.title,
-                      style: GoogleFonts.cairo(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        color: const Color(0xFF003D3D),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (widget.badgeText != null)
-                Positioned(
-                  top: 10,
-                  right: -14,
-                  child: Transform.rotate(
-                    angle: 0.55,
-                    child: Container(
-                      width: 90,
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      decoration: BoxDecoration(
-                        color: widget.badgeColor,
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Colors.black12,
-                            blurRadius: 4,
-                            offset: Offset(0, 2),
-                          )
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (widget.badgeIcon != null) ...[
-                            Text(
-                              widget.badgeIcon!,
-                              style: const TextStyle(fontSize: 10),
-                            ),
-                            const SizedBox(width: 4),
-                          ],
-                          Text(
-                            widget.badgeText!,
-                            style: GoogleFonts.cairo(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
+  Widget _blob({required double size, required Color color}) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [color, color.withValues(alpha: 0.0)],
         ),
       ),
     );
   }
+
+  static void _go(BuildContext context, Widget target) {
+    SoundManager.playTap();
+    Navigator.push(context, MaterialPageRoute(builder: (_) => target));
+  }
 }
 
-/* =========================================================
-   مكونات ثابتة (Header, Badge, Footer)
-========================================================= */
-
-class _UserHeader extends StatelessWidget {
-  const _UserHeader();
+// ========================
+// كارت الترحيب (الاسم + النقاط)
+// ========================
+class _WelcomeCard extends StatelessWidget {
+  final User? user;
+  const _WelcomeCard({required this.user});
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
           .collection('users')
@@ -338,45 +295,62 @@ class _UserHeader extends StatelessWidget {
       builder: (context, snapshot) {
         String name = "عضو Pro";
         int points = 0;
+
         if (snapshot.hasData && snapshot.data!.exists) {
-          final data = snapshot.data!.data() as Map<String, dynamic>;
-          name = data['name'] ?? name;
-          points = data['points'] ?? 0;
+          final data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
+          name = (data['name'] ?? name).toString();
+          final p = data['points'];
+          if (p is int) points = p;
         }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "أهلاً بك، $name ✨",
-                  style: GoogleFonts.cairo(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    color: const Color(0xFF003D3D),
+
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
                   ),
-                ),
-                _PointsBadge(points: points),
-              ],
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      "أهلاً بك، $name",
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style: GoogleFonts.cairo(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF003D3D),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _PointsBadge(points: points),
+                ],
+              ),
             ),
-            const SizedBox(height: 4),
-            const Row(
-              children: [
-                _MiniMotto("تعلم مستمر"),
-                _ArrowArabic(),
-                _MiniMotto("تطور كبير"),
-                _ArrowArabic(),
-                _MiniMotto("نجاح أكيد 💪")
-              ],
-            ),
-          ],
+          ),
         );
       },
     );
   }
 }
 
+// ========================
+// مربع النقاط (badge صغير - سطر واحد)
+// ========================
 class _PointsBadge extends StatelessWidget {
   final int points;
   const _PointsBadge({required this.points});
@@ -384,14 +358,22 @@ class _PointsBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFFFF8C00).withOpacity(0.3),
-          width: 1.0,
+        borderRadius: BorderRadius.circular(8),
+        gradient: LinearGradient(
+          colors: [
+            AppColors.secondaryOrange.withValues(alpha: 0.95),
+            AppColors.secondaryOrange.withValues(alpha: 0.80),
+          ],
         ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.secondaryOrange.withValues(alpha: 0.12),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -399,18 +381,18 @@ class _PointsBadge extends StatelessWidget {
           Text(
             "$points",
             style: GoogleFonts.poppins(
-              fontWeight: FontWeight.w900,
-              color: const Color(0xFF003D3D),
-              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              fontSize: 11,
+              color: Colors.white,
             ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 3),
           Text(
             "نقطة",
             style: GoogleFonts.cairo(
-              fontWeight: FontWeight.bold,
-              color: const Color(0xFFFF8C00),
-              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              fontSize: 9,
+              color: Colors.white,
             ),
           ),
         ],
@@ -419,136 +401,138 @@ class _PointsBadge extends StatelessWidget {
   }
 }
 
-class _PowerSentence extends StatelessWidget {
-  const _PowerSentence();
+
+// ========================
+// Micro-animations helper (press scale + subtle opacity)
+// ========================
+class _PressableScale extends StatefulWidget {
+  final VoidCallback onTap;
+  final BorderRadius borderRadius;
+  final Widget child;
+
+  const _PressableScale({
+    required this.onTap,
+    required this.borderRadius,
+    required this.child,
+  });
+
+  @override
+  State<_PressableScale> createState() => _PressableScaleState();
+}
+
+class _PressableScaleState extends State<_PressableScale> {
+  bool _pressed = false;
+
+  void _set(bool v) {
+    if (_pressed == v) return;
+    setState(() => _pressed = v);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: RichText(
-        text: TextSpan(
-          style: GoogleFonts.cairo(
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-            color: const Color(0xFF003D3D),
+    final scale = _pressed ? 0.985 : 1.0;
+    final opacity = _pressed ? 0.96 : 1.0;
+
+    return AnimatedScale(
+      scale: scale,
+      duration: const Duration(milliseconds: 110),
+      curve: Curves.easeOut,
+      child: AnimatedOpacity(
+        opacity: opacity,
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOut,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: widget.borderRadius,
+            onTap: widget.onTap,
+            onTapDown: (_) => _set(true),
+            onTapCancel: () => _set(false),
+            onTapUp: (_) => _set(false),
+            child: widget.child,
           ),
-          children: const [
-            TextSpan(text: "من يملك المعلومة"),
-            TextSpan(text: " • ", style: TextStyle(color: Color(0xFFFF8C00))),
-            TextSpan(text: "يملك القوة"),
-          ],
         ),
       ),
     );
   }
 }
 
-class _EnglishMotto extends StatelessWidget {
-  const _EnglishMotto();
+// ========================
+// كروت الأقسام (Grid Cards)
+// ========================
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Color accent;
+  final VoidCallback? onTap;
+
+  const _SectionCard({
+    required this.title,
+    required this.icon,
+    required this.accent,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        _EnglishWord("Success"),
-        _ArrowEnglish(),
-        _EnglishWord("Growth"),
-        _ArrowEnglish(),
-        _EnglishWord("Learn")
-      ],
-    );
-  }
-}
+    const br = BorderRadius.all(Radius.circular(18));
 
-class _MiniMotto extends StatelessWidget {
-  final String text;
-  const _MiniMotto(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: GoogleFonts.cairo(
-        fontSize: 11,
-        fontWeight: FontWeight.w800,
-        color: const Color(0xFFFF8C00),
+    final cardContent = Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: br,
+        color: Colors.white.withValues(alpha: 0.95),
+        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // أيقونة في دائرة
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: accent.withValues(alpha: 0.12),
+            ),
+            child: Icon(icon, color: accent, size: 20),
+          ),
+          const SizedBox(height: 8),
+          // العنوان
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.cairo(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF003D3D),
+            ),
+          ),
+        ],
       ),
     );
-  }
-}
 
-class _EnglishWord extends StatelessWidget {
-  final String text;
-  const _EnglishWord(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: GoogleFonts.cairo(
-        fontSize: 14,
-        fontWeight: FontWeight.w900,
-        color: const Color(0xFF4FA8A8),
-      ),
-    );
-  }
-}
-
-class _ArrowArabic extends StatelessWidget {
-  const _ArrowArabic();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 5),
-      child: CustomPaint(
-        size: Size(11, 9),
-        painter: _SolidTrianglePainter(Color(0xFF4FA8A8), isLeft: true),
-      ),
-    );
-  }
-}
-
-class _ArrowEnglish extends StatelessWidget {
-  const _ArrowEnglish();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 5),
-      child: CustomPaint(
-        size: Size(11, 9),
-        painter: _SolidTrianglePainter(Color(0xFF4FA8A8), isLeft: false),
-      ),
-    );
-  }
-}
-
-class _SolidTrianglePainter extends CustomPainter {
-  final Color color;
-  final bool isLeft;
-  const _SolidTrianglePainter(this.color, {required this.isLeft});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-    final path = Path();
-    if (isLeft) {
-      path.moveTo(size.width, 0);
-      path.lineTo(0, size.height / 2);
-      path.lineTo(size.width, size.height);
-    } else {
-      path.moveTo(0, 0);
-      path.lineTo(size.width, size.height / 2);
-      path.lineTo(0, size.height);
+    if (onTap == null) {
+      return Opacity(
+        opacity: 0.6,
+        child: cardContent,
+      );
     }
-    path.close();
-    canvas.drawPath(path, paint);
-  }
 
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
+    return _PressableScale(
+      onTap: onTap!,
+      borderRadius: br,
+      child: cardContent,
+    );
+  }
 }
+

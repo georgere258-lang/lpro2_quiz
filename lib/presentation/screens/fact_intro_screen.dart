@@ -41,8 +41,8 @@ class FactIntroScreen extends StatelessWidget {
                       begin: Alignment.topRight,
                       end: Alignment.bottomLeft,
                       colors: [
-                        const Color(0xFF003D3D).withOpacity(0.10),
-                        const Color(0xFFFF8C00).withOpacity(0.12),
+                        const Color(0xFF003D3D).withValues(alpha: 0.10),
+                        const Color(0xFFFF8C00).withValues(alpha: 0.12),
                       ],
                     ),
                   ),

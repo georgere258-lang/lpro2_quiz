@@ -18,7 +18,7 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
 
   // السرعة: كلما زاد الرقم زادت السرعة (بكسل في الثانية)
   // القيمة 50 مثالية جداً للقراءة المريحة
-  static const double _pixelsPerSecond = 50.0;
+  static const double _pixelsPerSecond = 35.0;
 
   @override
   void initState() {
@@ -75,7 +75,7 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
         color: AppColors.secondaryOrange,
         border: Border(
           bottom: BorderSide(
-            color: Colors.black.withOpacity(0.15),
+            color: Colors.black.withValues(alpha: 0.15),
             width: 1,
           ),
         ),

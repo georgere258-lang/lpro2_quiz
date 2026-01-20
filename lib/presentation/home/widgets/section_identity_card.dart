@@ -57,7 +57,7 @@ class SectionIdentityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final border = AppColors.primaryDeepTeal.withOpacity(0.12);
+    final border = AppColors.primaryDeepTeal.withValues(alpha: 0.12);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -67,7 +67,7 @@ class SectionIdentityCard extends StatelessWidget {
         border: Border.all(color: border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 18,
             offset: const Offset(0, 10),
           ),
@@ -85,8 +85,8 @@ class SectionIdentityCard extends StatelessWidget {
                   begin: Alignment.topRight,
                   end: Alignment.bottomLeft,
                   colors: [
-                    AppColors.primaryDeepTeal.withOpacity(0.08),
-                    _badgeColor.withOpacity(0.10),
+                    AppColors.primaryDeepTeal.withValues(alpha: 0.08),
+                    _badgeColor.withValues(alpha: 0.10),
                   ],
                 ),
               ),
@@ -101,7 +101,7 @@ class SectionIdentityCard extends StatelessWidget {
                       border: Border.all(color: border),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.04),
+                          color: Colors.black.withValues(alpha: 0.04),
                           blurRadius: 10,
                           offset: const Offset(0, 6),
                         ),
@@ -134,7 +134,7 @@ class SectionIdentityCard extends StatelessWidget {
                             fontSize: 12,
                             height: 1.2,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.primaryDeepTeal.withOpacity(0.75),
+                            color: AppColors.primaryDeepTeal.withValues(alpha: 0.75),
                           ),
                         ),
                       ],
@@ -185,7 +185,7 @@ class SectionIdentityCard extends StatelessWidget {
                   Container(
                     height: 1,
                     width: double.infinity,
-                    color: AppColors.primaryDeepTeal.withOpacity(0.08),
+                    color: AppColors.primaryDeepTeal.withValues(alpha: 0.08),
                   ),
 
                   const SizedBox(height: 14),
@@ -202,10 +202,10 @@ class SectionIdentityCard extends StatelessWidget {
                             width: 22,
                             height: 22,
                             decoration: BoxDecoration(
-                              color: _badgeColor.withOpacity(0.12),
+                              color: _badgeColor.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: _badgeColor.withOpacity(0.25),
+                                color: _badgeColor.withValues(alpha: 0.25),
                               ),
                             ),
                             child: Icon(
@@ -238,10 +238,10 @@ class SectionIdentityCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
-                      color: AppColors.primaryDeepTeal.withOpacity(0.05),
+                      color: AppColors.primaryDeepTeal.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: AppColors.primaryDeepTeal.withOpacity(0.10),
+                        color: AppColors.primaryDeepTeal.withValues(alpha: 0.10),
                       ),
                     ),
                     child: Row(
@@ -257,7 +257,7 @@ class SectionIdentityCard extends StatelessWidget {
                               height: 1.4,
                               fontWeight: FontWeight.w800,
                               color:
-                                  AppColors.primaryDeepTeal.withOpacity(0.85),
+                                  AppColors.primaryDeepTeal.withValues(alpha: 0.85),
                             ),
                           ),
                         ),
@@ -294,7 +294,7 @@ class _Badge extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.10),
+            color: Colors.black.withValues(alpha: 0.10),
             blurRadius: 10,
             offset: const Offset(0, 6),
           ),
