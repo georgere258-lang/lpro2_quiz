@@ -28,6 +28,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final List<FocusNode> otpFocusNodes =
       List.generate(6, (index) => FocusNode());
 
+  // ✅ UID الأدمن الأساسي (نفس اللي مستخدمه في تفعيل إشعارات الإدارة)
+  static const String _bootAdminUid = 'nw2CackXK6PQavoGPAAbhyp6d1R2';
+
   // دالة تفعيل الإشعارات مع طلب الإذن الرسمي
   void _activateNotifications(String uid) async {
     try {
@@ -45,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
         await messaging.subscribeToTopic(uid);
 
         // التحقق من الـ UID الخاص بالمسؤول لتفعيل إشعارات الإدارة
-        if (uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
+        if (uid == _bootAdminUid) {
           await messaging.subscribeToTopic('admin_notifications');
         }
       }
@@ -127,26 +130,48 @@ class _LoginScreenState extends State<LoginScreen> {
       _activateNotifications(user.uid);
 
       try {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
+        final usersRef = FirebaseFirestore.instance.collection('users');
+        final userRef = usersRef.doc(user.uid);
 
-        // التعديل: لا نقوم بمسح البيانات إذا كان المستخدم موجوداً مسبقاً
+        final userDoc = await userRef.get();
+        final isBootAdmin = user.uid == _bootAdminUid;
+
         if (!userDoc.exists) {
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .set({
+          // ✅ إنشاء أول مرة
+          await userRef.set({
             'uid': user.uid,
             'name': "عضو L Pro جديد",
             'phone': user.phoneNumber ?? phoneController.text,
             'points': 0,
             'starsPoints': 0,
             'proPoints': 0,
-            'role': 'user',
+            'role': isBootAdmin ? 'admin' : 'user',
             'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
           });
+        } else {
+          // ✅ موجود قبل كده: نثبت Role للأدمن الأساسي بدون مسح أي بيانات
+          final data = (userDoc.data() as Map<String, dynamic>?) ?? {};
+          final currentRole = (data['role'] ?? '').toString();
+
+          final Map<String, dynamic> patch = {
+            'updatedAt': FieldValue.serverTimestamp(),
+          };
+
+          if (isBootAdmin && currentRole != 'admin') {
+            patch['role'] = 'admin';
+          }
+
+          // كمان نضمن وجود uid/phone لو ناقصين (بدون override للقيم الموجودة)
+          if (data['uid'] == null) patch['uid'] = user.uid;
+          if (data['phone'] == null) {
+            patch['phone'] = user.phoneNumber ?? phoneController.text;
+          }
+
+          if (patch.length > 1 ||
+              (patch.length == 1 && patch['updatedAt'] != null)) {
+            await userRef.set(patch, SetOptions(merge: true));
+          }
         }
       } catch (e) {
         debugPrint("Error saving user data: $e");
