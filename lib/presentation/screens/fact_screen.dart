@@ -583,7 +583,6 @@ class _FactScreenState extends State<FactScreen> {
                 separatorBuilder: (_, __) => const SizedBox(height: 12),
                 itemBuilder: (context, index) {
                   final item = filtered[index];
-                  final isLastSeen = item.title.trim() == _lastSeenTitle.trim();
                   final isFav = _isFavorite(item.title);
 
                   return GestureDetector(
@@ -606,6 +605,7 @@ class _FactScreenState extends State<FactScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _blockHeader({
     required String title,
     required String subtitle,
@@ -663,6 +663,7 @@ class _FactScreenState extends State<FactScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _miniTopicCard({
     required _FactTopicItem item,
     required bool isFavorite,

@@ -680,7 +680,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 8,
                 offset: const Offset(0, 4))
           ]),
@@ -698,7 +698,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: color.withOpacity(0.15))),
+              border: Border.all(color: color.withValues(alpha: 0.15))),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(icon, size: 15, color: color),
             const SizedBox(width: 5),
@@ -711,7 +711,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: accentColor.withOpacity(0.25))),
+          border: Border.all(color: accentColor.withValues(alpha: 0.25))),
       child: Text(v,
           style: GoogleFonts.poppins(
               fontSize: 22, fontWeight: FontWeight.w800, color: accentColor)));
@@ -722,10 +722,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: primaryColor.withOpacity(0.2), width: 1.5),
+          border: Border.all(color: primaryColor.withValues(alpha: 0.2), width: 1.5),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 12,
                 offset: const Offset(0, 6))
           ]),
@@ -744,7 +744,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                     decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: RadialGradient(colors: [
-                          accentColor.withOpacity(0.10),
+                          accentColor.withValues(alpha: 0.10),
                           Colors.transparent
                         ])))),
             Positioned(
@@ -756,7 +756,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                     decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: RadialGradient(colors: [
-                          primaryColor.withOpacity(0.10),
+                          primaryColor.withValues(alpha: 0.10),
                           Colors.transparent
                         ]))))
           ]));

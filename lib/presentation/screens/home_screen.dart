@@ -78,14 +78,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       right: -100 + (30 * v),
                       child: _blob(
                           size: 400,
-                          color: const Color(0xFFFF8C00).withOpacity(0.06)),
+                          color: const Color(0xFFFF8C00).withValues(alpha: 0.06)),
                     ),
                     Positioned(
                       bottom: -100 + (40 * v),
                       left: -50 + (20 * v),
                       child: _blob(
                           size: 450,
-                          color: AppColors.primaryDeepTeal.withOpacity(0.07)),
+                          color: AppColors.primaryDeepTeal.withValues(alpha: 0.07)),
                     ),
                   ],
                 );
@@ -203,7 +203,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(colors: [color, color.withOpacity(0.0)]),
+        gradient: RadialGradient(colors: [color, color.withValues(alpha: 0.0)]),
       ),
     );
   }
@@ -213,6 +213,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     Navigator.push(context, MaterialPageRoute(builder: (_) => target));
   }
 
+  // ignore: unused_element
   Widget _buildAnimatedBackground() =>
       const SizedBox.shrink(); // Placeholder for unified logic
 }
@@ -289,7 +290,7 @@ class _PointsBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-              color: AppColors.secondaryOrange.withOpacity(0.2),
+              color: AppColors.secondaryOrange.withValues(alpha: 0.2),
               blurRadius: 8,
               offset: const Offset(0, 2))
         ],
@@ -346,7 +347,7 @@ class _SectionCard extends StatelessWidget {
             Positioned(
               bottom: -12,
               left: -12,
-              child: Icon(icon, size: 85, color: accent.withOpacity(0.06)),
+              child: Icon(icon, size: 85, color: accent.withValues(alpha: 0.06)),
             ),
             Padding(
               padding: const EdgeInsets.all(14),
@@ -364,18 +365,18 @@ class _SectionCard extends StatelessWidget {
                           padding: const EdgeInsets.all(11),
                           decoration: BoxDecoration(
                             color: isHighFocus
-                                ? accent.withOpacity(0.05 + (0.05 * floatValue))
+                                ? accent.withValues(alpha: 0.05 + (0.05 * floatValue))
                                 : Colors.white,
                             shape: BoxShape.circle,
                             border: isHighFocus
                                 ? Border.all(
                                     color: accent
-                                        .withOpacity(0.15 + (0.1 * floatValue)),
+                                        .withValues(alpha: 0.15 + (0.1 * floatValue)),
                                     width: 1.5)
                                 : null,
                             boxShadow: [
                               BoxShadow(
-                                  color: accent.withOpacity(isHighFocus
+                                  color: accent.withValues(alpha: isHighFocus
                                       ? 0.3 + (0.2 * floatValue)
                                       : 0.3),
                                   blurRadius:
@@ -430,16 +431,16 @@ class _SecondarySectionCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
           border: Border(
-              right: BorderSide(color: accent.withOpacity(0.4), width: 4.5)),
+              right: BorderSide(color: accent.withValues(alpha: 0.4), width: 4.5)),
           boxShadow: AppColors.eliteShadowL1,
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                  color: accent.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10)),
+                  decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10)),
               child: Icon(icon, color: accent, size: 22),
             ),
             const SizedBox(width: 12),

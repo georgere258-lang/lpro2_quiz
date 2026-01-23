@@ -47,12 +47,12 @@ class _InfoCardWidgetState extends State<InfoCardWidget>
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
           // ✅ تم التصحيح: إزالة كلمة alpha واستخدام القيمة مباشرة
-          color: const Color(0xFF003D3D).withOpacity(0.08),
+          color: const Color(0xFF003D3D).withValues(alpha: 0.08),
           width: 0.8,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -136,7 +136,7 @@ class _InfoCardWidgetState extends State<InfoCardWidget>
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
                           // ✅ تم التصحيح هنا أيضاً
-                          color: AppColors.secondaryOrange.withOpacity(0.3),
+                          color: AppColors.secondaryOrange.withValues(alpha: 0.3),
                           width: 1,
                         ),
                       ),

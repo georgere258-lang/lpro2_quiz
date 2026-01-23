@@ -137,7 +137,7 @@ class _SplashScreenState extends State<SplashScreen>
                             Shadow(
                               offset: const Offset(0, 2),
                               blurRadius: 10.0,
-                              color: Colors.black.withOpacity(0.3),
+                              color: Colors.black.withValues(alpha: 0.3),
                             ),
                           ],
                         ),
@@ -154,7 +154,7 @@ class _SplashScreenState extends State<SplashScreen>
                               19), // الحواف نصف الارتفاع تماماً
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.secondaryOrange.withOpacity(0.2),
+                              color: AppColors.secondaryOrange.withValues(alpha: 0.2),
                               blurRadius: 10,
                               offset: const Offset(0, 3),
                             ),

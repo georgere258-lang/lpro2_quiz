@@ -74,8 +74,11 @@ class _AdminPanelState extends State<AdminPanel>
   // =========================
   // Tab 4: Know Client (placeholder)
   // =========================
+  // ignore: unused_field
   static const String _kycCollection = "know_your_client";
+  // ignore: unused_field
   static const String _kycNotificationsQueue = "notifications_queue";
+  // ignore: unused_field
   static const List<String> _kycSections = [
     'أساسيات العميل',
     'أنماط الشخصيات',
@@ -85,6 +88,7 @@ class _AdminPanelState extends State<AdminPanel>
     'إغلاق الصفقة',
     'متابعة وما بعد البيع',
   ];
+  // ignore: unused_field
   final String _kycFilterSection = 'الكل';
   final TextEditingController _kycSearch = TextEditingController();
 
@@ -846,7 +850,7 @@ class _AdminPanelState extends State<AdminPanel>
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: AppColors.primaryDeepTeal.withOpacity(0.2),
+                              color: AppColors.primaryDeepTeal.withValues(alpha: 0.2),
                             ),
                           ),
                           child: Column(
@@ -859,8 +863,8 @@ class _AdminPanelState extends State<AdminPanel>
                                         horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
                                       color: isActive
-                                          ? Colors.green.withOpacity(0.2)
-                                          : Colors.red.withOpacity(0.2),
+                                          ? Colors.green.withValues(alpha: 0.2)
+                                          : Colors.red.withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(999),
                                     ),
                                     child: Text(
@@ -1265,8 +1269,8 @@ class _AdminPanelState extends State<AdminPanel>
                                       horizontal: 10, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: isActive
-                                        ? Colors.green.withOpacity(0.15)
-                                        : Colors.red.withOpacity(0.15),
+                                        ? Colors.green.withValues(alpha: 0.15)
+                                        : Colors.red.withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: Text(

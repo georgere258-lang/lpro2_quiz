@@ -248,7 +248,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   Shadow(
                                     offset: const Offset(0, 2),
                                     blurRadius: 8.0,
-                                    color: Colors.black.withOpacity(0.3),
+                                    color: Colors.black.withValues(alpha: 0.3),
                                   ),
                                 ])),
                         const SizedBox(height: 60),
@@ -261,7 +261,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   Shadow(
                                     offset: const Offset(0, 3),
                                     blurRadius: 10.0,
-                                    color: Colors.black.withOpacity(0.4),
+                                    color: Colors.black.withValues(alpha: 0.4),
                                   ),
                                 ])),
                         const SizedBox(height: 10),
@@ -289,7 +289,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               boxShadow: [
                                 BoxShadow(
                                   color: AppColors.secondaryOrange
-                                      .withOpacity(0.25),
+                                      .withValues(alpha: 0.25),
                                   blurRadius: 15,
                                   offset: const Offset(0, 5),
                                 ),
@@ -397,7 +397,7 @@ class _LoginScreenState extends State<LoginScreen> {
             // إضافة ظل بسيط لحقول الـ OTP لزيادة البروز
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 5,
                 offset: const Offset(0, 2),
               ),

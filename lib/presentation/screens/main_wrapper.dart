@@ -2,7 +2,6 @@
 // STATUS: ELITE PREMIUM WRAPPER (Dynamic Header & Spacing Precision)
 // ✅ UPDATED: Premium Radial Gradient Header
 
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -183,7 +182,7 @@ class _MainWrapperState extends State<MainWrapper> {
               Shadow(
                 offset: const Offset(0, 2),
                 blurRadius: 4.0,
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withValues(alpha: 0.3),
               ),
             ]),
       ),

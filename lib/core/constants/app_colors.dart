@@ -30,7 +30,7 @@ class AppColors {
   static const double _shadowAlphaL2 = 0.08;
   static const double _shadowAlphaL3 = 0.10;
 
-  static Color _shadowTint([double a = 0.08]) => primaryDeepTeal.withOpacity(a);
+  static Color _shadowTint([double a = 0.08]) => primaryDeepTeal.withValues(alpha: a);
 
   /// L1: wide cards (Radar/Economy) — soft, low elevation
   static List<BoxShadow> get eliteShadowL1 => [
@@ -51,7 +51,7 @@ class AppColors {
           offset: const Offset(0, 6),
         ),
         BoxShadow(
-          color: Colors.black.withOpacity(0.02),
+          color: Colors.black.withValues(alpha: 0.02),
           blurRadius: 4,
           spreadRadius: 0,
           offset: const Offset(0, 1),
@@ -67,7 +67,7 @@ class AppColors {
           offset: const Offset(0, 10),
         ),
         BoxShadow(
-          color: Colors.black.withOpacity(0.03),
+          color: Colors.black.withValues(alpha: 0.03),
           blurRadius: 6,
           spreadRadius: 0,
           offset: const Offset(0, 2),
@@ -84,7 +84,7 @@ class AppColors {
   }) {
     return [
       BoxShadow(
-        color: color.withOpacity(alpha),
+        color: color.withValues(alpha: alpha),
         blurRadius: blur,
         spreadRadius: spread,
         offset: const Offset(0, 0),
