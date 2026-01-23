@@ -36,11 +36,15 @@ class HomeProCardService {
       final isActive = d['isActive'] == true;
       final publishAt = _asDateTime(d['publishAt']);
       final expireAt = _asDateTime(d['expireAt']);
-      final now = DateTime.now();
+      final now = DateTime.now().toUtc();
+
+      // Convert timestamps to UTC for consistent comparison
+      final publishUtc = publishAt?.toUtc();
+      final expireUtc = expireAt?.toUtc();
 
       if (!isActive) return null;
-      if (publishAt != null && now.isBefore(publishAt)) return null;
-      if (expireAt != null && !now.isBefore(expireAt)) return null;
+      if (publishUtc != null && now.isBefore(publishUtc)) return null;
+      if (expireUtc != null && !now.isBefore(expireUtc)) return null;
 
       final text = (d['text'] ?? '').toString().trim();
       return text.isEmpty ? null : text;
