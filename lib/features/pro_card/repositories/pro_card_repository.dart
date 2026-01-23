@@ -29,6 +29,15 @@ class ProCardRepository {
       throw Exception('Pro Card text cannot be empty');
     }
 
+    // Convert to UTC for consistent storage
+    final DateTime? publishUtc = publishAt?.toUtc();
+    final DateTime? expireUtc = expireAt?.toUtc();
+
+    // Validate invariant: publishAt must be before expireAt if both are set
+    if (publishUtc != null && expireUtc != null && !publishUtc.isBefore(expireUtc)) {
+      throw Exception('publishAt must be before expireAt');
+    }
+
     final Map<String, dynamic> data = {
       'text': trimmed,
       'isActive': isActive,
@@ -36,14 +45,14 @@ class ProCardRepository {
     };
 
     // ✅ delete keys is only safe with merge:true
-    if (publishAt != null) {
-      data['publishAt'] = Timestamp.fromDate(publishAt);
+    if (publishUtc != null) {
+      data['publishAt'] = Timestamp.fromDate(publishUtc);
     } else {
       data['publishAt'] = FieldValue.delete();
     }
 
-    if (expireAt != null) {
-      data['expireAt'] = Timestamp.fromDate(expireAt);
+    if (expireUtc != null) {
+      data['expireAt'] = Timestamp.fromDate(expireUtc);
     } else {
       data['expireAt'] = FieldValue.delete();
     }
