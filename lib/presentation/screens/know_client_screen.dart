@@ -125,6 +125,7 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                     onTap: () async {
                       final items = await _fetchOnceItems();
                       if (!mounted) return;
+                      if (!context.mounted) return;
                       showSearch(
                         context: context,
                         delegate: _KnowClientSearchDelegate(items),

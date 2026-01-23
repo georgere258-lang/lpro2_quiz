@@ -204,6 +204,7 @@ class _AdminPanelState extends State<AdminPanel>
       initialDate: now,
     );
     if (date == null) return null;
+    if (!context.mounted) return null;
 
     final time = await showTimePicker(
       context: context,
@@ -294,6 +295,7 @@ class _AdminPanelState extends State<AdminPanel>
                       style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primaryDeepTeal),
                       onPressed: () async {
+                        final nav = Navigator.of(context);
                         final text = textC.text.trim();
                         setState(() => _saving = true);
                         try {
@@ -305,7 +307,7 @@ class _AdminPanelState extends State<AdminPanel>
                           );
                           _snack('تم الحفظ ✅');
                           if (!mounted) return;
-                          Navigator.pop(context);
+                          nav.pop();
                         } catch (_) {
                           _snack('فشل الحفظ. راجع Rules.');
                         } finally {
@@ -321,6 +323,7 @@ class _AdminPanelState extends State<AdminPanel>
                       style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.secondaryOrange),
                       onPressed: () async {
+                        final nav = Navigator.of(context);
                         final text = textC.text.trim();
                         setState(() => _saving = true);
                         try {
@@ -332,7 +335,7 @@ class _AdminPanelState extends State<AdminPanel>
                           );
                           _snack('تم النشر الآن ✅');
                           if (!mounted) return;
-                          Navigator.pop(context);
+                          nav.pop();
                         } catch (_) {
                           _snack('فشل النشر.');
                         } finally {
@@ -351,6 +354,7 @@ class _AdminPanelState extends State<AdminPanel>
                     _snack('اختر وقت النشر (publishAt) أولاً.');
                     return;
                   }
+                  final nav = Navigator.of(context);
                   final text = textC.text.trim();
                   setState(() => _saving = true);
                   try {
@@ -362,7 +366,7 @@ class _AdminPanelState extends State<AdminPanel>
                     );
                     _snack('تمت الجدولة ✅');
                     if (!mounted) return;
-                    Navigator.pop(context);
+                    nav.pop();
                   } catch (_) {
                     _snack('فشل الجدولة.');
                   } finally {
@@ -679,6 +683,7 @@ class _AdminPanelState extends State<AdminPanel>
                     _snack('النص فارغ.');
                     return;
                   }
+                  final nav = Navigator.of(context);
                   setState(() => _saving = true);
                   try {
                     final update = <String, dynamic>{
@@ -709,7 +714,7 @@ class _AdminPanelState extends State<AdminPanel>
 
                     _snack('تم الحفظ ✅');
                     if (!mounted) return;
-                    Navigator.pop(context);
+                    nav.pop();
                   } catch (_) {
                     _snack('فشل الحفظ.');
                   } finally {

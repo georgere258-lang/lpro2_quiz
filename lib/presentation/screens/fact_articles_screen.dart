@@ -342,6 +342,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
       initialDate: DateTime(init.year, init.month, init.day),
     );
     if (date == null) return null;
+    if (!mounted) return null;
 
     final time = await showTimePicker(
       context: context,
@@ -731,6 +732,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                               ),
                             ),
                             onPressed: () async {
+                              final nav = Navigator.of(context);
                               try {
                                 await _docRef.update({
                                   'isFeatured': isFeaturedLocal,
@@ -752,7 +754,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                                   _orderInSection = orderInSectionLocal;
                                 });
 
-                                Navigator.pop(context);
+                                nav.pop();
                                 _snack("تم حفظ التحكم ✅");
                               } catch (_) {
                                 _snack("فشل الحفظ. راجع Rules.");

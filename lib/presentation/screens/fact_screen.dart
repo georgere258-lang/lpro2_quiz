@@ -203,6 +203,7 @@ class _FactScreenState extends State<FactScreen> {
                     onTap: () async {
                       final items = await _fetchOnceItems();
                       if (!mounted) return;
+                      if (!context.mounted) return;
                       showSearch(
                         context: context,
                         delegate: _FactSearchDelegate(
