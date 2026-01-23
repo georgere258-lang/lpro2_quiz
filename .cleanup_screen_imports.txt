@@ -1,0 +1,8 @@
+﻿lib\main.dart
+16:import 'package:lpro2_quiz/presentation/screens/splash_screen.dart';
+17:import 'package:lpro2_quiz/presentation/screens/login_screen.dart';
+18:import 'package:lpro2_quiz/presentation/screens/complete_profile_screen.dart';
+19:import 'package:lpro2_quiz/presentation/screens/main_wrapper.dart';
+20:import 'package:lpro2_quiz/presentation/screens/about_screen.dart';
+21:import 'package:lpro2_quiz/presentation/screens/admin_panel.dart';
+22:import 'package:lpro2_quiz/presentation/screens/know_client_screen.dart';

@@ -1,0 +1,71 @@
+﻿lib\presentation\screens\login_screen.dart
+182:      Navigator.pushReplacement(
+183:          context, MaterialPageRoute(builder: (c) => const MainWrapper()));
+
+lib\presentation\screens\splash_screen.dart
+59:        Navigator.pushReplacement(
+60:            context, MaterialPageRoute(builder: (c) => const MainWrapper()));
+172:                            Navigator.pushReplacement(
+174:                                MaterialPageRoute(
+
+lib\presentation\screens\quiz_screen.dart
+245:          Navigator.pushAndRemoveUntil(
+247:            MaterialPageRoute(
+362:          Navigator.pushAndRemoveUntil(
+364:            MaterialPageRoute(
+
+lib\presentation\screens\home_screen.dart
+213:    Navigator.push(context, MaterialPageRoute(builder: (_) => target));
+
+lib\presentation\screens\fact_screen.dart
+116:    await Navigator.push(
+118:      MaterialPageRoute(
+141:          Navigator.pushAndRemoveUntil(
+143:            MaterialPageRoute(
+
+lib\presentation\screens\know_client_screen.dart
+248:                Navigator.push(
+250:                  MaterialPageRoute(
+603:            Navigator.push(
+605:              MaterialPageRoute(
+
+lib\presentation\screens\profile_screen.dart
+93:                      Navigator.push(
+95:                          MaterialPageRoute(
+105:                    Navigator.push(context,
+106:                        MaterialPageRoute(builder: (_) => const AboutScreen()));
+209:        MaterialPageRoute(builder: (_) => const LoginScreen()),
+
+lib\presentation\screens\complete_profile_screen.dart
+75:        Navigator.pushReplacement(context,
+76:            MaterialPageRoute(builder: (context) => const MainWrapper()));
+
+lib\presentation\screens\fact_articles_screen.dart
+313:    await Navigator.pushReplacement(
+315:      MaterialPageRoute(
+892:                              Navigator.pushReplacement(
+894:                                MaterialPageRoute(
+
+lib\presentation\screens\fact_topics_screen.dart
+42:                Navigator.push(
+44:                  MaterialPageRoute(
+
+lib\presentation\screens\know_client_articles_screen.dart
+163:    Navigator.pushReplacement(
+165:      MaterialPageRoute(
+
+lib\presentation\screens\fact_topic_reader_screen.dart
+116:    Navigator.pushReplacement(
+118:      MaterialPageRoute(builder: (_) => FactArticlesScreen(title: prevTitle)),
+125:    Navigator.pushReplacement(
+127:      MaterialPageRoute(builder: (_) => FactArticlesScreen(title: nextTitle)),
+
+lib\presentation\screens\fact_articles_reader_screen.dart
+119:                                Navigator.pushReplacement(
+121:                                  MaterialPageRoute(
+146:                                Navigator.pushReplacement(
+148:                                  MaterialPageRoute(
+
+lib\presentation\screens\admin_messages_list.dart
+163:                    Navigator.push(
+165:                      MaterialPageRoute(
