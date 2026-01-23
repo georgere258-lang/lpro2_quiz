@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/profile_screen.dart
-// STATUS: Full File – ✅ Removed "اعرف عميلك" button from Profile (as requested)
+// STATUS: ELITE PREMIUM UPGRADE (Unified Shadows Library)
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -58,24 +58,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
               .snapshots(),
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
+              return Center(child: CircularProgressIndicator(color: deepTeal));
             }
 
             final data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
             final userModel = UserModel.fromMap(data, user?.uid ?? '');
 
             return ListView(
+              physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 20),
               children: [
-                const SizedBox(height: 30),
+                const SizedBox(height: 35),
                 _buildProfileHeader(
                   userModel.displayName,
                   userModel.points,
                   userModel.avatarIndex,
                 ),
-                const SizedBox(height: 25),
-
-                // (اختياري) زر الدعم لو موجود callback
+                const SizedBox(height: 35),
                 if (widget.onSupportPressed != null)
                   _buildProfileBtn(
                     "الدعم الفني",
@@ -85,7 +84,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       widget.onSupportPressed?.call();
                     },
                   ),
-
                 if (userModel.role == 'admin')
                   _buildProfileBtn(
                     "لوحة التحكم (Admin)",
@@ -93,38 +91,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     () {
                       SoundManager.playTap();
                       Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const AdminPanel(),
-                        ),
-                      );
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const AdminPanel()));
                     },
                     iconColor: safetyOrange,
                   ),
-
                 _buildProfileBtn(
                   "حول L Pro",
                   Icons.info_outline_rounded,
                   () {
                     SoundManager.playTap();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AboutScreen(),
-                      ),
-                    );
+                    Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const AboutScreen()));
                   },
                 ),
-
-                // ✅ REMOVED: "اعرف عميلك" was here (intentionally removed)
-
                 _buildProfileBtn(
                   "تسجيل الخروج",
                   Icons.logout_rounded,
                   _handleLogout,
                   isExit: true,
                 ),
-
                 const SizedBox(height: 30),
               ],
             );
@@ -137,57 +124,81 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildProfileHeader(String name, int points, int avatarIndex) {
     return Column(
       children: [
-        CircleAvatar(
-          radius: 55,
-          backgroundColor: deepTeal,
-          child: Icon(
-            avatars[avatarIndex < avatars.length ? avatarIndex : 0],
-            size: 55,
-            color: Colors.white,
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            // ✅ توحيد مصدر الضوء مع الهوم سكرين عبر المحرك المركزي
+            boxShadow: AppColors.eliteShadowL2,
+          ),
+          child: CircleAvatar(
+            radius: 55,
+            backgroundColor: deepTeal,
+            child: Icon(
+              avatars[avatarIndex < avatars.length ? avatarIndex : 0],
+              size: 55,
+              color: Colors.white,
+            ),
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 20),
         Text(
           name,
           style: GoogleFonts.cairo(
-            fontSize: 24,
-            fontWeight: FontWeight.w900,
-            color: deepTeal,
-          ),
+              fontSize: 24, fontWeight: FontWeight.w900, color: deepTeal),
         ),
-        const SizedBox(height: 8),
-        Text(
-          _getMotivationalRank(points),
-          style: GoogleFonts.cairo(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: deepTeal,
+        const SizedBox(height: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          decoration: BoxDecoration(
+            color: deepTeal.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: deepTeal.withValues(alpha: 0.1)),
+          ),
+          child: Text(
+            _getMotivationalRank(points),
+            style: GoogleFonts.cairo(
+                fontSize: 13, fontWeight: FontWeight.w800, color: deepTeal),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildProfileBtn(
-    String title,
-    IconData icon,
-    VoidCallback onTap, {
-    bool isExit = false,
-    Color? iconColor,
-  }) {
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: isExit ? Colors.redAccent : (iconColor ?? deepTeal),
-      ),
-      title: Text(
-        title,
-        style: GoogleFonts.cairo(
-          fontWeight: FontWeight.w700,
-          color: isExit ? Colors.redAccent : Colors.black87,
+  Widget _buildProfileBtn(String title, IconData icon, VoidCallback onTap,
+      {bool isExit = false, Color? iconColor}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          // ✅ توحيد ظلال الأزرار لتتبع نفس لغة الظلال العالمية في التطبيق
+          boxShadow: AppColors.eliteShadowL1,
+        ),
+        child: ListTile(
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: (isExit ? Colors.redAccent : (iconColor ?? deepTeal))
+                  .withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon,
+                color: isExit ? Colors.redAccent : (iconColor ?? deepTeal),
+                size: 22),
+          ),
+          title: Text(
+            title,
+            style: GoogleFonts.cairo(
+                fontWeight: FontWeight.w700,
+                color: isExit ? Colors.redAccent : Colors.black87),
+          ),
+          onTap: onTap,
         ),
       ),
-      onTap: onTap,
     );
   }
 

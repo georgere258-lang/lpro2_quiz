@@ -9,6 +9,11 @@
 // ✅ NEW (Stability):
 // - Admin list stream no longer uses orderBy(createdAt) to avoid transient-null freezes.
 // - Stable client-side sorting: priority desc, updatedAt desc, docId desc.
+//
+// ✅ UI ONLY (Requested):
+// - Tab labels abbreviated: Pro | Quiz | News | KYC
+// - Prevent clipping + increase readability (TabBar styles + FittedBox)
+// - Quiz category dropdown shows Stars/Prof but SAVES Arabic values unchanged.
 
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -43,8 +48,17 @@ class _AdminPanelState extends State<AdminPanel>
   final TextEditingController _opt3 = TextEditingController();
   final TextEditingController _batchJson = TextEditingController();
 
-  final List<String> _quizCategories = const ["دوري النجوم", "دوري المحترفين"];
-  String _selectedCategory = "دوري النجوم";
+  // ✅ Values remain Arabic (do not break existing data)
+  static const String _catStarsValue = "دوري النجوم";
+  static const String _catProfValue = "دوري المحترفين";
+
+  // ✅ UI labels are short
+  static const List<Map<String, String>> _quizCategoryOptions = [
+    {"label": "Stars", "value": _catStarsValue},
+    {"label": "Prof", "value": _catProfValue},
+  ];
+
+  String _selectedCategory = _catStarsValue;
   int _correctIndex = 0;
 
   // =========================
@@ -590,7 +604,7 @@ class _AdminPanelState extends State<AdminPanel>
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<int>(
-                      value: pr,
+                      initialValue: pr,
                       items: List.generate(
                         11,
                         (i) => DropdownMenuItem(
@@ -716,20 +730,36 @@ class _AdminPanelState extends State<AdminPanel>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          "لوحة التحكم الاستراتيجية",
-          style: GoogleFonts.cairo(fontWeight: FontWeight.w900),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            "Admin Panel",
+            maxLines: 1,
+            style: GoogleFonts.cairo(fontWeight: FontWeight.w900),
+          ),
         ),
         backgroundColor: AppColors.primaryDeepTeal,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppColors.secondaryOrange,
-          tabs: const [
-            Tab(text: "Pro Card"),
-            Tab(text: "Quizzes"),
-            Tab(text: "شريط الأخبار"),
-            Tab(text: "اعرف عميلك"),
-          ],
+
+        // ✅ FIX: prevent tab text clipping on small screens / big text scale
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: TabBar(
+            controller: _tabController,
+            indicatorColor: AppColors.secondaryOrange,
+            isScrollable: false,
+            labelPadding: EdgeInsets.zero,
+            indicatorSize: TabBarIndicatorSize.tab,
+            labelStyle:
+                GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 12.5),
+            unselectedLabelStyle:
+                GoogleFonts.cairo(fontWeight: FontWeight.w800, fontSize: 11.5),
+            tabs: const [
+              _AdminTabLabel("Pro"),
+              _AdminTabLabel("Quiz"),
+              _AdminTabLabel("News"),
+              _AdminTabLabel("KYC"),
+            ],
+          ),
         ),
       ),
       body: Stack(
@@ -887,16 +917,16 @@ class _AdminPanelState extends State<AdminPanel>
                                   } catch (_) {
                                     _snack('فشل التعديل.');
                                   } finally {
-                                    if (mounted)
+                                    if (mounted) {
                                       setState(() => _saving = false);
+                                    }
                                   }
                                 },
                                 icon: Icon(
-                                  isActive
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                  size: 18,
-                                ),
+                                    isActive
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                    size: 18),
                                 label: _btnText(isActive ? 'إخفاء' : 'إظهار',
                                     size: 12),
                               ),
@@ -937,13 +967,15 @@ class _AdminPanelState extends State<AdminPanel>
               children: [
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: _selectedCategory,
-                    items: _quizCategories
-                        .map((e) => DropdownMenuItem(
-                              value: e,
-                              child: Text(e,
-                                  style: GoogleFonts.cairo(fontSize: 12)),
-                            ))
+                    initialValue: _selectedCategory,
+                    items: _quizCategoryOptions
+                        .map(
+                          (m) => DropdownMenuItem<String>(
+                            value: m["value"]!,
+                            child: Text(m["label"]!,
+                                style: GoogleFonts.cairo(fontSize: 12)),
+                          ),
+                        )
                         .toList(),
                     onChanged: (v) => setState(
                         () => _selectedCategory = v ?? _selectedCategory),
@@ -979,7 +1011,7 @@ class _AdminPanelState extends State<AdminPanel>
                     _tf(_opt3, "اختيار 4", maxLines: 1),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<int>(
-                      value: _correctIndex,
+                      initialValue: _correctIndex,
                       items: const [
                         DropdownMenuItem(
                             value: 0, child: Text("الإجابة الصحيحة: 1")),
@@ -1056,7 +1088,7 @@ class _AdminPanelState extends State<AdminPanel>
               children: [
                 Expanded(
                   child: DropdownButtonFormField<int>(
-                    value: _tickerPriority,
+                    initialValue: _tickerPriority,
                     items: List.generate(
                       11,
                       (i) => DropdownMenuItem(
@@ -1276,10 +1308,11 @@ class _AdminPanelState extends State<AdminPanel>
                                     onPressed: () =>
                                         _toggleTickerActive(doc.id, isActive),
                                     icon: Icon(
-                                        isActive
-                                            ? Icons.visibility_off
-                                            : Icons.visibility,
-                                        size: 18),
+                                      isActive
+                                          ? Icons.visibility_off
+                                          : Icons.visibility,
+                                      size: 18,
+                                    ),
                                     label: _btnText(
                                         isActive ? 'إخفاء' : 'إظهار',
                                         size: 12),
@@ -1324,5 +1357,26 @@ class _AdminPanelState extends State<AdminPanel>
 
   Widget _buildKycTab() {
     return const Center(child: Text("تبويب اعرف عميلك - جاهز للربط"));
+  }
+}
+
+// ✅ Added: safer tab label to avoid clipping on narrow screens / large font scale
+class _AdminTabLabel extends StatelessWidget {
+  final String text;
+  const _AdminTabLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Tab(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(text, maxLines: 1),
+          ),
+        ),
+      ),
+    );
   }
 }

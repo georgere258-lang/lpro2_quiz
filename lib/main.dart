@@ -1,8 +1,6 @@
 // PATH: lib/main.dart
-// STATUS: Full File – Added KnowClient route
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart'; // ✅ ضروري جداً للتحكم في الزوايا السفلية
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -21,21 +19,18 @@ import 'package:lpro2_quiz/presentation/screens/complete_profile_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/main_wrapper.dart';
 import 'package:lpro2_quiz/presentation/screens/about_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/admin_panel.dart';
-import 'package:lpro2_quiz/presentation/screens/know_client_screen.dart'; // ✅ NEW
+import 'package:lpro2_quiz/presentation/screens/know_client_screen.dart';
 
 import 'core/curriculum/unit_repository.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 }
 
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
   'lpro_notifications',
   'L Pro Notifications',
-  description: 'هذه القناة مخصصة لأخبار ومسابقات L Pro',
   importance: Importance.max,
 );
 
@@ -45,15 +40,19 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // ✅ التعديل الجذري: إخبار النظام بترك الزوايا السفلية للتطبيق ليلونها
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    systemNavigationBarColor: Colors.transparent, // جعل شريط النظام شفافاً
+    systemNavigationBarDividerColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.light,
+    statusBarColor: Colors.transparent,
+  ));
+
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   SoundManager.init();
 
-  FirebaseMessaging.onBackgroundMessage(
-    _firebaseMessagingBackgroundHandler,
-  );
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   const AndroidInitializationSettings initializationSettingsAndroid =
       AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -94,7 +93,6 @@ void _subscribeToNotificationTopics() {
   FirebaseAuth.instance.authStateChanges().listen((User? user) {
     if (user != null) {
       FirebaseMessaging.instance.subscribeToTopic(user.uid);
-
       if (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
         FirebaseMessaging.instance.subscribeToTopic('admin_notifications');
       }
@@ -104,7 +102,6 @@ void _subscribeToNotificationTopics() {
 
 class LProApp extends StatefulWidget {
   const LProApp({super.key});
-
   static void setLocale(BuildContext context, Locale newLocale) {
     final state = context.findAncestorStateOfType<_LProAppState>();
     state?.changeLanguage(newLocale);
@@ -116,7 +113,6 @@ class LProApp extends StatefulWidget {
 
 class _LProAppState extends State<LProApp> {
   Locale _locale = const Locale('ar', 'EG');
-
   void changeLanguage(Locale locale) {
     setState(() => _locale = locale);
   }
@@ -145,8 +141,6 @@ class _LProAppState extends State<LProApp> {
         '/home': (_) => const MainWrapper(),
         '/about': (_) => const AboutScreen(),
         '/admin': (_) => const AdminPanel(),
-
-        // ✅ NEW ROUTE
         '/know_client': (_) => const KnowClientScreen(),
       },
     );

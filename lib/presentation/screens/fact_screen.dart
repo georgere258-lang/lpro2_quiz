@@ -3,6 +3,7 @@
 //         + Favorites (SharedPreferences) + Last Seen Badge
 //         + Tag Normalization (fix: "سيستم الشركة" => "سيستم الشركات")
 //         + ✅ NEW: Top Blocks (Zero Cost): Featured "مختارات اليوم" + Recent "حديثًا"
+//         + ✅ ADDED: Bottom Navigation Bar ONLY
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +12,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/app_colors.dart';
 import 'fact_articles_screen.dart';
+import '../widgets/lpro_bottom_nav_bar.dart';
+import 'main_wrapper.dart';
 
 class FactScreen extends StatefulWidget {
   const FactScreen({super.key});
@@ -132,6 +135,18 @@ class _FactScreenState extends State<FactScreen> {
           style: GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 18),
         ),
       ),
+      bottomNavigationBar: LProBottomNavBar(
+        activeIndex: 0,
+        onTap: (index) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MainWrapper(initialIndex: index),
+            ),
+            (route) => false,
+          );
+        },
+      ),
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: Column(
@@ -157,7 +172,8 @@ class _FactScreenState extends State<FactScreen> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: AppColors.primaryDeepTeal.withValues(alpha: 0.10),
+                          color:
+                              AppColors.primaryDeepTeal.withValues(alpha: 0.10),
                         ),
                         boxShadow: [
                           BoxShadow(
@@ -219,40 +235,61 @@ class _FactScreenState extends State<FactScreen> {
 
   Widget _introCard() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primaryDeepTeal.withValues(alpha: 0.10),
-            AppColors.secondaryOrange.withValues(alpha: 0.10),
-          ],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: AppColors.primaryDeepTeal.withValues(alpha: 0.12),
+          width: 1.2,
         ),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Row(
         children: [
-          Text(
-            "بوابة المعلومة اللي بتفرق",
-            textAlign: TextAlign.right,
-            style: GoogleFonts.cairo(
-              fontSize: 13,
-              height: 1.5,
-              fontWeight: FontWeight.w900,
-              color: AppColors.primaryDeepTeal,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  "بوابة المعلومة اللي بتفرق",
+                  textAlign: TextAlign.right,
+                  style: GoogleFonts.cairo(
+                    fontSize: 14.5,
+                    height: 1.5,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.primaryDeepTeal,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "مواضيع قصيرة، مركزة، وفي نهايتها سلوك عملي.",
+                  textAlign: TextAlign.right,
+                  style: GoogleFonts.cairo(
+                    fontSize: 12.5,
+                    height: 1.6,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black54,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            "مواضيع قصيرة، مركزة، وفي نهايتها سلوك عملي.",
-            textAlign: TextAlign.right,
-            style: GoogleFonts.cairo(
-              fontSize: 12,
-              height: 1.6,
-              fontWeight: FontWeight.w700,
-              color: Colors.black54,
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.secondaryOrange.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
             ),
+            child: const Icon(Icons.auto_awesome,
+                color: AppColors.secondaryOrange, size: 22),
           ),
         ],
       ),
@@ -292,7 +329,7 @@ class _FactScreenState extends State<FactScreen> {
         // ✅ Base ordering for normal list
         allItems.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
 
-        // ✅ Featured (مختارات اليوم) – always show on top (from ANY section)
+        // ✅ Featured (ترشيحات Pro)
         final now = DateTime.now();
         final featured = allItems
             .where((e) => e.isFeatured == true && e.isFeaturedValid(now))
@@ -303,7 +340,7 @@ class _FactScreenState extends State<FactScreen> {
           return b.createdAtMs.compareTo(a.createdAtMs);
         });
 
-        // ✅ Recent (حديثًا) – always show on top (from ANY section)
+        // ✅ Recent (جديد Pro)
         final recentCutoff =
             now.subtract(const Duration(days: _recentDaysWindow));
         final recent = allItems
@@ -314,7 +351,7 @@ class _FactScreenState extends State<FactScreen> {
             .take(12)
             .toList();
 
-        // ✅ Filter list by selected section (but keep top blocks independent)
+        // ✅ Filter list by selected section
         List<_FactTopicItem> filtered;
         if (_selectedSection == 'كل المواضيع') {
           filtered = allItems;
@@ -355,7 +392,9 @@ class _FactScreenState extends State<FactScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
+                      border: Border.all(
+                          color: AppColors.primaryDeepTeal
+                              .withValues(alpha: 0.10)),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.04),
@@ -369,7 +408,8 @@ class _FactScreenState extends State<FactScreen> {
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.history_rounded, size: 16, color: AppColors.secondaryOrange),
+                            const Icon(Icons.history_rounded,
+                                size: 16, color: AppColors.secondaryOrange),
                             const SizedBox(width: 6),
                             Text(
                               "تابع من حيث توقفت",
@@ -400,7 +440,7 @@ class _FactScreenState extends State<FactScreen> {
               const SizedBox(height: 4),
             ],
 
-            // ✅ ترشيحات Pro (single card with vertical list)
+            // ✅ ترشيحات Pro
             if (featured.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
@@ -410,34 +450,33 @@ class _FactScreenState extends State<FactScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    border: Border.all(
+                        color:
+                            AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.star_rounded, size: 18, color: AppColors.secondaryOrange),
+                          const Icon(Icons.star_rounded,
+                              size: 18, color: AppColors.secondaryOrange),
                           const SizedBox(width: 8),
                           Text(
                             "ترشيحات Pro",
                             style: GoogleFonts.cairo(
-                              fontSize: 13,
+                              fontSize: 13.5,
                               fontWeight: FontWeight.w900,
                               color: AppColors.primaryDeepTeal,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      ...featured.take(5).map((item) => _verticalTopicRow(item)),
+                      const Divider(height: 16, thickness: 0.5),
+                      const SizedBox(height: 4),
+                      ...featured
+                          .take(5)
+                          .map((item) => _verticalTopicRow(item)),
                     ],
                   ),
                 ),
@@ -445,7 +484,7 @@ class _FactScreenState extends State<FactScreen> {
               const SizedBox(height: 4),
             ],
 
-            // ✅ جديد Pro (single card with vertical list)
+            // ✅ جديد Pro
             if (recent.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
@@ -455,33 +494,30 @@ class _FactScreenState extends State<FactScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    border: Border.all(
+                        color:
+                            AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.new_releases_rounded, size: 18, color: AppColors.secondaryOrange),
+                          const Icon(Icons.new_releases_rounded,
+                              size: 18, color: AppColors.secondaryOrange),
                           const SizedBox(width: 8),
                           Text(
                             "جديد Pro",
                             style: GoogleFonts.cairo(
-                              fontSize: 13,
+                              fontSize: 13.5,
                               fontWeight: FontWeight.w900,
                               color: AppColors.primaryDeepTeal,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const Divider(height: 16, thickness: 0.5),
+                      const SizedBox(height: 4),
                       ...recent.take(5).map((item) => _verticalTopicRow(item)),
                     ],
                   ),
@@ -500,14 +536,9 @@ class _FactScreenState extends State<FactScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+                    border: Border.all(
+                        color:
+                            AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -585,7 +616,8 @@ class _FactScreenState extends State<FactScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.08)),
+        border: Border.all(
+            color: AppColors.primaryDeepTeal.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -647,8 +679,8 @@ class _FactScreenState extends State<FactScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border:
-              Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.08)),
+          border: Border.all(
+              color: AppColors.primaryDeepTeal.withValues(alpha: 0.08)),
           boxShadow: [
             BoxShadow(
               color: AppColors.secondaryOrange.withValues(alpha: 0.08),
@@ -686,10 +718,12 @@ class _FactScreenState extends State<FactScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryDeepTeal.withValues(alpha: 0.06),
+                          color:
+                              AppColors.primaryDeepTeal.withValues(alpha: 0.06),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: AppColors.primaryDeepTeal.withValues(alpha: 0.12),
+                            color: AppColors.primaryDeepTeal
+                                .withValues(alpha: 0.12),
                           ),
                         ),
                         child: Text(
@@ -745,7 +779,8 @@ class _FactScreenState extends State<FactScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.08)),
+        border: Border.all(
+            color: AppColors.primaryDeepTeal.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
             color: shadowTint,
@@ -779,7 +814,7 @@ class _FactScreenState extends State<FactScreen> {
           const SizedBox(width: 10),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (isLastSeen) ...[
                   Align(
@@ -788,10 +823,12 @@ class _FactScreenState extends State<FactScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AppColors.secondaryOrange.withValues(alpha: 0.12),
+                        color:
+                            AppColors.secondaryOrange.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: AppColors.secondaryOrange.withValues(alpha: 0.22),
+                          color:
+                              AppColors.secondaryOrange.withValues(alpha: 0.22),
                         ),
                       ),
                       child: Text(
@@ -916,6 +953,8 @@ class _FactScreenState extends State<FactScreen> {
       ),
     );
   }
+
+  // دالة الشريط السفلي
 }
 
 class _PillButton extends StatelessWidget {
@@ -939,8 +978,8 @@ class _PillButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border:
-              Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
+          border: Border.all(
+              color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),

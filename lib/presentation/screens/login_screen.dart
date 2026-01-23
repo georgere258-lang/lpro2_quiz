@@ -151,7 +151,7 @@ class _LoginScreenState extends State<LoginScreen> {
           });
         } else {
           // ✅ موجود قبل كده: نثبت Role للأدمن الأساسي بدون مسح أي بيانات
-          final data = (userDoc.data() as Map<String, dynamic>?) ?? {};
+          final data = userDoc.data() ?? {};
           final currentRole = (data['role'] ?? '').toString();
 
           final Map<String, dynamic> patch = {
@@ -207,89 +207,135 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.primaryDeepTeal,
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
-          : Center(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 30, vertical: 50),
-                  child: Column(
-                    children: [
-                      SvgPicture.asset('assets/logo.svg',
-                          height: 110,
-                          placeholderBuilder: (c) => const Icon(Icons.business,
-                              size: 80, color: Colors.white)),
-                      const SizedBox(height: 12),
-                      Text("المعلومة بتفرق",
-                          style: GoogleFonts.cairo(
-                              color: AppColors.secondaryOrange,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 60),
-                      Text(isOtpStage ? "تأكيد الرمز" : "تسجيل الدخول",
-                          style: GoogleFonts.cairo(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white)),
-                      const SizedBox(height: 10),
-                      Text(
-                          isOtpStage
-                              ? "أدخل الكود المرسل لهاتفك"
-                              : "سجل برقم هاتفك لتبدأ التحدي",
-                          style: GoogleFonts.cairo(
-                              fontSize: 14, color: Colors.white70)),
-                      const SizedBox(height: 40),
-                      Directionality(
-                        textDirection: TextDirection.ltr,
-                        child:
-                            isOtpStage ? _buildOtpInput() : _buildPhoneInput(),
-                      ),
-                      const SizedBox(height: 40),
-                      Center(
-                        child: SizedBox(
-                          width: 150,
-                          height: 50,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.secondaryOrange,
-                              elevation: 0,
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(15)),
+      // التعديل: استبدال اللون الثابت بتدرج شعاعي بريميوم
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0, -0.3),
+            radius: 1.3,
+            colors: [
+              Color(0xFF136161), // درجة إضاءة مركزية
+              AppColors.primaryDeepTeal,
+            ],
+          ),
+        ),
+        child: isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: Colors.white))
+            : Center(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 30, vertical: 50),
+                    child: Column(
+                      children: [
+                        SvgPicture.asset('assets/logo.svg',
+                            height: 110,
+                            placeholderBuilder: (c) => const Icon(
+                                Icons.business,
+                                size: 80,
+                                color: Colors.white)),
+                        const SizedBox(height: 12),
+                        Text("المعلومة بتفرق",
+                            style: GoogleFonts.cairo(
+                                color: AppColors.secondaryOrange,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                // إضافة ظلال ناعمة للنص
+                                shadows: [
+                                  Shadow(
+                                    offset: const Offset(0, 2),
+                                    blurRadius: 8.0,
+                                    color: Colors.black.withOpacity(0.3),
+                                  ),
+                                ])),
+                        const SizedBox(height: 60),
+                        Text(isOtpStage ? "تأكيد الرمز" : "تسجيل الدخول",
+                            style: GoogleFonts.cairo(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                shadows: [
+                                  Shadow(
+                                    offset: const Offset(0, 3),
+                                    blurRadius: 10.0,
+                                    color: Colors.black.withOpacity(0.4),
+                                  ),
+                                ])),
+                        const SizedBox(height: 10),
+                        Text(
+                            isOtpStage
+                                ? "أدخل الكود المرسل لهاتفك"
+                                : "اكتب رقم الموبيل",
+                            style: GoogleFonts.cairo(
+                                fontSize: 14, color: Colors.white70)),
+                        const SizedBox(height: 40),
+                        Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: isOtpStage
+                              ? _buildOtpInput()
+                              : _buildPhoneInput(),
+                        ),
+                        const SizedBox(height: 40),
+                        Center(
+                          child: Container(
+                            width: 150,
+                            height: 50,
+                            // إضافة ظل متوهج للزر لتحسين المظهر البريميوم
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(15),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.secondaryOrange
+                                      .withOpacity(0.25),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ],
                             ),
-                            onPressed: isOtpStage ? _verifyOtp : _sendOtp,
-                            child: Container(
-                              alignment: Alignment.center,
-                              child: Text(
-                                isOtpStage ? "تأكيد" : "إرسال",
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.cairo(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    height: 1.0,
-                                    fontSize: 18),
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.secondaryOrange,
+                                elevation: 0,
+                                padding: EdgeInsets.zero,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(15)),
+                              ),
+                              onPressed: isOtpStage ? _verifyOtp : _sendOtp,
+                              child: Container(
+                                alignment: Alignment.center,
+                                child: Text(
+                                  isOtpStage ? "تأكيد" : "إرسال",
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.cairo(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      height: 1.0,
+                                      fontSize: 18),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                      if (isOtpStage)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 15),
-                          child: TextButton(
-                            onPressed: () => setState(() => isOtpStage = false),
-                            child: Text("تعديل رقم الهاتف؟",
-                                style:
-                                    GoogleFonts.cairo(color: Colors.white60)),
-                          ),
-                        )
-                    ],
+                        if (isOtpStage)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 15),
+                            child: TextButton(
+                              onPressed: () =>
+                                  setState(() => isOtpStage = false),
+                              child: Text("تعديل رقم الهاتف؟",
+                                  style:
+                                      GoogleFonts.cairo(color: Colors.white60)),
+                            ),
+                          )
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
+      ),
     );
   }
 
@@ -348,6 +394,14 @@ class _LoginScreenState extends State<LoginScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(10),
+            // إضافة ظل بسيط لحقول الـ OTP لزيادة البروز
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 5,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: TextField(
             controller: otpControllers[index],

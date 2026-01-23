@@ -1,63 +1,116 @@
 // PATH: lib/core/services/news_ticker_service.dart
 
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 class NewsTickerService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  static const String _col = 'news_ticker_items';
+  static const Duration _pollInterval = Duration(seconds: 5);
+
+  /// Realtime + Polling(Server) => guarantees fresh updates even if listener lags.
   Stream<List<Map<String, dynamic>>> streamTickerItems() {
-    return _firestore
-        .collection('news_ticker_items')
+    final query = _firestore
+        .collection(_col)
         .where('isActive', isEqualTo: true)
-        // ✅ أهم تأمين: orderBy واحد فقط على حقل ثابت (مش serverTimestamp)
         .orderBy('priority', descending: true)
-        .snapshots()
-        .map((snapshot) {
+        // keep it, but polling will cover serverTimestamp delays anyway
+        .orderBy('updatedAt', descending: true);
+
+    final controller = StreamController<List<Map<String, dynamic>>>.broadcast();
+
+    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? sub;
+    Timer? pollTimer;
+
+    String lastSignature = '';
+
+    List<Map<String, dynamic>> mapSnapshot(
+      QuerySnapshot<Map<String, dynamic>> snapshot,
+    ) {
       final now = DateTime.now();
 
-      // فلترة آمنة + منع النص الفارغ
-      final filtered = snapshot.docs.where((doc) {
-        final data = doc.data();
+      return snapshot.docs
+          .where((doc) {
+            final data = doc.data();
 
-        final text = data['text_ar']?.toString().trim();
-        if (text == null || text.isEmpty) return false;
+            final Timestamp? start = data['startDate'] as Timestamp?;
+            final Timestamp? end = data['endDate'] as Timestamp?;
 
-        final Timestamp? start = data['startDate'] as Timestamp?;
-        final Timestamp? end = data['endDate'] as Timestamp?;
+            if (start != null && now.isBefore(start.toDate())) return false;
+            if (end != null && now.isAfter(end.toDate())) return false;
 
-        if (start != null && now.isBefore(start.toDate())) return false;
-        if (end != null && now.isAfter(end.toDate())) return false;
+            final text = data['text_ar']?.toString().trim();
+            if (text == null || text.isEmpty) return false;
 
+            return true;
+          })
+          .map((doc) => doc.data())
+          .toList();
+    }
+
+    void emitIfChanged(List<Map<String, dynamic>> items, {String src = ''}) {
+      // signature based on text + updatedAt + id-ish fields if exist
+      final sig = items
+          .map((e) =>
+              '${(e['text_ar'] ?? '').toString()}|${(e['updatedAt'] ?? '').toString()}|${(e['priority'] ?? 0).toString()}')
+          .join('##');
+
+      if (sig == lastSignature) return;
+      lastSignature = sig;
+
+      assert(() {
+        debugPrint('NewsTicker emit ($src): count=${items.length}');
         return true;
-      }).toList();
+      }());
 
-      // ✅ ترتيب داخلي ثابت بدون ما نعتمد على Firestore orderBy لحقول قد تكون null
-      filtered.sort((a, b) {
-        final da = a.data();
-        final db = b.data();
+      controller.add(items);
+    }
 
-        int ta = _bestMillis(da);
-        int tb = _bestMillis(db);
+    Future<void> pollServerOnce() async {
+      try {
+        final snap = await query.get(const GetOptions(source: Source.server));
+        final items = mapSnapshot(snap);
+        emitIfChanged(items, src: 'server_poll');
+      } catch (e) {
+        // ignore polling errors; realtime may still work
+        assert(() {
+          debugPrint('NewsTicker poll error: $e');
+          return true;
+        }());
+      }
+    }
 
-        // الأحدث أولاً
-        if (ta != tb) return tb.compareTo(ta);
+    controller.onListen = () {
+      // 1) realtime listener
+      sub = query.snapshots(includeMetadataChanges: true).listen(
+        (snap) {
+          // emit cache/server listener results (fast path)
+          final items = mapSnapshot(snap);
+          emitIfChanged(items, src: snap.metadata.isFromCache ? 'cache' : 'rt');
+        },
+        onError: (e) {
+          assert(() {
+            debugPrint('NewsTicker stream error: $e');
+            return true;
+          }());
+        },
+      );
 
-        // fallback ثابت لو الاتنين نفس التوقيت/صفر
-        return b.id.compareTo(a.id);
-      });
+      // 2) server polling (hard guarantee)
+      // fire immediately, then every interval
+      pollServerOnce();
+      pollTimer = Timer.periodic(_pollInterval, (_) => pollServerOnce());
+    };
 
-      return filtered.map((d) => d.data()).toList();
-    });
-  }
+    controller.onCancel = () async {
+      await sub?.cancel();
+      pollTimer?.cancel();
+      await controller.close();
+    };
 
-  int _bestMillis(Map<String, dynamic> data) {
-    final Timestamp? u = data['updatedAt'] as Timestamp?;
-    if (u != null) return u.millisecondsSinceEpoch;
-
-    final Timestamp? c = data['createdAt'] as Timestamp?;
-    if (c != null) return c.millisecondsSinceEpoch;
-
-    return 0;
+    return controller.stream;
   }
 
   Future<void> publishNews({
@@ -70,21 +123,14 @@ class NewsTickerService {
     final trimmed = textAr.trim();
     if (trimmed.isEmpty) return;
 
-    final nowTs = Timestamp.now();
-
     final data = <String, dynamic>{
       'text_ar': trimmed,
       'priority': priority,
       'isActive': true,
       'notify': notify,
-
-      // ✅ updatedAt ثابت فوراً (مش serverTimestamp) عشان أي Sorting/Screen يعتمد عليه
-      'updatedAt': nowTs,
-
-      // نسيب createdAt زي ما هو موجود عندك (مش مؤثر على الاستعلام الآن)
       'createdAt': FieldValue.serverTimestamp(),
-
-      'source': 'system', // admin / ranking
+      'updatedAt': FieldValue.serverTimestamp(),
+      'source': 'system',
     };
 
     if (startDate != null) {
@@ -94,6 +140,6 @@ class NewsTickerService {
       data['endDate'] = Timestamp.fromDate(endDate);
     }
 
-    await _firestore.collection('news_ticker_items').add(data);
+    await _firestore.collection(_col).add(data);
   }
 }

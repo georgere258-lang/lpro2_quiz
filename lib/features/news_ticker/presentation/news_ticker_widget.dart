@@ -1,3 +1,6 @@
+// PATH: lib/features/news_ticker/presentation/news_ticker_widget.dart
+// STATUS: ULTRA-PREMIUM UPGRADE (Visual Depth & Digital Gradient)
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,7 +9,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/services/news_ticker_service.dart';
 
 class NewsTickerWidget extends StatefulWidget {
-  final String userName; // الترحيب متلغى حالياً
+  final String userName;
   const NewsTickerWidget({super.key, required this.userName});
 
   @override
@@ -18,21 +21,17 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
   late final ScrollController _scrollController;
 
   static const double _pixelsPerSecond = 35.0;
-  static const Duration _tick = Duration(milliseconds: 16); // ~60fps
+  static const Duration _tick = Duration(milliseconds: 16);
 
   Timer? _timer;
-
-  // ✅ Cache لآخر أخبار سليمة (عشان ميختفوش لو الاستعلام وقع/فرغ لحظة)
   List<String> _cachedMessages = const [];
   String _lastSignature = '';
-
   bool _resetScheduled = false;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
-
     _timer = Timer.periodic(_tick, (_) => _onTick());
   }
 
@@ -61,9 +60,7 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
       } else {
         _scrollController.jumpTo(next);
       }
-    } catch (_) {
-      // تجاهل
-    }
+    } catch (_) {}
   }
 
   void _scheduleResetToStart() {
@@ -74,7 +71,6 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
       _resetScheduled = false;
       if (!mounted) return;
       if (!_scrollController.hasClients) return;
-
       try {
         _scrollController.jumpTo(0);
       } catch (_) {}
@@ -83,30 +79,15 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
 
   List<String> _extractMessages(
       AsyncSnapshot<List<Map<String, dynamic>>> snap) {
-    // ✅ لو في Error: نسيب آخر cache بدل ما نفضي الشريط
-    if (snap.hasError) {
-      debugPrint('NewsTicker stream error: ${snap.error}');
-      return _cachedMessages;
-    }
-
-    // ✅ لو مفيش Data (loading / dropped): برضه نسيب cache
-    if (!snap.hasData) {
-      return _cachedMessages;
-    }
+    if (snap.hasError) return _cachedMessages;
+    if (!snap.hasData) return _cachedMessages;
 
     final out = <String>[];
-
     for (final item in snap.data!) {
       final text = item['text_ar']?.toString().trim();
       if (text != null && text.isNotEmpty) out.add(text);
     }
-
-    // ✅ لو الاستعلام رجّع فاضي لحظيًا: لا تمسح الشريط
-    if (out.isEmpty) {
-      return _cachedMessages;
-    }
-
-    return out;
+    return out.isEmpty ? _cachedMessages : out;
   }
 
   @override
@@ -115,15 +96,9 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
       stream: _service.streamTickerItems(),
       builder: (context, snapshot) {
         final messages = _extractMessages(snapshot);
+        if (messages.isEmpty) return const SizedBox.shrink();
 
-        // لو لأول مرة ولسه مفيش cache حقيقية
-        if (messages.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        // ✅ حدّث cache لما يكون في بيانات فعلية
         if (snapshot.hasData && !snapshot.hasError) {
-          // (messages هنا مش فاضي)
           _cachedMessages = messages;
         }
 
@@ -133,36 +108,70 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
           _scheduleResetToStart();
         }
 
-        // كرر المحتوى لضمان scroll
         final looped = [...messages, ...messages, ...messages, ...messages];
 
         return Container(
           height: 34,
           width: double.infinity,
+          // ✅ التحسين الجوهري: إضافة تدرج لوني وعمق بصري للشريط
           decoration: BoxDecoration(
-            color: AppColors.secondaryOrange,
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                AppColors.secondaryOrange, // لون الأساس
+                AppColors.secondaryOrange.withValues(alpha: 0.85), // تدرج للعمق
+              ],
+            ),
+            boxShadow: [
+              // ظل علوي داخلي خفيف لإعطاء إيحاء بالاحتواء (Inset Effect)
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                offset: const Offset(0, 1),
+                blurRadius: 2,
+                spreadRadius: 0,
+              ),
+            ],
             border: Border(
               bottom: BorderSide(
-                color: Colors.black.withValues(alpha: 0.15),
-                width: 1,
+                color: Colors.black.withValues(alpha: 0.1),
+                width: 0.5,
               ),
             ),
           ),
-          child: IgnorePointer(
-            child: ListView.builder(
-              controller: _scrollController,
-              scrollDirection: Axis.horizontal,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: looped.length,
-              itemBuilder: (context, index) {
-                return Row(
-                  children: [
-                    _buildText(looped[index]),
-                    _divider(),
-                  ],
-                );
-              },
-            ),
+          child: Stack(
+            children: [
+              // الطبقة الشفافة العلوية لزيادة اللمعان (Premium Sheen)
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: const [0.0, 0.5],
+                    colors: [
+                      Colors.white.withValues(alpha: 0.12),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+              IgnorePointer(
+                child: ListView.builder(
+                  controller: _scrollController,
+                  scrollDirection: Axis.horizontal,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: looped.length,
+                  itemBuilder: (context, index) {
+                    return Row(
+                      children: [
+                        _buildText(looped[index]),
+                        _divider(),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -175,9 +184,17 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
       child: Text(
         text,
         style: GoogleFonts.cairo(
-          fontSize: 12,
+          fontSize: 12.5, // تكبير طفيف جداً للوضوح
           fontWeight: FontWeight.w800,
           color: Colors.white,
+          // إضافة ظل خفيف جداً للنص لزيادة التباين
+          shadows: [
+            Shadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              offset: const Offset(0, 1),
+              blurRadius: 1,
+            ),
+          ],
         ),
       ),
     );
@@ -185,12 +202,25 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
 
   Widget _divider() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 26),
-      width: 10,
-      height: 2.5,
+      margin: const EdgeInsets.symmetric(
+          horizontal: 22), // تقليل المسافة لرشاقة أكبر
+      width: 8,
+      height: 3,
       decoration: BoxDecoration(
-        color: const Color(0xFF1A535C),
+        // استخدام تدرج داخل الفاصل لجعله يبدو "محفوراً"
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF1A535C),
+            const Color(0xFF1A535C).withValues(alpha: 0.7),
+          ],
+        ),
         borderRadius: BorderRadius.circular(4),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white.withValues(alpha: 0.1),
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
     );
   }

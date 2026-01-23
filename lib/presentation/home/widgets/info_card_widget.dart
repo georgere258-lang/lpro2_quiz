@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lpro2_quiz/core/constants/app_colors.dart';
+// تأكد من استيراد ملف الألوان بشكل صحيح، يمكنك حذفه وإعادة كتابته ليقترح عليك المسار التلقائي
+
 
 class InfoCardWidget extends StatefulWidget {
   final String text;
@@ -23,7 +25,6 @@ class _InfoCardWidgetState extends State<InfoCardWidget>
   @override
   void initState() {
     super.initState();
-    // إعداد أنميشن النبض (تتحرك الأيقونة وتلمع باستمرار)
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -39,31 +40,33 @@ class _InfoCardWidgetState extends State<InfoCardWidget>
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      // محاذاة العرض مع كروت HomeScreen
+      margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: const Color(0xFF003D3D).withValues(alpha: 0.08),
+          // ✅ تم التصحيح: إزالة كلمة alpha واستخدام القيمة مباشرة
+          color: const Color(0xFF003D3D).withOpacity(0.08),
           width: 0.8,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF003D3D).withValues(alpha: 0.06),
-            blurRadius: 25,
-            offset: const Offset(0, 12),
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            /// ===== Slim Elegant Header with Animated Icon =====
+            /// ===== Header Section =====
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.centerRight,
@@ -73,20 +76,15 @@ class _InfoCardWidgetState extends State<InfoCardWidget>
               ),
               child: Row(
                 children: [
-                  // الأيقونة النابضة (Animated Pulse)
                   ScaleTransition(
                     scale: Tween(begin: 1.0, end: 1.2).animate(
                       CurvedAnimation(
                           parent: _pulseController, curve: Curves.easeInOut),
                     ),
-                    child: FadeTransition(
-                      opacity:
-                          Tween(begin: 0.7, end: 1.0).animate(_pulseController),
-                      child: const Icon(
-                        Icons.tips_and_updates_rounded,
-                        color: AppColors.secondaryOrange,
-                        size: 16,
-                      ),
+                    child: const Icon(
+                      Icons.tips_and_updates_rounded,
+                      color: AppColors.secondaryOrange,
+                      size: 16,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -107,65 +105,49 @@ class _InfoCardWidgetState extends State<InfoCardWidget>
             /// ===== Content Section =====
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(22, 22, 22, 16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.white,
-                    const Color(0xFFFDFBF7).withValues(alpha: 0.3)
-                  ],
-                ),
-              ),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+              color: Colors.white,
               child: Text(
                 widget.text,
                 textAlign: TextAlign.right,
                 style: GoogleFonts.cairo(
-                  fontSize: 15.5,
-                  height: 1.85,
+                  fontSize: 15,
+                  height: 1.7,
                   fontWeight: FontWeight.w600,
                   color: const Color(0xFF2D3142),
                 ),
               ),
             ),
 
-            /// ===== Premium Interactive Button =====
+            /// ===== Button Section =====
             if (widget.onRead != null)
               Padding(
-                padding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
                     onTap: widget.onRead,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                     child: Ink(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8F4F0),
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: AppColors.secondaryOrange.withValues(alpha: 0.35),
-                          width: 1.2,
+                          // ✅ تم التصحيح هنا أيضاً
+                          color: AppColors.secondaryOrange.withOpacity(0.3),
+                          width: 1,
                         ),
                       ),
                       child: Center(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.verified_rounded,
-                                color: AppColors.secondaryOrange, size: 16),
-                            const SizedBox(width: 8),
-                            Text(
-                              "استوعبت المعلومة",
-                              style: GoogleFonts.cairo(
-                                fontWeight: FontWeight.w900,
-                                color: AppColors.secondaryOrange,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          "استوعبت المعلومة",
+                          style: GoogleFonts.cairo(
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.secondaryOrange,
+                            fontSize: 13,
+                          ),
                         ),
                       ),
                     ),

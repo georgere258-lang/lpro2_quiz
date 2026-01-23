@@ -2,7 +2,7 @@
 // STATUS: Full File – ✅ Admin can see scheduled topics before publishAt, users only see published.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // ✅ NEW
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -19,7 +19,6 @@ class KnowClientScreen extends StatefulWidget {
 class _KnowClientScreenState extends State<KnowClientScreen> {
   static const String _collectionName = 'know_your_client';
 
-  // ✅ أقسام ثابتة (خطة القسم) - الفلترة تعتمد على tags
   static const List<String> _sectionsPlan = [
     'كل المواضيع',
     'أساسيات العميل',
@@ -33,7 +32,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
 
   String _selectedSection = 'كل المواضيع';
 
-  // ✅ Admin flag (from users/{uid}.isAdmin)
   bool _isAdmin = false;
 
   @override
@@ -78,8 +76,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
         child: Column(
           children: [
             const SizedBox(height: 14),
-
-            // ===== Header Row (Sections + Selected + Search) =====
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -98,7 +94,8 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: AppColors.primaryDeepTeal.withValues(alpha: 0.10),
+                          color:
+                              AppColors.primaryDeepTeal.withValues(alpha: 0.10),
                         ),
                         boxShadow: [
                           BoxShadow(
@@ -137,18 +134,12 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                 ],
               ),
             ),
-
             const SizedBox(height: 12),
-
-            // ===== Intro Card =====
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _introCard(),
             ),
-
             const SizedBox(height: 10),
-
-            // ===== Topics List =====
             Expanded(child: _topicsList()),
           ],
         ),
@@ -226,18 +217,14 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
           if (e.isActive != true) return false;
           if (e.title.trim().isEmpty) return false;
 
-          // ✅ scheduled logic
           final isScheduledFuture =
               (e.publishAtMs > 0 && e.publishAtMs > nowMs);
 
-          // user: hide scheduled
-          // admin: show scheduled
           if (!_isAdmin && isScheduledFuture) return false;
 
           return true;
         }).toList();
 
-        // ✅ ترتيب محلي حسب createdAt (الأحدث أولاً)
         items.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
 
         final filtered = _selectedSection == 'كل المواضيع'
@@ -261,7 +248,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    // ✅ safer: open by docId
                     builder: (_) => KnowClientArticlesScreen(
                       docId: item.id,
                       title: item.title,
@@ -294,7 +280,8 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.08)),
+        border: Border.all(
+            color: AppColors.primaryDeepTeal.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
             color: shadowTint,
@@ -313,7 +300,8 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
           const SizedBox(width: 10),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              // ✅ التعديل هنا: تم تغيير end إلى start لضبط المحاذاة لليمين في وضع RTL
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   item.title,
@@ -326,8 +314,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                     color: AppColors.primaryDeepTeal,
                   ),
                 ),
-
-                // ✅ Admin only badge for scheduled
                 if (_isAdmin && isScheduledFuture) ...[
                   const SizedBox(height: 8),
                   Align(
@@ -336,10 +322,12 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.secondaryOrange.withValues(alpha: 0.12),
+                        color:
+                            AppColors.secondaryOrange.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: AppColors.secondaryOrange.withValues(alpha: 0.25),
+                          color:
+                              AppColors.secondaryOrange.withValues(alpha: 0.25),
                         ),
                       ),
                       child: Text(
@@ -449,8 +437,8 @@ class _PillButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border:
-              Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
+          border: Border.all(
+              color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
@@ -635,7 +623,7 @@ class _KycTopicItem {
   final String id;
   final String title;
   final int createdAtMs;
-  final int publishAtMs; // ✅ NEW
+  final int publishAtMs;
   final List<String> tags;
   final bool isActive;
 

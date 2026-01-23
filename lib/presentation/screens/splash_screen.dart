@@ -53,7 +53,6 @@ class _SplashScreenState extends State<SplashScreen>
       if (mounted) _pulseController.repeat(reverse: true);
     });
 
-    // المنطق الوحيد المضاف: 3 ثوانٍ فحص للحالة
     Future.delayed(const Duration(seconds: 3), () {
       if (!mounted) return;
       if (isUserLoggedIn) {
@@ -93,78 +92,109 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.primaryDeepTeal,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center, // توسيط عمودي
-          children: [
-            // اللوجو بنفس مقاساتك الأصلية
-            ScaleTransition(
-              scale: _scaleAnimation,
-              child: SvgPicture.asset(
-                'assets/logo.svg',
-                width: MediaQuery.of(context).size.width * 0.8, // المقاس الأصلي
-                fit: BoxFit.contain,
-                placeholderBuilder: (c) =>
-                    const Icon(Icons.business, size: 100, color: Colors.white),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0, -0.1),
+            radius: 1.2,
+            colors: [
+              Color(0xFF136161),
+              AppColors.primaryDeepTeal,
+            ],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ScaleTransition(
+                scale: _scaleAnimation,
+                child: SvgPicture.asset(
+                  'assets/logo.svg',
+                  width: MediaQuery.of(context).size.width * 0.8,
+                  fit: BoxFit.contain,
+                  placeholderBuilder: (c) => const Icon(Icons.business,
+                      size: 100, color: Colors.white),
+                ),
               ),
-            ),
-            const SizedBox(height: 15),
-            FadeTransition(
-              opacity: _fadeAnimation,
-              child: Column(
-                children: [
-                  ScaleTransition(
-                    scale: _pulseAnimation,
-                    child: Text(
-                      "المعلومة بتفرق",
-                      textAlign: TextAlign.center, // توسيط النص
-                      style: GoogleFonts.cairo(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.secondaryOrange,
+              const SizedBox(height: 5),
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: Column(
+                  children: [
+                    ScaleTransition(
+                      scale: _pulseAnimation,
+                      child: Text(
+                        "المعلومة بتفرق",
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.cairo(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.secondaryOrange,
+                          shadows: [
+                            Shadow(
+                              offset: const Offset(0, 2),
+                              blurRadius: 10.0,
+                              color: Colors.black.withOpacity(0.3),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 35),
-                  // الزر يظهر فقط للمستخدم الجديد بنفس تصميمك
-                  if (showLoginButton)
-                    SizedBox(
-                      width: 160, // العرض الأصلي من كودك
-                      height: 50, // الارتفاع الأصلي من كودك
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.secondaryOrange,
-                          elevation: 0,
-                          padding: EdgeInsets.zero,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(25)),
+                    const SizedBox(height: 35),
+                    if (showLoginButton)
+                      Container(
+                        // ✅ تم التصغير مجدداً: العرض 130 والارتفاع 38
+                        width: 130,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(
+                              19), // الحواف نصف الارتفاع تماماً
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.secondaryOrange.withOpacity(0.2),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
                         ),
-                        onPressed: () {
-                          Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (c) => const LoginScreen()));
-                        },
-                        child: Text(
-                          "يلا Pro",
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.cairo(
-                            fontSize: 18,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            height: 1.2,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.secondaryOrange,
+                            elevation: 0,
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(19)),
+                          ),
+                          onPressed: () {
+                            Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (c) => const LoginScreen()));
+                          },
+                          child: Text(
+                            "اهلا Pro",
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.cairo(
+                              fontSize:
+                                  15, // تصغير إضافي ليتناسب مع الحجم الصغير
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              height: 1.0,
+                            ),
                           ),
                         ),
-                      ),
-                    )
-                  else if (isUserLoggedIn)
-                    const CircularProgressIndicator(
-                        color: AppColors.secondaryOrange),
-                ],
+                      )
+                    else if (isUserLoggedIn)
+                      const CircularProgressIndicator(
+                          color: AppColors.secondaryOrange),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
