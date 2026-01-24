@@ -1,8 +1,12 @@
 // PATH: lib/presentation/screens/know_client_articles_screen.dart
 // STATUS: Full File – ✅ Firestore Reader by docId (safe) + fallback by title + compact actions + prev/next by docIds
 // + BottomNav added (aligned with Fact architecture)
+// + ✅ Admin Tools (role-based) identical to FactArticlesScreen
+
+import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -37,6 +41,11 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
   bool _loading = true;
   bool _isFavorite = false;
 
+  // ✅ Admin state (role from users/{uid}.role)
+  String _role = 'user';
+  bool get _canAdmin => _role == 'admin' || _role == 'moderator';
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _roleSubscription;
+
   // doc
   String _docId = '';
   String _title = '';
@@ -47,6 +56,12 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
   String _example = '';
   String _lock = '';
 
+  // ✅ Control fields (stored in Firestore)
+  bool _isActive = true;
+  bool _isFeatured = false;
+  int _featuredOrder = 0;
+  DateTime? _featuredUntil;
+
   // navigation list
   List<_NavItem> _nav = [];
   int _navIndex = -1;
@@ -54,7 +69,54 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
   @override
   void initState() {
     super.initState();
+    _listenRole();
     _loadArticleAndNav();
+  }
+
+  @override
+  void dispose() {
+    _roleSubscription?.cancel();
+    super.dispose();
+  }
+
+  // =========================
+  // Helpers
+  // =========================
+  String _fmtDt(DateTime dt) {
+    final y = dt.year.toString().padLeft(4, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    final d = dt.day.toString().padLeft(2, '0');
+    final hh = dt.hour.toString().padLeft(2, '0');
+    final mm = dt.minute.toString().padLeft(2, '0');
+    return "$y-$m-$d  $hh:$mm";
+  }
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  // =========================
+  // Role (Admin / Moderator)
+  // =========================
+  void _listenRole() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    _roleSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .snapshots()
+        .listen(
+      (doc) {
+        final data = doc.data();
+        final r = (data?['role'] ?? 'user').toString().trim().toLowerCase();
+        if (mounted) {
+          setState(() => _role = r.isEmpty ? 'user' : r);
+        }
+      },
+      onError: (_) {},
+    );
   }
 
   Future<void> _loadArticleAndNav() async {
@@ -76,11 +138,8 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
             .doc(incomingDocId)
             .get();
 
-        // ✅ Enforce active flag when reading by docId
         if (d.exists) {
-          final data = d.data() ?? {};
-          final isActive = data['isActive'] == true;
-          if (isActive) docSnap = d;
+          docSnap = d;
         }
       }
 
@@ -89,7 +148,6 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
         final snap = await FirebaseFirestore.instance
             .collection(_collectionName)
             .where('title', isEqualTo: incomingTitle)
-            .where('isActive', isEqualTo: true)
             .limit(1)
             .get();
 
@@ -117,6 +175,17 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
       _core = (data['core'] ?? '').toString();
       _example = (data['example'] ?? '').toString();
       _lock = (data['lock'] ?? '').toString();
+
+      // ✅ Control fields
+      _isActive = data['isActive'] == true;
+      _isFeatured = data['isFeatured'] == true;
+
+      final foRaw = data['featuredOrder'];
+      _featuredOrder =
+          (foRaw is int) ? foRaw : int.tryParse((foRaw ?? '0').toString()) ?? 0;
+
+      final fu = data['featuredUntil'];
+      _featuredUntil = (fu is Timestamp) ? fu.toDate() : null;
 
       // =========================
       // 2) Build navigation list (active only, ordered by createdAt desc)
@@ -213,9 +282,550 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
       MaterialPageRoute(
         builder: (_) => KnowClientArticlesScreen(
           docId: item.id,
-          title: item.title, // display fallback only
+          title: item.title,
         ),
       ),
+    );
+  }
+
+  // =========================
+  // ✅ Admin Tools
+  // =========================
+  DocumentReference<Map<String, dynamic>> get _docRef =>
+      FirebaseFirestore.instance.collection(_collectionName).doc(_docId);
+
+  Future<DateTime?> _pickDateTime({DateTime? initial}) async {
+    final now = DateTime.now();
+    final init = initial ?? now;
+
+    final date = await showDatePicker(
+      context: context,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 3),
+      initialDate: DateTime(init.year, init.month, init.day),
+    );
+    if (date == null) return null;
+    if (!mounted) return null;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(init),
+    );
+    if (time == null) return null;
+
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute);
+  }
+
+  Future<void> _confirmDelete() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("حذف الموضوع", textAlign: TextAlign.right),
+        content: const Text(
+          "هل تريد حذف هذا الموضوع نهائيًا؟",
+          textAlign: TextAlign.right,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("إلغاء"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("حذف"),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    try {
+      if (_docId.isEmpty) {
+        _snack("لا يوجد docId للموضوع.");
+        return;
+      }
+
+      await _docRef.delete();
+      if (!mounted) return;
+      _snack("تم الحذف ✅");
+      Navigator.pop(context);
+    } catch (_) {
+      _snack("فشل الحذف. راجع Rules.");
+    }
+  }
+
+  Future<void> _toggleActive(bool value) async {
+    try {
+      if (_docId.isEmpty) {
+        _snack("لا يوجد docId للموضوع.");
+        return;
+      }
+
+      await _docRef.update({
+        'isActive': value,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+      setState(() => _isActive = value);
+
+      _snack(value ? "تم الإظهار ✅" : "تم الإخفاء ✅");
+    } catch (_) {
+      _snack("فشل التحديث. راجع Rules.");
+    }
+  }
+
+  Future<void> _publishNow() async {
+    try {
+      if (_docId.isEmpty) {
+        _snack("لا يوجد docId للموضوع.");
+        return;
+      }
+
+      await _docRef.update({
+        'isActive': true,
+        'publishAt': Timestamp.fromDate(DateTime.now()),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+      setState(() => _isActive = true);
+
+      _snack("تم النشر الآن ✅");
+    } catch (_) {
+      _snack("فشل النشر. راجع Rules.");
+    }
+  }
+
+  Future<void> _schedulePublishAt() async {
+    final dt = await _pickDateTime(
+      initial: DateTime.now().add(const Duration(minutes: 10)),
+    );
+    if (dt == null) return;
+
+    try {
+      if (_docId.isEmpty) {
+        _snack("لا يوجد docId للموضوع.");
+        return;
+      }
+
+      await _docRef.update({
+        'publishAt': Timestamp.fromDate(dt),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      _snack("تمت جدولة وقت النشر ✅");
+    } catch (_) {
+      _snack("فشل الجدولة. راجع Rules.");
+    }
+  }
+
+  // ✅ Featured control (no section control for KYC)
+  Future<void> _openFeaturedControl() async {
+    if (_docId.isEmpty) {
+      _snack("لا يوجد docId للموضوع.");
+      return;
+    }
+
+    bool isFeaturedLocal = _isFeatured;
+    int featuredOrderLocal = _featuredOrder;
+    DateTime? untilLocal = _featuredUntil;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (_) {
+        return StatefulBuilder(
+          builder: (context, setLocal) {
+            Widget stepperRow({
+              required String label,
+              required int value,
+              required VoidCallback onDown,
+              required VoidCallback onUp,
+              String? hint,
+            }) {
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        hint == null
+                            ? "$label: $value"
+                            : "$label: $value\n$hint",
+                        textAlign: TextAlign.right,
+                        style: GoogleFonts.cairo(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12.5,
+                          height: 1.4,
+                          color: AppColors.primaryDeepTeal,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: "تقليل",
+                      onPressed: onDown,
+                      icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                    ),
+                    IconButton(
+                      tooltip: "زيادة",
+                      onPressed: onUp,
+                      icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 12,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 14,
+                ),
+                child: Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 42,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          "ترشيحات Pro",
+                          textAlign: TextAlign.right,
+                          style: GoogleFonts.cairo(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 14.5,
+                            color: AppColors.primaryDeepTeal,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "• ترتيب المختارات = ترتيب داخل \"ترشيحات Pro\"",
+                          textAlign: TextAlign.right,
+                          style: GoogleFonts.cairo(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Featured toggle
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  "مختارات اليوم (Featured)",
+                                  textAlign: TextAlign.right,
+                                  style: GoogleFonts.cairo(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 12.8,
+                                    color: AppColors.primaryDeepTeal,
+                                  ),
+                                ),
+                              ),
+                              Switch(
+                                value: isFeaturedLocal,
+                                onChanged: (v) =>
+                                    setLocal(() => isFeaturedLocal = v),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Featured order stepper
+                        stepperRow(
+                          label: "ترتيب داخل المختارات",
+                          value: featuredOrderLocal,
+                          hint: "استخدم الأسهم ↑ ↓ بدل كتابة رقم",
+                          onDown: () => setLocal(() {
+                            if (featuredOrderLocal > 0) featuredOrderLocal--;
+                          }),
+                          onUp: () => setLocal(() => featuredOrderLocal++),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // Featured until
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  untilLocal == null
+                                      ? "انتهاء التثبيت: غير محدد"
+                                      : "انتهاء التثبيت: ${_fmtDt(untilLocal!)}",
+                                  textAlign: TextAlign.right,
+                                  style: GoogleFonts.cairo(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 12.5,
+                                    color: AppColors.primaryDeepTeal,
+                                  ),
+                                ),
+                              ),
+                              TextButton.icon(
+                                onPressed: () async {
+                                  final picked = await _pickDateTime(
+                                    initial: untilLocal ??
+                                        DateTime.now()
+                                            .add(const Duration(days: 1)),
+                                  );
+                                  if (picked == null) return;
+                                  setLocal(() => untilLocal = picked);
+                                },
+                                icon:
+                                    const Icon(Icons.timer_outlined, size: 18),
+                                label: Text(
+                                  "تحديد",
+                                  style: GoogleFonts.cairo(
+                                      fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                              if (untilLocal != null)
+                                IconButton(
+                                  tooltip: "مسح",
+                                  onPressed: () =>
+                                      setLocal(() => untilLocal = null),
+                                  icon: const Icon(Icons.close_rounded),
+                                ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 14),
+                        // ✅ Save button: adaptive height, no clipping
+                        Align(
+                          alignment: Alignment.center,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 48),
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.secondaryOrange,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 14, horizontal: 28),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              onPressed: () async {
+                                final nav = Navigator.of(context);
+                                try {
+                                  await _docRef.update({
+                                    'isFeatured': isFeaturedLocal,
+                                    'featuredOrder': featuredOrderLocal,
+                                    'featuredUntil': untilLocal == null
+                                        ? FieldValue.delete()
+                                        : Timestamp.fromDate(untilLocal!),
+                                    'updatedAt': FieldValue.serverTimestamp(),
+                                  });
+
+                                  if (!mounted) return;
+                                  setState(() {
+                                    _isFeatured = isFeaturedLocal;
+                                    _featuredOrder = featuredOrderLocal;
+                                    _featuredUntil = untilLocal;
+                                  });
+
+                                  nav.pop();
+                                  _snack("تم حفظ التحكم ✅");
+                                } catch (_) {
+                                  _snack("فشل الحفظ. راجع Rules.");
+                                }
+                              },
+                              child: Text(
+                                "حفظ التحكم",
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.cairo(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _openAdminToolsSheet() {
+    if (!_canAdmin) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (_) {
+        Widget chip({
+          required IconData icon,
+          required String text,
+          required String tooltip,
+          required VoidCallback onTap,
+          required Color color,
+        }) {
+          return Tooltip(
+            message: tooltip,
+            child: ActionChip(
+              onPressed: onTap,
+              avatar: Icon(icon, size: 18, color: color),
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              labelPadding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              label: Text(
+                text,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.cairo(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                  height: 1.3,
+                  color: color,
+                ),
+              ),
+              backgroundColor: color.withValues(alpha: 0.08),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+            ),
+          );
+        }
+
+        return SafeArea(
+          child: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    "أدوات الأدمن",
+                    textAlign: TextAlign.right,
+                    style: GoogleFonts.cairo(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14.5,
+                      color: AppColors.primaryDeepTeal,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      chip(
+                        icon: Icons.star_outline_rounded,
+                        text: "ترشيحات\n+ ترتيب",
+                        tooltip: "ترشيحات Pro + ترتيب",
+                        color: AppColors.secondaryOrange,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _openFeaturedControl();
+                        },
+                      ),
+                      chip(
+                        icon: _isActive
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        text: _isActive ? "إخفاء" : "إظهار",
+                        tooltip: "إخفاء/إظهار",
+                        color: _isActive ? Colors.redAccent : Colors.green,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _toggleActive(!_isActive);
+                        },
+                      ),
+                      chip(
+                        icon: Icons.publish_rounded,
+                        text: "نشر الآن",
+                        tooltip: "نشر الآن",
+                        color: AppColors.secondaryOrange,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _publishNow();
+                        },
+                      ),
+                      chip(
+                        icon: Icons.schedule_send,
+                        text: "جدولة\nنشر",
+                        tooltip: "جدولة نشر",
+                        color: Colors.black87,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _schedulePublishAt();
+                        },
+                      ),
+                      chip(
+                        icon: Icons.delete_outline,
+                        text: "حذف",
+                        tooltip: "حذف نهائي",
+                        color: Colors.red,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _confirmDelete();
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -231,13 +841,27 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
         backgroundColor: AppColors.primaryDeepTeal,
         foregroundColor: Colors.white,
         centerTitle: true,
-        title: Text(
-          safeTitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 16),
+        title: SizedBox(
+          height: 28,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.center,
+            child: Text(
+              safeTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.cairo(fontWeight: FontWeight.w900),
+            ),
+          ),
         ),
         actions: [
+          if (_canAdmin)
+            IconButton(
+              tooltip: 'أدوات الأدمن',
+              onPressed: _openAdminToolsSheet,
+              icon: const Icon(Icons.admin_panel_settings_rounded,
+                  color: Colors.white),
+            ),
           IconButton(
             tooltip: _isFavorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة',
             onPressed: _toggleFavorite,
