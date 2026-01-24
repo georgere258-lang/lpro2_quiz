@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/admin/quizzes/question_details_screen.dart
-// Question details screen: Edit / Hide-Show / Delete / Move league
+// Question details screen v2: Arabic categories + hard delete + isActive toggle
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -10,12 +10,10 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/firestore_paths.dart';
 import '../../../../core/services/app_config_service.dart';
 import '../../../../features/quizzes/models/quiz.dart';
-import '../../../../features/quizzes/repositories/quiz_repository.dart';
 import '../widgets/admin_shared_widgets.dart';
 
 class QuestionDetailsScreen extends StatefulWidget {
   final String docId;
-  final QuizRepository quizRepo;
   final void Function(bool) setSaving;
   final void Function(String) snack;
   final Future<bool> Function(String, String) confirm;
@@ -23,7 +21,6 @@ class QuestionDetailsScreen extends StatefulWidget {
   const QuestionDetailsScreen({
     super.key,
     required this.docId,
-    required this.quizRepo,
     required this.setSaving,
     required this.snack,
     required this.confirm,
@@ -35,14 +32,14 @@ class QuestionDetailsScreen extends StatefulWidget {
 
 class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
   // ═══════════════════════════════════════════════════════════════════════════
-  // League Labels
+  // Category Values (Arabic - stored directly in Firestore)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  static const Map<String, String> _leagueLabels = {
-    QuizCategory.stars: 'دوري النجوم',
-    QuizCategory.pros: 'دوري المحترفين',
-    QuizCategory.general: 'عام',
-  };
+  static const List<String> _categoryValues = [
+    'دوري النجوم',
+    'دوري المحترفين',
+    'عام',
+  ];
 
   // ═══════════════════════════════════════════════════════════════════════════
   // State
@@ -59,7 +56,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
   final _o2C = TextEditingController();
   final _o3C = TextEditingController();
   int _correctIndex = 0;
-  String _category = QuizCategory.stars;
+  String _category = 'دوري النجوم';
   String _league = QuizLeague.bronze;
   bool _isActive = true;
 
@@ -106,7 +103,11 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
       _o2C.text = quiz.options.length > 2 ? quiz.options[2] : '';
       _o3C.text = quiz.options.length > 3 ? quiz.options[3] : '';
       _correctIndex = quiz.correctOptionIndex.clamp(0, 3);
-      _category = quiz.category;
+
+      // Use category directly (Arabic), fallback to default
+      _category = _categoryValues.contains(quiz.category)
+          ? quiz.category
+          : 'دوري النجوم';
       _league = quiz.league;
       _isActive = quiz.isActive;
 
@@ -149,13 +150,17 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
     widget.setSaving(true);
 
     try {
-      await widget.quizRepo.update(widget.docId, {
+      await FirebaseFirestore.instance
+          .collection(FirestorePaths.quizzes)
+          .doc(widget.docId)
+          .update({
         'question': question,
         'options': options,
         'correctOptionIndex': _correctIndex,
         'category': _category,
         'league': _league,
         'isActive': _isActive,
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
       widget.snack('تم الحفظ ✅');
@@ -168,12 +173,19 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
     }
   }
 
+  /// Toggle isActive (Hide/Show)
   Future<void> _toggleActive() async {
     widget.setSaving(true);
 
     try {
       final newValue = !_isActive;
-      await widget.quizRepo.toggleActive(widget.docId, newValue);
+      await FirebaseFirestore.instance
+          .collection(FirestorePaths.quizzes)
+          .doc(widget.docId)
+          .update({
+        'isActive': newValue,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
       setState(() {
         _isActive = newValue;
         _changed = true;
@@ -186,10 +198,11 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
     }
   }
 
+  /// Hard delete - permanently removes the document
   Future<void> _deleteQuestion() async {
     final confirmed = await widget.confirm(
-      'حذف السؤال؟',
-      'سيتم إخفاء السؤال نهائياً ولن يظهر للمستخدمين.',
+      'حذف السؤال نهائياً؟',
+      'سيتم حذف السؤال من قاعدة البيانات ولا يمكن استرجاعه.',
     );
 
     if (!confirmed) return;
@@ -197,7 +210,11 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
     widget.setSaving(true);
 
     try {
-      await widget.quizRepo.softDelete(widget.docId);
+      await FirebaseFirestore.instance
+          .collection(FirestorePaths.quizzes)
+          .doc(widget.docId)
+          .delete();
+
       widget.snack('تم الحذف ✅');
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -206,6 +223,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
     }
   }
 
+  /// Move league - only updates category field to Arabic value
   Future<void> _moveLeague() async {
     String newCategory = _category;
     String newLeague = _league;
@@ -224,11 +242,11 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
                 DropdownButtonFormField<String>(
                   value: newCategory,
                   decoration: adminDropDecor().copyWith(labelText: 'الدوري'),
-                  items: QuizCategory.values
+                  items: _categoryValues
                       .map((c) => DropdownMenuItem(
                             value: c,
                             child: Text(
-                              _leagueLabels[c] ?? c,
+                              c,
                               style: GoogleFonts.cairo(fontSize: 12),
                             ),
                           ))
@@ -259,11 +277,15 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
                   Navigator.pop(ctx);
                   widget.setSaving(true);
                   try {
-                    await widget.quizRepo.move(
-                      widget.docId,
-                      newCategory: newCategory,
-                      newLeague: newLeague,
-                    );
+                    // Simply update category field (Arabic string)
+                    await FirebaseFirestore.instance
+                        .collection(FirestorePaths.quizzes)
+                        .doc(widget.docId)
+                        .update({
+                      'category': newCategory,
+                      'league': newLeague,
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    });
                     setState(() {
                       _category = newCategory;
                       _league = newLeague;
@@ -298,8 +320,8 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
       return;
     }
 
-    final payload = widget.quizRepo.buildSharePayload(_quiz!);
-    Clipboard.setData(ClipboardData(text: payload['deepLink']));
+    final deepLink = 'lpro://quiz/${widget.docId}';
+    Clipboard.setData(ClipboardData(text: deepLink));
     widget.snack('تم نسخ الرابط ✅');
   }
 
@@ -350,7 +372,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                '${_leagueLabels[_category] ?? _category} • $_league',
+                                '$_category • $_league',
                                 style: GoogleFonts.cairo(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
@@ -382,7 +404,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
                                 ? Icons.visibility_off_outlined
                                 : Icons.visibility_outlined,
                             label: _isActive ? 'إخفاء' : 'إظهار',
-                            color: _isActive ? Colors.redAccent : Colors.green,
+                            color: _isActive ? Colors.orange : Colors.green,
                             onTap: _toggleActive,
                           ),
                           _actionChip(
@@ -398,8 +420,8 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
                             onTap: _shareQuestion,
                           ),
                           _actionChip(
-                            icon: Icons.delete_outline,
-                            label: 'حذف',
+                            icon: Icons.delete_forever_outlined,
+                            label: 'حذف نهائي',
                             color: Colors.red,
                             onTap: _deleteQuestion,
                           ),
@@ -421,11 +443,11 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
                               value: _category,
                               decoration:
                                   adminDropDecor().copyWith(labelText: 'الدوري'),
-                              items: QuizCategory.values
+                              items: _categoryValues
                                   .map((c) => DropdownMenuItem(
                                         value: c,
                                         child: Text(
-                                          _leagueLabels[c] ?? c,
+                                          c,
                                           style: GoogleFonts.cairo(
                                               fontWeight: FontWeight.w800,
                                               fontSize: 12),
@@ -562,16 +584,14 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        border: isCorrect
-            ? Border.all(color: Colors.green, width: 2)
-            : null,
+        border: isCorrect ? Border.all(color: Colors.green, width: 2) : null,
       ),
       child: Row(
         children: [
           Expanded(child: adminTextField(c, hint)),
           if (isCorrect)
-            Padding(
-              padding: const EdgeInsets.only(left: 8),
+            const Padding(
+              padding: EdgeInsets.only(left: 8),
               child: Icon(Icons.check_circle, color: Colors.green, size: 20),
             ),
         ],

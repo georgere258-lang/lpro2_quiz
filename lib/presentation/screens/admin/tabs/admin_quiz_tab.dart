@@ -1,15 +1,13 @@
 // PATH: lib/presentation/screens/admin/tabs/admin_quiz_tab.dart
-// Quiz CMS v1: Search-first UI + Add + Bulk Import
+// Quiz CMS v2: Arabic categories + hard delete + stable behavior
 
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/firestore_paths.dart';
-import '../../../../core/models/admin_control_models.dart';
 import '../../../../features/quizzes/models/quiz.dart';
 import '../../../../features/quizzes/repositories/quiz_repository.dart';
 import '../widgets/admin_shared_widgets.dart';
@@ -35,29 +33,27 @@ class AdminQuizTab extends StatefulWidget {
 
 class _AdminQuizTabState extends State<AdminQuizTab> {
   // ═══════════════════════════════════════════════════════════════════════════
-  // League Mapping (Arabic -> Internal)
+  // Category Values (Arabic - stored directly in Firestore)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  static const Map<String, String?> _leagueMap = {
-    'كل الدوريات': null,
-    'دوري النجوم': QuizCategory.stars,
-    'دوري المحترفين': QuizCategory.pros,
-    'عام': QuizCategory.general,
-  };
+  static const List<String> _categoryValues = [
+    'دوري النجوم',
+    'دوري المحترفين',
+    'عام',
+  ];
 
-  static const Map<String, String> _leagueLabels = {
-    QuizCategory.stars: 'دوري النجوم',
-    QuizCategory.pros: 'دوري المحترفين',
-    QuizCategory.general: 'عام',
-  };
-
-  static List<String> get _leagueOptions => _leagueMap.keys.toList();
+  static const List<String> _filterOptions = [
+    'كل الدوريات',
+    'دوري النجوم',
+    'دوري المحترفين',
+    'عام',
+  ];
 
   // ═══════════════════════════════════════════════════════════════════════════
   // State
   // ═══════════════════════════════════════════════════════════════════════════
 
-  String _selectedLeague = 'كل الدوريات';
+  String _selectedFilter = 'كل الدوريات';
   final _searchC = TextEditingController();
   List<Quiz> _searchResults = [];
   bool _isSearching = false;
@@ -71,7 +67,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
   final _o2C = TextEditingController();
   final _o3C = TextEditingController();
   int _correctIndex = 0;
-  String _addLeague = QuizCategory.stars;
+  String _addCategory = 'دوري النجوم';
   String _addLevel = QuizLeague.bronze;
   bool _addIsActive = true;
 
@@ -98,19 +94,15 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
     setState(() => _isSearching = true);
 
     try {
-      final category = _leagueMap[_selectedLeague];
       final searchText = _searchC.text.trim().toLowerCase();
 
       Query<Map<String, dynamic>> query =
           FirebaseFirestore.instance.collection(FirestorePaths.quizzes);
 
       // Filter by category if not "all"
-      if (category != null) {
-        query = query.where('category', isEqualTo: category);
+      if (_selectedFilter != 'كل الدوريات') {
+        query = query.where('category', isEqualTo: _selectedFilter);
       }
-
-      // Exclude deleted
-      query = query.where('isDeleted', isEqualTo: false);
 
       // Limit and order
       query = query.orderBy('createdAt', descending: true).limit(100);
@@ -188,23 +180,22 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
     widget.setSaving(true);
 
     try {
-      final control = AdminControlFields(
-        isActive: _addIsActive,
-        sectionKey: FirestorePaths.sectionKeyQuiz,
-      );
+      final data = <String, dynamic>{
+        'question': question,
+        'options': options,
+        'correctOptionIndex': _correctIndex,
+        'category': _addCategory,
+        'league': _addLevel,
+        'difficulty': 3,
+        'isActive': _addIsActive,
+        'sectionKey': FirestorePaths.sectionKeyQuiz,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
 
-      final quiz = Quiz(
-        id: '',
-        question: question,
-        options: options,
-        correctOptionIndex: _correctIndex,
-        category: _addLeague,
-        league: _addLevel,
-        control: control,
-      );
-
-      quiz.validate();
-      await widget.quizRepo.create(quiz);
+      await FirebaseFirestore.instance
+          .collection(FirestorePaths.quizzes)
+          .add(data);
 
       widget.snack('تم إضافة السؤال ✅');
       _clearAddForm();
@@ -259,30 +250,12 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
             continue;
           }
 
-          // Validate category
+          // Validate category (must be Arabic string)
           final category = (item['category'] ?? '').toString().trim();
-          if (category.isEmpty) {
-            failures.add('[$index] category مطلوب');
+          if (!_categoryValues.contains(category)) {
+            failures.add(
+                '[$index] category يجب أن يكون: ${_categoryValues.join(" / ")}');
             continue;
-          }
-
-          // Map Arabic category to internal
-          String internalCategory = category;
-          if (_leagueLabels.containsValue(category)) {
-            internalCategory = _leagueLabels.entries
-                .firstWhere((e) => e.value == category)
-                .key;
-          }
-
-          if (!QuizCategory.isValid(internalCategory)) {
-            // Try to match
-            if (category.contains('نجوم')) {
-              internalCategory = QuizCategory.stars;
-            } else if (category.contains('محترفين')) {
-              internalCategory = QuizCategory.pros;
-            } else {
-              internalCategory = QuizCategory.general;
-            }
           }
 
           // Validate question
@@ -333,11 +306,10 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
             'question': question,
             'options': options,
             'correctOptionIndex': correct,
-            'category': internalCategory,
+            'category': category,
             'league': validLeague,
             'difficulty': 3,
             'isActive': isActive,
-            'isDeleted': false,
             'sectionKey': FirestorePaths.sectionKeyQuiz,
             'createdAt': FieldValue.serverTimestamp(),
             'updatedAt': FieldValue.serverTimestamp(),
@@ -396,20 +368,20 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
             _sectionHeader('بحث الأسئلة'),
             const SizedBox(height: 10),
 
-            // League filter
+            // Category filter
             DropdownButtonFormField<String>(
-              value: _selectedLeague,
+              value: _selectedFilter,
               decoration: adminDropDecor().copyWith(labelText: 'الدوري'),
-              items: _leagueOptions
-                  .map((l) => DropdownMenuItem(
-                        value: l,
-                        child: Text(l,
+              items: _filterOptions
+                  .map((c) => DropdownMenuItem(
+                        value: c,
+                        child: Text(c,
                             style: GoogleFonts.cairo(
                                 fontWeight: FontWeight.w800, fontSize: 13)),
                       ))
                   .toList(),
               onChanged: (v) {
-                if (v != null) setState(() => _selectedLeague = v);
+                if (v != null) setState(() => _selectedFilter = v);
               },
             ),
             const SizedBox(height: 10),
@@ -476,19 +448,19 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
                 children: [
                   const SizedBox(height: 12),
 
-                  // Category (league)
+                  // Category + Level
                   Row(
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: _addLeague,
+                          value: _addCategory,
                           decoration:
                               adminDropDecor().copyWith(labelText: 'الدوري'),
-                          items: QuizCategory.values
+                          items: _categoryValues
                               .map((c) => DropdownMenuItem(
                                     value: c,
                                     child: Text(
-                                      _leagueLabels[c] ?? c,
+                                      c,
                                       style: GoogleFonts.cairo(
                                           fontWeight: FontWeight.w800,
                                           fontSize: 12),
@@ -496,7 +468,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
                                   ))
                               .toList(),
                           onChanged: (v) {
-                            if (v != null) setState(() => _addLeague = v);
+                            if (v != null) setState(() => _addCategory = v);
                           },
                         ),
                       ),
@@ -629,6 +601,14 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'القيم المسموحة للدوري: ${_categoryValues.join(" / ")}',
+                    style: GoogleFonts.cairo(
+                      fontSize: 10,
+                      color: Colors.grey[600],
+                    ),
+                  ),
                   const SizedBox(height: 12),
                   Align(
                     alignment: Alignment.centerRight,
@@ -664,7 +644,6 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
           MaterialPageRoute(
             builder: (_) => QuestionDetailsScreen(
               docId: q.id,
-              quizRepo: widget.quizRepo,
               setSaving: widget.setSaving,
               snack: widget.snack,
               confirm: widget.confirm,
@@ -697,7 +676,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
                 adminStatusBadge(q.isActive),
                 const Spacer(),
                 Text(
-                  '${_leagueLabels[q.category] ?? q.category} • ${q.league}',
+                  '${q.category} • ${q.league}',
                   style: GoogleFonts.cairo(fontSize: 10, color: Colors.grey),
                 ),
               ],
