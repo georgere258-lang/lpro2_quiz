@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/firestore_paths.dart';
 import '../../../../core/models/admin_control_models.dart';
+import '../../../../core/services/app_config_service.dart';
 import '../../../../features/quizzes/models/quiz.dart';
 import '../../../../features/quizzes/repositories/quiz_repository.dart';
 import '../widgets/admin_shared_widgets.dart';
@@ -93,7 +94,15 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
               adminTinyBtn('تعديل', () => _openQuizEditor(quiz: q)),
               adminTinyBtn('نقل', () => _openMoveQuizDialog(q)),
               adminTinyBtn('حذف', () async { if (await widget.confirm('حذف السؤال؟', 'سيتم إخفاء السؤال نهائياً')) { widget.setSaving(true); try { await widget.quizRepo.softDelete(q.id); widget.snack('تم الحذف ✅'); } catch (_) { widget.snack('فشل'); } finally { widget.setSaving(false); } } }),
-              adminTinyBtn('مشاركة', () { final payload = widget.quizRepo.buildSharePayload(q); Clipboard.setData(ClipboardData(text: payload['deepLink'])); widget.snack('تم نسخ الرابط ✅'); }),
+              adminTinyBtn('مشاركة', () {
+                if (!AppConfigService().quizShareEnabled) {
+                  widget.snack('المشاركة غير متاحة حالياً');
+                  return;
+                }
+                final payload = widget.quizRepo.buildSharePayload(q);
+                Clipboard.setData(ClipboardData(text: payload['deepLink']));
+                widget.snack('تم نسخ الرابط ✅');
+              }),
             ],
           ),
         ],

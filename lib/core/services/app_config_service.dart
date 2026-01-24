@@ -1,14 +1,45 @@
 // PATH: lib/core/services/app_config_service.dart
 // App-wide feature flags and limits configuration service.
 
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../constants/firestore_paths.dart';
 
 class AppConfigService {
-  AppConfigService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+  // ─────────────────────────────────────────────────────────────
+  // Singleton pattern with cached config
+  // ─────────────────────────────────────────────────────────────
+
+  static final AppConfigService _instance = AppConfigService._internal();
+  factory AppConfigService() => _instance;
+
+  AppConfigService._internal() : _db = FirebaseFirestore.instance {
+    _initStream();
+  }
+
+  /// For testing: create instance with custom Firestore
+  AppConfigService.withFirestore(FirebaseFirestore firestore)
+      : _db = firestore {
+    _initStream();
+  }
 
   final FirebaseFirestore _db;
+  StreamSubscription<Map<String, dynamic>>? _subscription;
+
+  /// Cached latest config map (updated from stream)
+  Map<String, dynamic> _cachedConfig = defaults;
+
+  void _initStream() {
+    _subscription?.cancel();
+    _subscription = watchCurrent().listen((data) {
+      _cachedConfig = data;
+    });
+  }
+
+  /// Dispose resources (call on app shutdown if needed)
+  void dispose() {
+    _subscription?.cancel();
+  }
 
   static const String _col = FirestorePaths.appConfig;
   static const String _docId = 'current';
@@ -20,20 +51,53 @@ class AppConfigService {
   static const Map<String, dynamic> defaultFeatures = {
     'pushNotificationsEnabled': false,
     'sectionNotificationsEnabled': false,
-    'supportChatEnabled': true,
+    'supportChatEnabled': false, // default FALSE to avoid cost
     'quizShareEnabled': true,
   };
 
   static const Map<String, dynamic> defaultLimits = {
     'maxFetchPerPage': 50,
-    'maxProInsightScan': 300,
-    'maxSupportMessagesPerDay': 50,
+    'maxProInsightScan': 200,
+    'maxSupportMessagesPerDay': 20,
   };
 
   static Map<String, dynamic> get defaults => {
         'features': Map<String, dynamic>.from(defaultFeatures),
         'limits': Map<String, dynamic>.from(defaultLimits),
       };
+
+  // ─────────────────────────────────────────────────────────────
+  // Strongly-typed getters (with safe defaults from cached config)
+  // ─────────────────────────────────────────────────────────────
+
+  Map<String, dynamic> get _features =>
+      (_cachedConfig['features'] as Map<String, dynamic>?) ?? defaultFeatures;
+
+  Map<String, dynamic> get _limits =>
+      (_cachedConfig['limits'] as Map<String, dynamic>?) ?? defaultLimits;
+
+  // Feature flags
+  bool get pushNotificationsEnabled =>
+      _features['pushNotificationsEnabled'] as bool? ?? false;
+
+  bool get sectionNotificationsEnabled =>
+      _features['sectionNotificationsEnabled'] as bool? ?? false;
+
+  bool get supportChatEnabled =>
+      _features['supportChatEnabled'] as bool? ?? false;
+
+  bool get quizShareEnabled =>
+      _features['quizShareEnabled'] as bool? ?? true;
+
+  // Limits
+  int get maxFetchPerPage =>
+      _limits['maxFetchPerPage'] as int? ?? 50;
+
+  int get maxProInsightScan =>
+      _limits['maxProInsightScan'] as int? ?? 200;
+
+  int get maxSupportMessagesPerDay =>
+      _limits['maxSupportMessagesPerDay'] as int? ?? 20;
 
   // ─────────────────────────────────────────────────────────────
   // Public API

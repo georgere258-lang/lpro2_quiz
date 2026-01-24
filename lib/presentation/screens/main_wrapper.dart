@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/services/app_config_service.dart';
 import 'home_screen.dart';
 import 'leaderboard_screen.dart';
 import 'profile_screen.dart';
@@ -36,9 +37,28 @@ class _MainWrapperState extends State<MainWrapper> {
     _pages = [
       const HomeScreen(),
       const LeaderboardScreen(),
-      ProfileScreen(onSupportPressed: () => setState(() => _currentIndex = 3)),
+      ProfileScreen(onSupportPressed: _handleSupportPressed),
       const ChatSupportScreen(),
     ];
+  }
+
+  void _handleSupportPressed() {
+    if (AppConfigService().supportChatEnabled) {
+      setState(() => _currentIndex = 3);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'الدعم غير متاح حالياً',
+            style: GoogleFonts.cairo(fontWeight: FontWeight.w600),
+            textAlign: TextAlign.center,
+          ),
+          backgroundColor: AppColors.primaryDeepTeal,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   @override
