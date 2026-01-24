@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/firestore_paths.dart';
+import '../../features/news_ticker/repositories/news_ticker_repository.dart';
 import '../../features/pro_card/repositories/pro_card_repository.dart';
 
 class AdminPanel extends StatefulWidget {
@@ -66,6 +67,7 @@ class _AdminPanelState extends State<AdminPanel>
   // Tab 3: News Ticker (CRUD)
   // =========================
   static const String _tickerCol = FirestorePaths.newsTickerItems;
+  final NewsTickerRepository _tickerRepo = NewsTickerRepository();
   final TextEditingController _tickerText = TextEditingController();
   int _tickerPriority = 0;
   bool _tickerNotify = false;
@@ -523,16 +525,16 @@ class _AdminPanelState extends State<AdminPanel>
 
     setState(() => _saving = true);
     try {
-      await FirebaseFirestore.instance.collection(_tickerCol).add(
-            _tickerPayload(
-              textAr: text,
-              priority: _tickerPriority,
-              isActive: true,
-              notify: _tickerNotify,
-              startDate: _tickerStart,
-              endDate: _tickerEnd,
-            ),
-          );
+      await _tickerRepo.addItem(
+        _tickerPayload(
+          textAr: text,
+          priority: _tickerPriority,
+          isActive: true,
+          notify: _tickerNotify,
+          startDate: _tickerStart,
+          endDate: _tickerEnd,
+        ),
+      );
       _snack('تمت الإضافة ✅');
       _tickerText.clear();
       setState(() {
@@ -551,13 +553,7 @@ class _AdminPanelState extends State<AdminPanel>
   Future<void> _toggleTickerActive(String docId, bool current) async {
     setState(() => _saving = true);
     try {
-      await FirebaseFirestore.instance
-          .collection(_tickerCol)
-          .doc(docId)
-          .update({
-        'isActive': !current,
-        'updatedAt': FieldValue.serverTimestamp(), // ✅ FIX
-      });
+      await _tickerRepo.toggleActive(docId, current);
       _snack(current ? 'تم الإخفاء ✅' : 'تم الإظهار ✅');
     } catch (_) {
       _snack('فشل التعديل.');
@@ -569,10 +565,7 @@ class _AdminPanelState extends State<AdminPanel>
   Future<void> _deleteTicker(String docId) async {
     setState(() => _saving = true);
     try {
-      await FirebaseFirestore.instance
-          .collection(_tickerCol)
-          .doc(docId)
-          .delete();
+      await _tickerRepo.deleteItem(docId);
       _snack('تم الحذف ✅');
     } catch (_) {
       _snack('فشل الحذف.');
@@ -717,10 +710,7 @@ class _AdminPanelState extends State<AdminPanel>
                     update['startDate'] = startUtc != null ? Timestamp.fromDate(startUtc) : FieldValue.delete();
                     update['endDate'] = endUtc != null ? Timestamp.fromDate(endUtc) : FieldValue.delete();
 
-                    await FirebaseFirestore.instance
-                        .collection(_tickerCol)
-                        .doc(docId)
-                        .update(update);
+                    await _tickerRepo.updateItem(docId, update);
 
                     _snack('تم الحفظ ✅');
                     if (!mounted) return;
@@ -1211,10 +1201,7 @@ class _AdminPanelState extends State<AdminPanel>
             Expanded(
               child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 // ✅ FIX: remove orderBy(createdAt) to avoid transient null freeze/index issues
-                stream: FirebaseFirestore.instance
-                    .collection(_tickerCol)
-                    .orderBy('priority', descending: true)
-                    .snapshots(),
+                stream: _tickerRepo.watchAllForAdmin(),
                 builder: (context, snap) {
                   if (!snap.hasData) {
                     return const Center(child: CircularProgressIndicator());
