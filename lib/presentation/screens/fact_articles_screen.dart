@@ -765,62 +765,59 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                         ),
 
                         const SizedBox(height: 14),
-                        // ✅ Save button: not full-width, clear font, height 46
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              height: 46,
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.secondaryOrange,
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 32, vertical: 10),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
+                        // ✅ Save button: fixed width ~220, height 46, Cairo 15 w900
+                        Align(
+                          alignment: Alignment.center,
+                          child: SizedBox(
+                            width: 220,
+                            height: 46,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.secondaryOrange,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
                                 ),
-                                onPressed: () async {
-                                  final nav = Navigator.of(context);
-                                  try {
-                                    // ✅ Only update sectionKey/orderInSection, DO NOT touch tags
-                                    await _proInsightRepo.update(_docId, {
-                                      'isFeatured': isFeaturedLocal,
-                                      'featuredOrder': featuredOrderLocal,
-                                      'featuredUntil': untilLocal == null
-                                          ? FieldValue.delete()
-                                          : untilLocal,
-                                      'sectionKey': sectionKeyLocal.trim(),
-                                      'orderInSection': orderInSectionLocal,
-                                      'updatedAt': FieldValue.serverTimestamp(),
-                                    });
+                              ),
+                              onPressed: () async {
+                                final nav = Navigator.of(context);
+                                try {
+                                  // ✅ Only update sectionKey/orderInSection, DO NOT touch tags
+                                  await _proInsightRepo.update(_docId, {
+                                    'isFeatured': isFeaturedLocal,
+                                    'featuredOrder': featuredOrderLocal,
+                                    'featuredUntil': untilLocal == null
+                                        ? FieldValue.delete()
+                                        : untilLocal,
+                                    'sectionKey': sectionKeyLocal.trim(),
+                                    'orderInSection': orderInSectionLocal,
+                                    'updatedAt': FieldValue.serverTimestamp(),
+                                  });
 
-                                    if (!mounted) return;
-                                    setState(() {
-                                      _isFeatured = isFeaturedLocal;
-                                      _featuredOrder = featuredOrderLocal;
-                                      _featuredUntil = untilLocal;
-                                      _sectionKey = sectionKeyLocal.trim();
-                                      _orderInSection = orderInSectionLocal;
-                                    });
+                                  if (!mounted) return;
+                                  setState(() {
+                                    _isFeatured = isFeaturedLocal;
+                                    _featuredOrder = featuredOrderLocal;
+                                    _featuredUntil = untilLocal;
+                                    _sectionKey = sectionKeyLocal.trim();
+                                    _orderInSection = orderInSectionLocal;
+                                  });
 
-                                    nav.pop();
-                                    _snack("تم حفظ التحكم ✅");
-                                  } catch (_) {
-                                    _snack("فشل الحفظ. راجع Rules.");
-                                  }
-                                },
-                                child: Text(
-                                  "حفظ التحكم",
-                                  style: GoogleFonts.cairo(
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 14,
-                                    color: Colors.white,
-                                  ),
+                                  nav.pop();
+                                  _snack("تم حفظ التحكم ✅");
+                                } catch (_) {
+                                  _snack("فشل الحفظ. راجع Rules.");
+                                }
+                              },
+                              child: Text(
+                                "حفظ التحكم",
+                                style: GoogleFonts.cairo(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 15,
+                                  color: Colors.white,
                                 ),
                               ),
                             ),
-                          ],
+                          ),
                         ),
                         const SizedBox(height: 10),
                       ],
@@ -904,77 +901,74 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                     const SizedBox(height: 10),
                     _tf(lockC, "إغلاق/سلوك عملي (lock)", maxLines: 4),
                     const SizedBox(height: 12),
-                    // ✅ Save button: not full-width, clear font, height 46
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          height: 46,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.secondaryOrange,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 32, vertical: 10),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
+                    // ✅ Save button: fixed width ~220, height 46, Cairo 15 w900
+                    Align(
+                      alignment: Alignment.center,
+                      child: SizedBox(
+                        width: 220,
+                        height: 46,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.secondaryOrange,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
                             ),
-                            onPressed: () async {
-                              final t = titleC.text.trim();
-                              if (t.isEmpty) {
-                                _snack("العنوان مطلوب.");
-                                return;
-                              }
+                          ),
+                          onPressed: () async {
+                            final t = titleC.text.trim();
+                            if (t.isEmpty) {
+                              _snack("العنوان مطلوب.");
+                              return;
+                            }
 
-                              try {
-                                await _proInsightRepo.update(_docId, {
-                                  'title': t,
-                                  'hook': hookC.text.trim(),
-                                  'reset': resetC.text.trim(),
-                                  'core': coreC.text.trim(),
-                                  'example': exampleC.text.trim(),
-                                  'lock': lockC.text.trim(),
-                                  'updatedAt': FieldValue.serverTimestamp(),
-                                });
+                            try {
+                              await _proInsightRepo.update(_docId, {
+                                'title': t,
+                                'hook': hookC.text.trim(),
+                                'reset': resetC.text.trim(),
+                                'core': coreC.text.trim(),
+                                'example': exampleC.text.trim(),
+                                'lock': lockC.text.trim(),
+                                'updatedAt': FieldValue.serverTimestamp(),
+                              });
 
+                              if (!mounted) return;
+                              setState(() {
+                                _hook = hookC.text.trim();
+                                _reset = resetC.text.trim();
+                                _core = coreC.text.trim();
+                                _example = exampleC.text.trim();
+                                _lock = lockC.text.trim();
+                              });
+
+                              Navigator.pop(context);
+
+                              if (t != widget.title.trim()) {
                                 if (!mounted) return;
-                                setState(() {
-                                  _hook = hookC.text.trim();
-                                  _reset = resetC.text.trim();
-                                  _core = coreC.text.trim();
-                                  _example = exampleC.text.trim();
-                                  _lock = lockC.text.trim();
-                                });
-
-                                Navigator.pop(context);
-
-                                if (t != widget.title.trim()) {
-                                  if (!mounted) return;
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          FactArticlesScreen(title: t),
-                                    ),
-                                  );
-                                } else {
-                                  _snack("تم التحديث ✅");
-                                }
-                              } catch (_) {
-                                _snack("فشل التحديث. راجع Rules.");
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        FactArticlesScreen(title: t),
+                                  ),
+                                );
+                              } else {
+                                _snack("تم التحديث ✅");
                               }
-                            },
-                            child: Text(
-                              "حفظ التعديل",
-                              style: GoogleFonts.cairo(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 14,
-                                color: Colors.white,
-                              ),
+                            } catch (_) {
+                              _snack("فشل التحديث. راجع Rules.");
+                            }
+                          },
+                          child: Text(
+                            "حفظ التعديل",
+                            style: GoogleFonts.cairo(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 15,
+                              color: Colors.white,
                             ),
                           ),
                         ),
-                      ],
+                      ),
                     ),
                     const SizedBox(height: 10),
                   ],
