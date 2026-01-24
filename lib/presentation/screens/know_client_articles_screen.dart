@@ -1,12 +1,16 @@
 // PATH: lib/presentation/screens/know_client_articles_screen.dart
 // STATUS: Full File – ✅ Firestore Reader by docId (safe) + fallback by title + compact actions + prev/next by docIds
-// NOTE: UI unchanged. Only safety/logic hardening.
+// + BottomNav added (aligned with Fact architecture)
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../widgets/lpro_bottom_nav_bar.dart';
+import 'main_wrapper.dart';
 
 class KnowClientArticlesScreen extends StatefulWidget {
   // ✅ docId is preferred
@@ -28,8 +32,10 @@ class KnowClientArticlesScreen extends StatefulWidget {
 
 class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
   static const String _collectionName = 'know_your_client';
+  static const String _prefsFavKey = 'kyc_fav_titles';
 
   bool _loading = true;
+  bool _isFavorite = false;
 
   // doc
   String _docId = '';
@@ -145,12 +151,54 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
 
       _navIndex = _nav.indexWhere((e) => e.id == _docId);
 
+      // Load favorite state
+      await _loadFavoriteState();
+
       if (!mounted) return;
       setState(() => _loading = false);
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
     }
+  }
+
+  Future<void> _loadFavoriteState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final fav = prefs.getStringList(_prefsFavKey) ?? <String>[];
+      final normTitle = _title.replaceAll(RegExp(r'\s+'), ' ').trim();
+      if (!mounted) return;
+      setState(() => _isFavorite = fav.contains(normTitle));
+    } catch (_) {}
+  }
+
+  Future<void> _toggleFavorite() async {
+    final normTitle = _title.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (normTitle.isEmpty) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final fav = (prefs.getStringList(_prefsFavKey) ?? <String>[]).toList();
+
+      if (fav.contains(normTitle)) {
+        fav.remove(normTitle);
+        if (!mounted) return;
+        setState(() => _isFavorite = false);
+      } else {
+        fav.add(normTitle);
+        if (!mounted) return;
+        setState(() => _isFavorite = true);
+      }
+
+      await prefs.setStringList(_prefsFavKey, fav);
+    } catch (_) {}
+  }
+
+  void _shareTopic() {
+    final title = _title.trim();
+    final h = _hook.trim().isEmpty ? "موضوع من L Pro" : _hook.trim();
+    final shareText = "$title\n\n$h\n\n#LPro #اعرف_عميلك";
+    Share.share(shareText);
   }
 
   bool get _hasPrev => _navIndex > 0;
@@ -189,6 +237,31 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
           overflow: TextOverflow.ellipsis,
           style: GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 16),
         ),
+        actions: [
+          IconButton(
+            tooltip: _isFavorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة',
+            onPressed: _toggleFavorite,
+            icon: Icon(
+              _isFavorite
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_border_rounded,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
+      bottomNavigationBar: LProBottomNavBar(
+        activeIndex: 0,
+        onTap: (index) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MainWrapper(initialIndex: index),
+            ),
+            (route) => false,
+          );
+        },
       ),
       body: Directionality(
         textDirection: TextDirection.rtl,
@@ -238,16 +311,8 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
                             _hasPrev ? () => _goToIndex(_navIndex - 1) : null,
                         onNext:
                             _hasNext ? () => _goToIndex(_navIndex + 1) : null,
-                        onFav: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('قريبًا: المفضلة')),
-                          );
-                        },
-                        onShare: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('قريبًا: الشير')),
-                          );
-                        },
+                        onFav: _toggleFavorite,
+                        onShare: _shareTopic,
                       ),
                     ],
                   ),
@@ -294,7 +359,8 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
             offset: const Offset(0, 6),
           ),
         ],
-        border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.06)),
+        border:
+            Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.06)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -335,7 +401,8 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
             offset: const Offset(0, 6),
           ),
         ],
-        border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.06)),
+        border:
+            Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.06)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -411,9 +478,13 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
           Row(
             children: [
               IconButton(
-                tooltip: 'مفضلة',
+                tooltip: _isFavorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة',
                 onPressed: onFav,
-                icon: const Icon(Icons.bookmark_border_rounded),
+                icon: Icon(
+                  _isFavorite
+                      ? Icons.bookmark_rounded
+                      : Icons.bookmark_border_rounded,
+                ),
                 color: AppColors.primaryDeepTeal,
               ),
               IconButton(
