@@ -1,65 +1,88 @@
 // PATH: lib/features/pro_card/repositories/pro_card_repository.dart
-// Pro Card = single live message (home_pro_card/current).
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/firestore_paths.dart';
+import '../../../core/models/admin_control_models.dart';
+import '../models/pro_card_banner.dart';
 
+/// Repository for Pro Card banner operations.
 class ProCardRepository {
   final FirebaseFirestore _firestore;
+  late final DocumentReference<Map<String, dynamic>> _docRef;
 
   ProCardRepository([FirebaseFirestore? firestore])
-      : _firestore = firestore ?? FirebaseFirestore.instance;
-
-  Stream<Map<String, dynamic>?> watchCurrent() {
-    return _firestore
-        .collection(FirestorePaths.proCardCurrent)
-        .doc(FirestorePaths.currentDoc)
-        .snapshots()
-        .map((s) => s.data());
+      : _firestore = firestore ?? FirebaseFirestore.instance {
+    _docRef = _firestore
+        .collection(FirestorePaths.homeProCard)
+        .doc(FirestorePaths.currentDoc);
   }
 
-  Future<void> setCurrent({
+  /// Watches the current pro card banner.
+  Stream<ProCardBanner?> watchCurrent() {
+    return _docRef.snapshots().map((snap) {
+      if (!snap.exists || snap.data() == null) return null;
+      return ProCardBanner.fromFirestore(snap.data()!, snap.id);
+    });
+  }
+
+  /// Gets the current pro card banner.
+  Future<ProCardBanner?> getCurrent() async {
+    final snap = await _docRef.get();
+    if (!snap.exists || snap.data() == null) return null;
+    return ProCardBanner.fromFirestore(snap.data()!, snap.id);
+  }
+
+  /// Creates or updates the current pro card banner.
+  Future<void> upsertCurrent({
     required String text,
     required bool isActive,
     DateTime? publishAt,
     DateTime? expireAt,
+    bool clearPublishAt = false,
+    bool clearExpireAt = false,
   }) async {
-    final trimmed = text.trim();
-    if (trimmed.isEmpty) {
-      throw Exception('Pro Card text cannot be empty');
-    }
+    final control = AdminControlFields(
+      isActive: isActive,
+      publishAt: clearPublishAt ? null : publishAt,
+      expireAt: clearExpireAt ? null : expireAt,
+      sectionKey: FirestorePaths.sectionKeyProCard,
+    );
 
-    // Convert to UTC for consistent storage
-    final DateTime? publishUtc = publishAt?.toUtc();
-    final DateTime? expireUtc = expireAt?.toUtc();
+    final model = ProCardBanner(
+      id: FirestorePaths.currentDoc,
+      text: text.trim(),
+      control: control,
+    );
+    model.validate();
 
-    // Validate invariant: publishAt must be before expireAt if both are set
-    if (publishUtc != null && expireUtc != null && !publishUtc.isBefore(expireUtc)) {
-      throw Exception('publishAt must be before expireAt');
-    }
+    await _firestore.runTransaction((tx) async {
+      final snap = await tx.get(_docRef);
+      final data = model.toFirestore();
 
-    final Map<String, dynamic> data = {
-      'text': trimmed,
+      // Handle publishAt/expireAt deletion
+      if (clearPublishAt && publishAt == null) {
+        data['publishAt'] = FieldValue.delete();
+      }
+      if (clearExpireAt && expireAt == null) {
+        data['expireAt'] = FieldValue.delete();
+      }
+
+      data['updatedAt'] = FieldValue.serverTimestamp();
+
+      if (!snap.exists) {
+        data['createdAt'] = FieldValue.serverTimestamp();
+        tx.set(_docRef, data);
+      } else {
+        tx.update(_docRef, data);
+      }
+    });
+  }
+
+  /// Toggles the active state of the current pro card.
+  Future<void> toggleActive(bool isActive) async {
+    await _docRef.update({
       'isActive': isActive,
       'updatedAt': FieldValue.serverTimestamp(),
-    };
-
-    // ✅ delete keys is only safe with merge:true
-    if (publishUtc != null) {
-      data['publishAt'] = Timestamp.fromDate(publishUtc);
-    } else {
-      data['publishAt'] = FieldValue.delete();
-    }
-
-    if (expireUtc != null) {
-      data['expireAt'] = Timestamp.fromDate(expireUtc);
-    } else {
-      data['expireAt'] = FieldValue.delete();
-    }
-
-    await _firestore
-        .collection(FirestorePaths.proCardCurrent)
-        .doc(FirestorePaths.currentDoc)
-        .set(data, SetOptions(merge: true)); // ✅ FIX
+    });
   }
 }
