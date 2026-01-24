@@ -62,17 +62,19 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
   DateTime? _featuredUntil; // انتهاء التثبيت (اختياري)
   String _sectionKey = ''; // داخل "المعلومة بتفرق"
   int _orderInSection = 0; // ترتيب داخل القسم
+  List<String> _tags = []; // ✅ Tags (read-only here, not modified by admin)
 
-  // ✅ Known section keys (adjust anytime later)
-  static const List<String> _sectionKeys = [
-    'start',
-    'language',
-    'market_system',
-    'company_system',
-    'projects',
-    'contracts',
-    'broker',
-  ];
+  // ✅ Known section keys with Arabic labels
+  static const Map<String, String> _sectionLabels = {
+    'start': 'البداية الصح',
+    'language': 'لغة العقارات',
+    'market_system': 'سيستم السوق',
+    'company_system': 'سيستم الشركات',
+    'projects': 'دراسة المشاريع',
+    'contracts': 'التعاقدات والإجراءات',
+    'broker': 'البروكر',
+  };
+  static List<String> get _sectionKeys => _sectionLabels.keys.toList();
 
   String get _rawTitle => widget.title;
   String get _normTitle => _norm(widget.title);
@@ -251,6 +253,13 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
         ? orderRaw
         : int.tryParse((orderRaw ?? '0').toString()) ?? 0;
 
+    // ✅ Read tags (for display only, not modified by admin tools)
+    List<String> tags = [];
+    final tagsRaw = data['tags'];
+    if (tagsRaw is List) {
+      tags = tagsRaw.map((e) => e.toString().trim()).where((t) => t.isNotEmpty).toList();
+    }
+
     setState(() {
       _hook = (data['hook'] ?? '').toString();
       _reset = (data['reset'] ?? '').toString();
@@ -264,6 +273,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
       _featuredUntil = featuredUntil;
       _sectionKey = sectionKey;
       _orderInSection = orderInSection;
+      _tags = tags;
 
       _loadingArticle = false;
       _articleExists = true;
@@ -686,24 +696,30 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                         ),
                         const SizedBox(height: 10),
 
-                        // section dropdown
+                        // section dropdown with Arabic labels
                         DropdownButtonFormField<String>(
-                          initialValue:
-                              sectionKeyLocal.isEmpty ? null : sectionKeyLocal,
+                          value: sectionOptions.contains(sectionKeyLocal)
+                              ? sectionKeyLocal
+                              : null,
                           items: sectionOptions
                               .map((k) => DropdownMenuItem(
                                     value: k,
                                     child: Text(
-                                      k,
+                                      _sectionLabels[k] ?? k,
                                       style: GoogleFonts.cairo(
-                                          fontWeight: FontWeight.w800),
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 13),
                                     ),
                                   ))
                               .toList(),
                           onChanged: (v) =>
                               setLocal(() => sectionKeyLocal = v ?? ''),
                           decoration: InputDecoration(
-                            hintText: "اختر القسم (sectionKey)",
+                            hintText: "اختر القسم",
+                            hintStyle: GoogleFonts.cairo(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
                             filled: true,
                             fillColor: Colors.grey[100],
                             border: OutlineInputBorder(
@@ -726,52 +742,62 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                         ),
 
                         const SizedBox(height: 14),
-                        SizedBox(
-                          height: 46,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.secondaryOrange,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                        // ✅ Save button: not full-width, clear font, height 46
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              height: 46,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.secondaryOrange,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 32, vertical: 10),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                onPressed: () async {
+                                  final nav = Navigator.of(context);
+                                  try {
+                                    // ✅ Only update sectionKey/orderInSection, DO NOT touch tags
+                                    await _proInsightRepo.update(_docId, {
+                                      'isFeatured': isFeaturedLocal,
+                                      'featuredOrder': featuredOrderLocal,
+                                      'featuredUntil': untilLocal == null
+                                          ? FieldValue.delete()
+                                          : untilLocal,
+                                      'sectionKey': sectionKeyLocal.trim(),
+                                      'orderInSection': orderInSectionLocal,
+                                      'updatedAt': FieldValue.serverTimestamp(),
+                                    });
+
+                                    if (!mounted) return;
+                                    setState(() {
+                                      _isFeatured = isFeaturedLocal;
+                                      _featuredOrder = featuredOrderLocal;
+                                      _featuredUntil = untilLocal;
+                                      _sectionKey = sectionKeyLocal.trim();
+                                      _orderInSection = orderInSectionLocal;
+                                    });
+
+                                    nav.pop();
+                                    _snack("تم حفظ التحكم ✅");
+                                  } catch (_) {
+                                    _snack("فشل الحفظ. راجع Rules.");
+                                  }
+                                },
+                                child: Text(
+                                  "حفظ التحكم",
+                                  style: GoogleFonts.cairo(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 14,
+                                    color: Colors.white,
+                                  ),
+                                ),
                               ),
                             ),
-                            onPressed: () async {
-                              final nav = Navigator.of(context);
-                              try {
-                                await _proInsightRepo.update(_docId, {
-                                  'isFeatured': isFeaturedLocal,
-                                  'featuredOrder': featuredOrderLocal,
-                                  'featuredUntil': untilLocal == null
-                                      ? FieldValue.delete()
-                                      : untilLocal,
-                                  'sectionKey': sectionKeyLocal.trim(),
-                                  'orderInSection': orderInSectionLocal,
-                                  'updatedAt': FieldValue.serverTimestamp(),
-                                });
-
-                                if (!mounted) return;
-                                setState(() {
-                                  _isFeatured = isFeaturedLocal;
-                                  _featuredOrder = featuredOrderLocal;
-                                  _featuredUntil = untilLocal;
-                                  _sectionKey = sectionKeyLocal.trim();
-                                  _orderInSection = orderInSectionLocal;
-                                });
-
-                                nav.pop();
-                                _snack("تم حفظ التحكم ✅");
-                              } catch (_) {
-                                _snack("فشل الحفظ. راجع Rules.");
-                              }
-                            },
-                            child: Text(
-                              "حفظ",
-                              style: GoogleFonts.cairo(
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
+                          ],
                         ),
                         const SizedBox(height: 10),
                       ],
@@ -855,67 +881,77 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                     const SizedBox(height: 10),
                     _tf(lockC, "إغلاق/سلوك عملي (lock)", maxLines: 4),
                     const SizedBox(height: 12),
-                    SizedBox(
-                      height: 46,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.secondaryOrange,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+                    // ✅ Save button: not full-width, clear font, height 46
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          height: 46,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.secondaryOrange,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 32, vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            onPressed: () async {
+                              final t = titleC.text.trim();
+                              if (t.isEmpty) {
+                                _snack("العنوان مطلوب.");
+                                return;
+                              }
+
+                              try {
+                                await _proInsightRepo.update(_docId, {
+                                  'title': t,
+                                  'hook': hookC.text.trim(),
+                                  'reset': resetC.text.trim(),
+                                  'core': coreC.text.trim(),
+                                  'example': exampleC.text.trim(),
+                                  'lock': lockC.text.trim(),
+                                  'updatedAt': FieldValue.serverTimestamp(),
+                                });
+
+                                if (!mounted) return;
+                                setState(() {
+                                  _hook = hookC.text.trim();
+                                  _reset = resetC.text.trim();
+                                  _core = coreC.text.trim();
+                                  _example = exampleC.text.trim();
+                                  _lock = lockC.text.trim();
+                                });
+
+                                Navigator.pop(context);
+
+                                if (t != widget.title.trim()) {
+                                  if (!mounted) return;
+                                  Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          FactArticlesScreen(title: t),
+                                    ),
+                                  );
+                                } else {
+                                  _snack("تم التحديث ✅");
+                                }
+                              } catch (_) {
+                                _snack("فشل التحديث. راجع Rules.");
+                              }
+                            },
+                            child: Text(
+                              "حفظ التعديل",
+                              style: GoogleFonts.cairo(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
                         ),
-                        onPressed: () async {
-                          final t = titleC.text.trim();
-                          if (t.isEmpty) {
-                            _snack("العنوان مطلوب.");
-                            return;
-                          }
-
-                          try {
-                            await _proInsightRepo.update(_docId, {
-                              'title': t,
-                              'hook': hookC.text.trim(),
-                              'reset': resetC.text.trim(),
-                              'core': coreC.text.trim(),
-                              'example': exampleC.text.trim(),
-                              'lock': lockC.text.trim(),
-                              'updatedAt': FieldValue.serverTimestamp(),
-                            });
-
-                            if (!mounted) return;
-                            setState(() {
-                              _hook = hookC.text.trim();
-                              _reset = resetC.text.trim();
-                              _core = coreC.text.trim();
-                              _example = exampleC.text.trim();
-                              _lock = lockC.text.trim();
-                            });
-
-                            Navigator.pop(context);
-
-                            if (t != widget.title.trim()) {
-                              if (!mounted) return;
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => FactArticlesScreen(title: t),
-                                ),
-                              );
-                            } else {
-                              _snack("تم التحديث ✅");
-                            }
-                          } catch (_) {
-                            _snack("فشل التحديث. راجع Rules.");
-                          }
-                        },
-                        child: Text(
-                          "حفظ",
-                          style: GoogleFonts.cairo(
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
+                      ],
                     ),
                     const SizedBox(height: 10),
                   ],

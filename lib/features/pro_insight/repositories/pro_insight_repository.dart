@@ -69,22 +69,20 @@ class ProInsightRepository {
       throw Exception('publishAt must be before expireAt');
     }
 
-    // Invariant: featuredUntil must be in the future
-    if (featuredUntilUtc != null && !featuredUntilUtc.isAfter(DateTime.now().toUtc())) {
-      throw Exception('featuredUntil must be in the future');
-    }
+    // ✅ REMOVED: featuredUntil must be in the future (to avoid breaking existing data)
 
-    // Validate and clean tags
+    // Validate and clean tags (truncate to 5 instead of throwing)
     if (out.containsKey('tags')) {
       final val = out['tags'];
       if (val is List) {
-        final cleaned = val
+        var cleaned = val
             .whereType<String>()
             .map((t) => t.trim())
             .where((t) => t.isNotEmpty)
             .toList();
+        // ✅ Truncate to max 5 instead of throwing
         if (cleaned.length > 5) {
-          throw Exception('tags must be <= 5');
+          cleaned = cleaned.take(5).toList();
         }
         out['tags'] = cleaned;
       } else if (val != null && val is! FieldValue) {
