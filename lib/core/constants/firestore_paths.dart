@@ -13,4 +13,7 @@ class FirestorePaths {
 
   // News Ticker
   static const String newsTickerItems = 'news_ticker_items';
+
+  // Pro Insight
+  static const String proInsight = 'pro_insight';
 }

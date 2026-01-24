@@ -14,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../features/pro_insight/repositories/pro_insight_repository.dart';
 
 class FactArticlesScreen extends StatefulWidget {
   final String title; // ✅ Protocol: title only
@@ -28,6 +29,8 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
 
   static const String _prefsFavKey = 'pro_insight_fav_titles';
   static const String _prefsLastSeenKey = 'pro_insight_last_seen_title';
+
+  final ProInsightRepository _proInsightRepo = ProInsightRepository();
 
   bool _isFavorite = false;
 
@@ -400,7 +403,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
         return;
       }
 
-      await _docRef.update({
+      await _proInsightRepo.update(_docId, {
         'isActive': value,
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -421,9 +424,9 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
         return;
       }
 
-      await _docRef.update({
+      await _proInsightRepo.update(_docId, {
         'isActive': true,
-        'publishAt': Timestamp.fromDate(DateTime.now()),
+        'publishAt': DateTime.now(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
@@ -448,8 +451,8 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
         return;
       }
 
-      await _docRef.update({
-        'publishAt': Timestamp.fromDate(dt),
+      await _proInsightRepo.update(_docId, {
+        'publishAt': dt,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
@@ -734,12 +737,12 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                             onPressed: () async {
                               final nav = Navigator.of(context);
                               try {
-                                await _docRef.update({
+                                await _proInsightRepo.update(_docId, {
                                   'isFeatured': isFeaturedLocal,
                                   'featuredOrder': featuredOrderLocal,
                                   'featuredUntil': untilLocal == null
                                       ? FieldValue.delete()
-                                      : Timestamp.fromDate(untilLocal!),
+                                      : untilLocal,
                                   'sectionKey': sectionKeyLocal.trim(),
                                   'orderInSection': orderInSectionLocal,
                                   'updatedAt': FieldValue.serverTimestamp(),
@@ -868,7 +871,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                           }
 
                           try {
-                            await _docRef.update({
+                            await _proInsightRepo.update(_docId, {
                               'title': t,
                               'hook': hookC.text.trim(),
                               'reset': resetC.text.trim(),
