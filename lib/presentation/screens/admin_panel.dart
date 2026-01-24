@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/firestore_paths.dart';
+import '../../core/services/app_config_service.dart';
 import '../../features/news_ticker/repositories/news_ticker_repository.dart';
 import '../../features/pro_card/repositories/pro_card_repository.dart';
 
@@ -39,6 +40,11 @@ class _AdminPanelState extends State<AdminPanel>
   // Tab 1: Pro Card (CMS)
   // =========================
   final ProCardRepository _proCardRepo = ProCardRepository();
+
+  // =========================
+  // App Config (Feature Flags + Limits)
+  // =========================
+  final AppConfigService _configService = AppConfigService();
 
   // =========================
   // Tab 2: Quizzes (Single + Batch)
@@ -781,17 +787,17 @@ class _AdminPanelState extends State<AdminPanel>
       textDirection: TextDirection.rtl,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _centerBtn(
-              onPressed: () => _openProEditor(),
-              bg: AppColors.primaryDeepTeal,
-              child: _btnText('تعديل / إنشاء الرسالة الحية', size: 12.5),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: StreamBuilder<Map<String, dynamic>?>(
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _centerBtn(
+                onPressed: () => _openProEditor(),
+                bg: AppColors.primaryDeepTeal,
+                child: _btnText('تعديل / إنشاء الرسالة الحية', size: 12.5),
+              ),
+              const SizedBox(height: 16),
+              StreamBuilder<Map<String, dynamic>?>(
                 stream: _proCardRepo.watchCurrent(),
                 builder: (ctx, snap) {
                   if (!snap.hasData) {
@@ -827,123 +833,313 @@ class _AdminPanelState extends State<AdminPanel>
                       ? (d['expireAt'] as Timestamp).toDate()
                       : null;
 
-                  return SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: AppColors.primaryDeepTeal.withValues(alpha: 0.2),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: isActive
-                                          ? Colors.green.withValues(alpha: 0.2)
-                                          : Colors.red.withValues(alpha: 0.2),
-                                      borderRadius: BorderRadius.circular(999),
-                                    ),
-                                    child: Text(
-                                      isActive ? 'ظاهر' : 'مخفي',
-                                      style: GoogleFonts.cairo(
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 12,
-                                        color: isActive
-                                            ? Colors.green[800]
-                                            : Colors.red[800],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 10),
-                              Text(text,
-                                  style: GoogleFonts.cairo(
-                                      fontSize: 14, height: 1.6)),
-                              const SizedBox(height: 10),
-                              Text(
-                                'وقت النشر: ${publishAt != null ? _dtStr(publishAt) : "—"}',
-                                style: GoogleFonts.cairo(
-                                    fontSize: 11, color: Colors.grey[700]),
-                              ),
-                              Text(
-                                'وقت الانتهاء: ${expireAt != null ? _dtStr(expireAt) : "—"}',
-                                style: GoogleFonts.cairo(
-                                    fontSize: 11, color: Colors.grey[700]),
-                              ),
-                            ],
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: AppColors.primaryDeepTeal.withValues(alpha: 0.2),
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            SizedBox(
-                              width: 120,
-                              height: 40,
-                              child: ElevatedButton.icon(
-                                onPressed: () async {
-                                  setState(() => _saving = true);
-                                  try {
-                                    await _proCardRepo.setCurrent(
-                                      text: text,
-                                      isActive: !isActive,
-                                      publishAt: publishAt,
-                                      expireAt: expireAt,
-                                    );
-                                    _snack(isActive
-                                        ? 'تم الإخفاء ✅'
-                                        : 'تم الإظهار ✅');
-                                  } catch (_) {
-                                    _snack('فشل التعديل.');
-                                  } finally {
-                                    if (mounted) {
-                                      setState(() => _saving = false);
-                                    }
-                                  }
-                                },
-                                icon: Icon(
-                                    isActive
-                                        ? Icons.visibility_off
-                                        : Icons.visibility,
-                                    size: 18),
-                                label: _btnText(isActive ? 'إخفاء' : 'إظهار',
-                                    size: 12),
-                              ),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: isActive
+                                        ? Colors.green.withValues(alpha: 0.2)
+                                        : Colors.red.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    isActive ? 'ظاهر' : 'مخفي',
+                                    style: GoogleFonts.cairo(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 12,
+                                      color: isActive
+                                          ? Colors.green[800]
+                                          : Colors.red[800],
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 10),
-                            SizedBox(
-                              width: 120,
-                              height: 40,
-                              child: ElevatedButton.icon(
-                                onPressed: () => _openProEditor(current: d),
-                                icon: const Icon(Icons.edit, size: 18),
-                                label: _btnText('تعديل', size: 12),
-                              ),
+                            const SizedBox(height: 10),
+                            Text(text,
+                                style: GoogleFonts.cairo(
+                                    fontSize: 14, height: 1.6)),
+                            const SizedBox(height: 10),
+                            Text(
+                              'وقت النشر: ${publishAt != null ? _dtStr(publishAt) : "—"}',
+                              style: GoogleFonts.cairo(
+                                  fontSize: 11, color: Colors.grey[700]),
+                            ),
+                            Text(
+                              'وقت الانتهاء: ${expireAt != null ? _dtStr(expireAt) : "—"}',
+                              style: GoogleFonts.cairo(
+                                  fontSize: 11, color: Colors.grey[700]),
                             ),
                           ],
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 120,
+                            height: 40,
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                setState(() => _saving = true);
+                                try {
+                                  await _proCardRepo.setCurrent(
+                                    text: text,
+                                    isActive: !isActive,
+                                    publishAt: publishAt,
+                                    expireAt: expireAt,
+                                  );
+                                  _snack(isActive
+                                      ? 'تم الإخفاء ✅'
+                                      : 'تم الإظهار ✅');
+                                } catch (_) {
+                                  _snack('فشل التعديل.');
+                                } finally {
+                                  if (mounted) {
+                                    setState(() => _saving = false);
+                                  }
+                                }
+                              },
+                              icon: Icon(
+                                  isActive
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  size: 18),
+                              label: _btnText(isActive ? 'إخفاء' : 'إظهار',
+                                  size: 12),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          SizedBox(
+                            width: 120,
+                            height: 40,
+                            child: ElevatedButton.icon(
+                              onPressed: () => _openProEditor(current: d),
+                              icon: const Icon(Icons.edit, size: 18),
+                              label: _btnText('تعديل', size: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   );
                 },
               ),
-            ),
-          ],
+              const SizedBox(height: 24),
+              // ─────────────────────────────────────────────────────────────
+              // App Controls (Feature Flags + Limits)
+              // ─────────────────────────────────────────────────────────────
+              _buildAppConfigSection(),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  // =========================
+  // App Config Section
+  // =========================
+  Widget _buildAppConfigSection() {
+    return StreamBuilder<Map<String, dynamic>>(
+      stream: _configService.watchCurrent(),
+      builder: (context, snap) {
+        final config = snap.data ?? AppConfigService.defaults;
+        final features = (config['features'] as Map<String, dynamic>?) ??
+            AppConfigService.defaultFeatures;
+        final limits = (config['limits'] as Map<String, dynamic>?) ??
+            AppConfigService.defaultLimits;
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'App Controls',
+                style: GoogleFonts.cairo(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 14,
+                  color: AppColors.primaryDeepTeal,
+                ),
+              ),
+              const Divider(),
+              // Feature Flags
+              Text('Feature Flags',
+                  style: GoogleFonts.cairo(
+                      fontWeight: FontWeight.w800, fontSize: 12)),
+              const SizedBox(height: 6),
+              _configSwitch(
+                label: 'Push Notifications',
+                value: features['pushNotificationsEnabled'] == true,
+                onChanged: (v) => _saveFeature('pushNotificationsEnabled', v),
+              ),
+              _configSwitch(
+                label: 'Section Notifications',
+                value: features['sectionNotificationsEnabled'] == true,
+                onChanged: (v) => _saveFeature('sectionNotificationsEnabled', v),
+              ),
+              _configSwitch(
+                label: 'Support Chat',
+                value: features['supportChatEnabled'] == true,
+                onChanged: (v) => _saveFeature('supportChatEnabled', v),
+              ),
+              _configSwitch(
+                label: 'Quiz Share',
+                value: features['quizShareEnabled'] == true,
+                onChanged: (v) => _saveFeature('quizShareEnabled', v),
+              ),
+              const SizedBox(height: 12),
+              // Limits
+              Text('Limits',
+                  style: GoogleFonts.cairo(
+                      fontWeight: FontWeight.w800, fontSize: 12)),
+              const SizedBox(height: 6),
+              _configLimitRow(
+                label: 'Max Fetch Per Page',
+                value: limits['maxFetchPerPage'] ?? 50,
+                onSave: (v) => _saveLimit('maxFetchPerPage', v),
+              ),
+              _configLimitRow(
+                label: 'Max ProInsight Scan',
+                value: limits['maxProInsightScan'] ?? 300,
+                onSave: (v) => _saveLimit('maxProInsightScan', v),
+              ),
+              _configLimitRow(
+                label: 'Max Support Msgs/Day',
+                value: limits['maxSupportMessagesPerDay'] ?? 50,
+                onSave: (v) => _saveLimit('maxSupportMessagesPerDay', v),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _configSwitch({
+    required String label,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return SwitchListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      title: Text(label, style: GoogleFonts.cairo(fontSize: 12)),
+      value: value,
+      onChanged: onChanged,
+    );
+  }
+
+  Widget _configLimitRow({
+    required String label,
+    required int value,
+    required ValueChanged<int> onSave,
+  }) {
+    final controller = TextEditingController(text: value.toString());
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(label, style: GoogleFonts.cairo(fontSize: 11)),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 70,
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.cairo(fontSize: 12),
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          SizedBox(
+            width: 50,
+            height: 32,
+            child: ElevatedButton(
+              onPressed: () {
+                final parsed = int.tryParse(controller.text.trim());
+                if (parsed != null && parsed > 0) {
+                  onSave(parsed);
+                } else {
+                  _snack('قيمة غير صالحة');
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                padding: EdgeInsets.zero,
+                backgroundColor: AppColors.primaryDeepTeal,
+              ),
+              child: Text('Save', style: GoogleFonts.cairo(fontSize: 10)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveFeature(String key, bool value) async {
+    setState(() => _saving = true);
+    try {
+      await _configService.upsertCurrent({
+        'features': {key: value},
+      });
+      _snack('تم الحفظ ✅');
+    } catch (_) {
+      _snack('فشل الحفظ.');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _saveLimit(String key, int value) async {
+    setState(() => _saving = true);
+    try {
+      await _configService.upsertCurrent({
+        'limits': {key: value},
+      });
+      _snack('تم الحفظ ✅');
+    } catch (_) {
+      _snack('فشل الحفظ.');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   Widget _buildQuizTab() {

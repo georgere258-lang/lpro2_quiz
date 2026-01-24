@@ -8,6 +8,7 @@ class FirestorePaths {
   // Collections
   // ─────────────────────────────────────────────────────────────
 
+  static const String appConfig = 'app_config';
   static const String homeProCard = 'home_pro_card';
   static const String knowYourClient = 'know_your_client';
   static const String newsTickerItems = 'news_ticker_items';
