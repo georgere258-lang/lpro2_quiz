@@ -18,10 +18,11 @@ class ProInsightRepository {
     return _db.collection(_col).doc(docId);
   }
 
-  /// Normalize UTC for publishAt/featuredUntil and validate invariants.
+  /// Normalize UTC for publishAt/expireAt/featuredUntil and validate invariants.
   Map<String, dynamic> _normalizeAndValidateUpdate(Map<String, dynamic> input) {
     final out = Map<String, dynamic>.from(input);
     DateTime? publishAtUtc;
+    DateTime? expireAtUtc;
     DateTime? featuredUntilUtc;
 
     // Normalize publishAt
@@ -33,6 +34,19 @@ class ProInsightRepository {
       } else if (val is Timestamp) {
         publishAtUtc = val.toDate().toUtc();
         out['publishAt'] = Timestamp.fromDate(publishAtUtc);
+      }
+      // FieldValue (delete/serverTimestamp) stays as-is
+    }
+
+    // Normalize expireAt
+    if (out.containsKey('expireAt')) {
+      final val = out['expireAt'];
+      if (val is DateTime) {
+        expireAtUtc = val.toUtc();
+        out['expireAt'] = Timestamp.fromDate(expireAtUtc);
+      } else if (val is Timestamp) {
+        expireAtUtc = val.toDate().toUtc();
+        out['expireAt'] = Timestamp.fromDate(expireAtUtc);
       }
       // FieldValue (delete/serverTimestamp) stays as-is
     }
@@ -50,11 +64,32 @@ class ProInsightRepository {
       // FieldValue (delete/serverTimestamp) stays as-is
     }
 
-    // Invariant: publishAt must be before featuredUntil if both exist
-    if (publishAtUtc != null &&
-        featuredUntilUtc != null &&
-        !publishAtUtc.isBefore(featuredUntilUtc)) {
-      throw Exception('publishAt must be before featuredUntil');
+    // Invariant: publishAt must be before expireAt if both exist as real times
+    if (publishAtUtc != null && expireAtUtc != null && !publishAtUtc.isBefore(expireAtUtc)) {
+      throw Exception('publishAt must be before expireAt');
+    }
+
+    // Invariant: featuredUntil must be in the future
+    if (featuredUntilUtc != null && !featuredUntilUtc.isAfter(DateTime.now().toUtc())) {
+      throw Exception('featuredUntil must be in the future');
+    }
+
+    // Validate and clean tags
+    if (out.containsKey('tags')) {
+      final val = out['tags'];
+      if (val is List) {
+        final cleaned = val
+            .whereType<String>()
+            .map((t) => t.trim())
+            .where((t) => t.isNotEmpty)
+            .toList();
+        if (cleaned.length > 5) {
+          throw Exception('tags must be <= 5');
+        }
+        out['tags'] = cleaned;
+      } else if (val != null && val is! FieldValue) {
+        throw Exception('tags must be a List');
+      }
     }
 
     return out;
