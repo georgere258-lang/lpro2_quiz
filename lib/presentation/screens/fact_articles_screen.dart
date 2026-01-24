@@ -579,7 +579,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          "تحكم التثبيت والترتيب",
+                          "ترشيحات Pro + نقل القسم",
                           textAlign: TextAlign.right,
                           style: GoogleFonts.cairo(
                             fontWeight: FontWeight.w900,
@@ -587,7 +587,18 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                             color: AppColors.primaryDeepTeal,
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 4),
+                        // ✅ Explanatory hint for Featured
+                        Text(
+                          "• ترتيب المختارات = ترتيب داخل \"ترشيحات Pro\"",
+                          textAlign: TextAlign.right,
+                          style: GoogleFonts.cairo(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
 
                         // Featured toggle
                         Container(
@@ -694,7 +705,19 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                             color: AppColors.secondaryOrange,
                           ),
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 4),
+                        // ✅ Explanatory hints
+                        Text(
+                          "• القسم = مكان الظهور في \"المعلومة بتفرق\"\n• الترتيب = ترتيب داخل نفس القسم",
+                          textAlign: TextAlign.right,
+                          style: GoogleFonts.cairo(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                            height: 1.5,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
 
                         // section dropdown with Arabic labels
                         DropdownButtonFormField<String>(
@@ -984,23 +1007,27 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
         Widget chip({
           required IconData icon,
           required String text,
+          required String tooltip,
           required VoidCallback onTap,
           required Color color,
         }) {
-          return ActionChip(
-            onPressed: onTap,
-            avatar: Icon(icon, size: 18, color: color),
-            label: Text(
-              text,
-              style: GoogleFonts.cairo(
-                fontWeight: FontWeight.w900,
-                fontSize: 12.5,
-                color: color,
+          return Tooltip(
+            message: tooltip,
+            child: ActionChip(
+              onPressed: onTap,
+              avatar: Icon(icon, size: 18, color: color),
+              label: Text(
+                text,
+                style: GoogleFonts.cairo(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12.5,
+                  color: color,
+                ),
               ),
+              backgroundColor: color.withValues(alpha: 0.08),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
             ),
-            backgroundColor: color.withValues(alpha: 0.08),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           );
         }
 
@@ -1029,7 +1056,8 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                     children: [
                       chip(
                         icon: Icons.star_outline_rounded,
-                        text: "تثبيت/ترتيب/نقل",
+                        text: "ترشيحات + ترتيب",
+                        tooltip: "ترشيحات Pro + ترتيب",
                         color: AppColors.secondaryOrange,
                         onTap: () {
                           Navigator.pop(context);
@@ -1039,6 +1067,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                       chip(
                         icon: Icons.edit_outlined,
                         text: "تعديل",
+                        tooltip: "تعديل المحتوى",
                         color: AppColors.primaryDeepTeal,
                         onTap: () {
                           Navigator.pop(context);
@@ -1050,6 +1079,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                             ? Icons.visibility_off_outlined
                             : Icons.visibility_outlined,
                         text: _isActive ? "إخفاء" : "إظهار",
+                        tooltip: "إخفاء/إظهار",
                         color: _isActive ? Colors.redAccent : Colors.green,
                         onTap: () {
                           Navigator.pop(context);
@@ -1059,6 +1089,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                       chip(
                         icon: Icons.publish_rounded,
                         text: "نشر الآن",
+                        tooltip: "نشر الآن",
                         color: AppColors.secondaryOrange,
                         onTap: () {
                           Navigator.pop(context);
@@ -1068,6 +1099,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                       chip(
                         icon: Icons.schedule_send,
                         text: "جدولة نشر",
+                        tooltip: "جدولة نشر",
                         color: Colors.black87,
                         onTap: () {
                           Navigator.pop(context);
@@ -1077,6 +1109,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                       chip(
                         icon: Icons.delete_outline,
                         text: "حذف نهائي",
+                        tooltip: "حذف نهائي",
                         color: Colors.red,
                         onTap: () {
                           Navigator.pop(context);
