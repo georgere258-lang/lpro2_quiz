@@ -128,6 +128,13 @@ class NewsTickerService {
     final trimmed = textAr.trim();
     if (trimmed.isEmpty) return;
 
+    final DateTime? startUtc = startDate?.toUtc();
+    final DateTime? endUtc = endDate?.toUtc();
+
+    if (startUtc != null && endUtc != null && !startUtc.isBefore(endUtc)) {
+      throw Exception('startDate must be before endDate');
+    }
+
     final data = <String, dynamic>{
       'text_ar': trimmed,
       'priority': priority,
@@ -138,11 +145,11 @@ class NewsTickerService {
       'source': 'system',
     };
 
-    if (startDate != null) {
-      data['startDate'] = Timestamp.fromDate(startDate);
+    if (startUtc != null) {
+      data['startDate'] = Timestamp.fromDate(startUtc);
     }
-    if (endDate != null) {
-      data['endDate'] = Timestamp.fromDate(endDate);
+    if (endUtc != null) {
+      data['endDate'] = Timestamp.fromDate(endUtc);
     }
 
     await _firestore.collection(_col).add(data);
