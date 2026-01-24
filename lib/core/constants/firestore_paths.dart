@@ -16,4 +16,7 @@ class FirestorePaths {
 
   // Pro Insight
   static const String proInsight = 'pro_insight';
+
+  // Users
+  static const String users = 'users';
 }

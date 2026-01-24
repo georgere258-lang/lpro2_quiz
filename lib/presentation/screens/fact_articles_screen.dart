@@ -118,7 +118,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
       if (u == null) return;
 
       final snap =
-          await FirebaseFirestore.instance.collection('users').doc(u.uid).get();
+          await FirebaseFirestore.instance.collection(FirestorePaths.users).doc(u.uid).get();
       final data = snap.data() ?? {};
       final r = (data['role'] ?? 'user').toString().trim().toLowerCase();
 
