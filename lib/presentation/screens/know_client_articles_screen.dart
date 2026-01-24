@@ -37,6 +37,7 @@ class KnowClientArticlesScreen extends StatefulWidget {
 class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
   static const String _collectionName = 'know_your_client';
   static const String _prefsFavKey = 'kyc_fav_titles';
+  static const String _prefsLastSeenKey = 'kyc_last_seen_title';
 
   bool _loading = true;
   bool _isFavorite = false;
@@ -94,6 +95,19 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
   void _snack(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  // =========================
+  // ✅ Mark Last Seen (write once on open)
+  // =========================
+  Future<void> _markLastSeen(String title, String docId) async {
+    final t = title.trim();
+    if (t.isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefsLastSeenKey, t);
+      await prefs.setString('${_prefsLastSeenKey}_docid', docId.trim());
+    } catch (_) {}
   }
 
   // =========================
@@ -175,6 +189,9 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
       _core = (data['core'] ?? '').toString();
       _example = (data['example'] ?? '').toString();
       _lock = (data['lock'] ?? '').toString();
+
+      // ✅ Write Last Seen (once per topic open)
+      await _markLastSeen(_title, _docId);
 
       // ✅ Control fields
       _isActive = data['isActive'] == true;

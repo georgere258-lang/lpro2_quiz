@@ -397,9 +397,8 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
         final docs = snap.data!.docs;
         final nowMs = DateTime.now().millisecondsSinceEpoch;
 
-        final allItems = docs
-            .map((d) => _KycTopicItem.fromDoc(d.id, d.data()))
-            .where((e) {
+        final allItems =
+            docs.map((d) => _KycTopicItem.fromDoc(d.id, d.data())).where((e) {
           if (e.isActive != true) return false;
           if (e.title.trim().isEmpty) return false;
 
@@ -415,7 +414,7 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
         // ✅ Base ordering for normal list
         allItems.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
 
-        // ✅ Featured (ترشيحات Pro)
+        // ✅ Featured (ترشيحات L Pro)
         final now = DateTime.now();
         final featured = allItems
             .where((e) => e.isFeatured == true && e.isFeaturedValid(now))
@@ -426,7 +425,7 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
           return b.createdAtMs.compareTo(a.createdAtMs);
         });
 
-        // ✅ Recent (جديد Pro)
+        // ✅ Recent (جديد L Pro)
         final recentCutoff =
             now.subtract(const Duration(days: _recentDaysWindow));
         final recent = allItems
@@ -621,8 +620,7 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
             ),
             if (badge != null)
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppColors.secondaryOrange,
                   borderRadius: BorderRadius.circular(10),
@@ -777,7 +775,9 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
 
       final nowMs = DateTime.now().millisecondsSinceEpoch;
 
-      final items = snap.docs.map((d) => _KycTopicItem.fromDoc(d.id, d.data())).where((e) {
+      final items = snap.docs
+          .map((d) => _KycTopicItem.fromDoc(d.id, d.data()))
+          .where((e) {
         if (e.title.trim().isEmpty) return false;
 
         final isScheduledFuture = (e.publishAtMs > 0 && e.publishAtMs > nowMs);
