@@ -37,4 +37,5 @@ class FirestorePaths {
   static const String sectionKeyRadar = 'radar';
   static const String sectionKeyMoney = 'money';
   static const String sectionKeyProCard = 'pro_card';
+  static const String sectionKeyQuiz = 'quiz';
 }
