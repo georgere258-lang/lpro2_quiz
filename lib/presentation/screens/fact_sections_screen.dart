@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/fact_sections_screen.dart
-// PURPOSE: Show all sections of "المعلومة بتفرق" as a list
+// PURPOSE: Show all sections of "المعلومة بتفرق" as a 2-column grid
 // NAVIGATION: FactScreen → FactSectionsScreen → FactSectionTopicsScreen
 
 import 'package:flutter/material.dart';
@@ -13,14 +13,14 @@ import 'main_wrapper.dart';
 class FactSectionsScreen extends StatelessWidget {
   const FactSectionsScreen({super.key});
 
-  // ✅ Section names (same as content plan)
-  static const List<String> _sections = [
-    'البداية الصح',
-    'لغة العقارات',
-    'سيستم السوق',
-    'سيستم الشركات',
-    'التعاقدات والإجراءات',
-    'دراسة المشاريع',
+  // ✅ Section names + icons
+  static const List<_SectionData> _sections = [
+    _SectionData(name: 'البداية الصح', icon: Icons.flag_rounded),
+    _SectionData(name: 'لغة العقارات', icon: Icons.translate_rounded),
+    _SectionData(name: 'سيستم السوق', icon: Icons.storefront_rounded),
+    _SectionData(name: 'سيستم الشركات', icon: Icons.business_rounded),
+    _SectionData(name: 'التعاقدات والإجراءات', icon: Icons.assignment_rounded),
+    _SectionData(name: 'دراسة المشاريع', icon: Icons.analytics_rounded),
   ];
 
   @override
@@ -50,20 +50,26 @@ class FactSectionsScreen extends StatelessWidget {
       ),
       body: Directionality(
         textDirection: TextDirection.rtl,
-        child: ListView.separated(
+        child: GridView.builder(
           padding: const EdgeInsets.all(16),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 14,
+            crossAxisSpacing: 14,
+            childAspectRatio: 1.1,
+          ),
           itemCount: _sections.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (context, index) {
-            final sectionName = _sections[index];
+            final section = _sections[index];
             return _SectionCard(
-              sectionName: sectionName,
+              sectionName: section.name,
+              icon: section.icon,
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) =>
-                        FactSectionTopicsScreen(sectionName: sectionName),
+                        FactSectionTopicsScreen(sectionName: section.name),
                   ),
                 );
               },
@@ -75,60 +81,76 @@ class FactSectionsScreen extends StatelessWidget {
   }
 }
 
+class _SectionData {
+  final String name;
+  final IconData icon;
+
+  const _SectionData({required this.name, required this.icon});
+}
+
 class _SectionCard extends StatelessWidget {
   final String sectionName;
+  final IconData icon;
   final VoidCallback onTap;
 
   const _SectionCard({
     required this.sectionName,
+    required this.icon,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(20),
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: AppColors.primaryDeepTeal.withValues(alpha: 0.10),
+            color: AppColors.primaryDeepTeal.withValues(alpha: 0.12),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
+              color: AppColors.primaryDeepTeal.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
+            ),
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: Row(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Expanded(
-              child: Text(
-                sectionName,
-                textAlign: TextAlign.right,
-                style: GoogleFonts.cairo(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.primaryDeepTeal,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.secondaryOrange.withValues(alpha: 0.1),
+                color: AppColors.secondaryOrange.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
+              child: Icon(
+                icon,
+                size: 26,
                 color: AppColors.secondaryOrange,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              sectionName,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.cairo(
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                height: 1.3,
+                color: AppColors.primaryDeepTeal,
               ),
             ),
           ],

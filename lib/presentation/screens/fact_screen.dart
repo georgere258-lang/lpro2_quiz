@@ -53,10 +53,8 @@ class _FactScreenState extends State<FactScreen> {
       if (!mounted) return;
       setState(() {
         _lastSeenTitle = last.trim();
-        _favoriteTitles = favList
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .toSet();
+        _favoriteTitles =
+            favList.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
       });
     } catch (_) {}
   }
@@ -229,7 +227,8 @@ class _FactScreenState extends State<FactScreen> {
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.04),
+                                      color:
+                                          Colors.black.withValues(alpha: 0.04),
                                       blurRadius: 8,
                                       offset: const Offset(0, 4),
                                     ),
@@ -354,7 +353,7 @@ class _FactScreenState extends State<FactScreen> {
         // ✅ Base ordering for normal list
         allItems.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
 
-        // ✅ Featured (ترشيحات Pro)
+        // ✅ Featured (ترشيحات L Pro)
         final now = DateTime.now();
         final featured = allItems
             .where((e) => e.isFeatured == true && e.isFeaturedValid(now))
@@ -365,7 +364,7 @@ class _FactScreenState extends State<FactScreen> {
           return b.createdAtMs.compareTo(a.createdAtMs);
         });
 
-        // ✅ Recent (جديد Pro)
+        // ✅ Recent (جديد L Pro)
         final recentCutoff =
             now.subtract(const Duration(days: _recentDaysWindow));
         final recent = allItems
@@ -382,10 +381,10 @@ class _FactScreenState extends State<FactScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1️⃣ Intro Card (bigger + stronger shadow)
+              // 1️⃣ Intro Card (compact)
               _introCard(),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
               // 2️⃣ Sections Button (Full width + prominent)
               _fullWidthButton(
@@ -402,12 +401,12 @@ class _FactScreenState extends State<FactScreen> {
                 },
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
 
-              // 3️⃣ تابع من حيث توقفت (if exists)
+              // 3️⃣ تابع من حيث توقفت (compact - same height as buttons)
               if (_lastSeenTitle.trim().isNotEmpty) ...[
-                _lastSeenCard(),
-                const SizedBox(height: 12),
+                _lastSeenButton(),
+                const SizedBox(height: 10),
               ],
 
               // 4️⃣ Favorites Button (Working!)
@@ -422,20 +421,20 @@ class _FactScreenState extends State<FactScreen> {
 
               const SizedBox(height: 16),
 
-              // 5️⃣ جديد Pro (last 5)
+              // 5️⃣ جديد L Pro (last 5)
               if (recent.isNotEmpty) ...[
                 _topicsCard(
-                  title: 'جديد Pro',
+                  title: 'جديد L Pro',
                   icon: Icons.new_releases_rounded,
                   items: recent.take(5).toList(),
                 ),
                 const SizedBox(height: 12),
               ],
 
-              // 6️⃣ ترشيحات Pro (last 5)
+              // 6️⃣ ترشيحات L Pro (last 5)
               if (featured.isNotEmpty) ...[
                 _topicsCard(
-                  title: 'ترشيحات Pro',
+                  title: 'ترشيحات L Pro',
                   icon: Icons.star_rounded,
                   items: featured.take(5).toList(),
                 ),
@@ -447,26 +446,22 @@ class _FactScreenState extends State<FactScreen> {
     );
   }
 
+  // ✅ Compact Intro Card
   Widget _introCard() {
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: AppColors.primaryDeepTeal.withValues(alpha: 0.15),
-          width: 1.5,
+          color: AppColors.primaryDeepTeal.withValues(alpha: 0.12),
+          width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryDeepTeal.withValues(alpha: 0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: AppColors.primaryDeepTeal.withValues(alpha: 0.06),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -480,19 +475,19 @@ class _FactScreenState extends State<FactScreen> {
                   "بوابة المعلومة اللي بتفرق",
                   textAlign: TextAlign.right,
                   style: GoogleFonts.cairo(
-                    fontSize: 17,
-                    height: 1.4,
+                    fontSize: 15,
+                    height: 1.3,
                     fontWeight: FontWeight.w900,
                     color: AppColors.primaryDeepTeal,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                 Text(
-                  "مواضيع قصيرة ومركزة، كل موضوع فيه معلومة عملية تقدر تطبقها فوراً في شغلك العقاري.\n\nفي نهاية كل موضوع سلوك عملي يساعدك تستفيد بشكل مباشر.",
+                  "مواضيع قصيرة ومركزة، كل موضوع فيه معلومة عملية تقدر تطبقها فوراً.",
                   textAlign: TextAlign.right,
                   style: GoogleFonts.cairo(
-                    fontSize: 12.5,
-                    height: 1.75,
+                    fontSize: 11.5,
+                    height: 1.6,
                     fontWeight: FontWeight.w600,
                     color: Colors.black54,
                   ),
@@ -500,22 +495,15 @@ class _FactScreenState extends State<FactScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: AppColors.secondaryOrange.withValues(alpha: 0.12),
+              color: AppColors.secondaryOrange.withValues(alpha: 0.10),
               shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.secondaryOrange.withValues(alpha: 0.15),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
             ),
             child: const Icon(Icons.auto_awesome,
-                color: AppColors.secondaryOrange, size: 28),
+                color: AppColors.secondaryOrange, size: 22),
           ),
         ],
       ),
@@ -530,40 +518,40 @@ class _FactScreenState extends State<FactScreen> {
     required VoidCallback onTap,
   }) {
     return InkWell(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(14),
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: isPrimary
-              ? AppColors.primaryDeepTeal.withValues(alpha: 0.06)
+              ? AppColors.primaryDeepTeal.withValues(alpha: 0.05)
               : Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isPrimary
-                ? AppColors.primaryDeepTeal.withValues(alpha: 0.20)
+                ? AppColors.primaryDeepTeal.withValues(alpha: 0.18)
                 : AppColors.primaryDeepTeal.withValues(alpha: 0.10),
-            width: isPrimary ? 1.5 : 1,
+            width: isPrimary ? 1.2 : 1,
           ),
           boxShadow: [
             BoxShadow(
               color: isPrimary
-                  ? AppColors.primaryDeepTeal.withValues(alpha: 0.10)
-                  : Colors.black.withValues(alpha: 0.06),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
+                  ? AppColors.primaryDeepTeal.withValues(alpha: 0.08)
+                  : Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Row(
           children: [
-            Icon(icon, size: 22, color: AppColors.primaryDeepTeal),
-            const SizedBox(width: 12),
+            Icon(icon, size: 20, color: AppColors.primaryDeepTeal),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 label,
                 style: GoogleFonts.cairo(
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w900,
                   color: AppColors.primaryDeepTeal,
                 ),
@@ -572,77 +560,69 @@ class _FactScreenState extends State<FactScreen> {
             if (badge != null)
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppColors.secondaryOrange,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   badge,
                   style: GoogleFonts.cairo(
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
                   ),
                 ),
               ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             const Icon(Icons.arrow_forward_ios,
-                size: 16, color: AppColors.secondaryOrange),
+                size: 14, color: AppColors.secondaryOrange),
           ],
         ),
       ),
     );
   }
 
-  Widget _lastSeenCard() {
-    return GestureDetector(
+  // ✅ Compact "تابع" button - same height as other buttons
+  Widget _lastSeenButton() {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
       onTap: () => _openTopic(_lastSeenTitle),
       child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-              color: AppColors.primaryDeepTeal.withValues(alpha: 0.12)),
+              color: AppColors.secondaryOrange.withValues(alpha: 0.20)),
           boxShadow: [
             BoxShadow(
               color: AppColors.secondaryOrange.withValues(alpha: 0.08),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Row(
-              children: [
-                const Icon(Icons.history_rounded,
-                    size: 16, color: AppColors.secondaryOrange),
-                const SizedBox(width: 6),
-                Text(
-                  "تابع من حيث توقفت",
-                  style: GoogleFonts.cairo(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black54,
-                  ),
+            const Icon(Icons.history_rounded,
+                size: 20, color: AppColors.secondaryOrange),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                "تابع: $_lastSeenTitle",
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.cairo(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.primaryDeepTeal,
                 ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              _lastSeenTitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.cairo(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: AppColors.primaryDeepTeal,
               ),
             ),
+            const SizedBox(width: 6),
+            const Icon(Icons.arrow_forward_ios,
+                size: 14, color: AppColors.secondaryOrange),
           ],
         ),
       ),
@@ -656,17 +636,17 @@ class _FactScreenState extends State<FactScreen> {
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-            color: AppColors.primaryDeepTeal.withValues(alpha: 0.12)),
+            color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 14,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -675,20 +655,19 @@ class _FactScreenState extends State<FactScreen> {
         children: [
           Row(
             children: [
-              Icon(icon, size: 20, color: AppColors.secondaryOrange),
+              Icon(icon, size: 18, color: AppColors.secondaryOrange),
               const SizedBox(width: 8),
               Text(
                 title,
                 style: GoogleFonts.cairo(
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w900,
                   color: AppColors.primaryDeepTeal,
                 ),
               ),
             ],
           ),
-          const Divider(height: 18, thickness: 0.5),
-          const SizedBox(height: 4),
+          const Divider(height: 16, thickness: 0.5),
           ...items.map((item) => _verticalTopicRow(item)),
         ],
       ),
@@ -699,7 +678,7 @@ class _FactScreenState extends State<FactScreen> {
     return GestureDetector(
       onTap: () => _openTopic(item.title),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 7),
+        padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(
           children: [
             Expanded(
@@ -708,7 +687,7 @@ class _FactScreenState extends State<FactScreen> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.cairo(
-                  fontSize: 12.5,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: AppColors.primaryDeepTeal,
                 ),
@@ -717,7 +696,7 @@ class _FactScreenState extends State<FactScreen> {
             const SizedBox(width: 8),
             const Icon(
               Icons.arrow_back_ios_new_rounded,
-              size: 12,
+              size: 11,
               color: Colors.black26,
             ),
           ],
