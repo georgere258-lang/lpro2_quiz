@@ -64,11 +64,11 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // quizzes: public read if not hidden, moderator full access
+    // quizzes: public read if isActive, moderator full access
     // ═══════════════════════════════════════════════════════════════════════
 
     match /quizzes/{docId} {
-      allow read: if isModerator() || resource.data.isHidden != true;
+      allow read: if isModerator() || resource.data.isActive == true;
       allow write: if isModerator();
     }
 
@@ -102,9 +102,9 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Helper: user can only update name and avatarId
+    // Helper: user can only update name and avatarId (strictly)
     function onlyAllowedUserFields() {
-      let allowedFields = ['name', 'avatarId', 'updatedAt'];
+      let allowedFields = ['name', 'avatarId'];
       let changedFields = request.resource.data.diff(resource.data).affectedKeys();
       return changedFields.hasOnly(allowedFields);
     }
