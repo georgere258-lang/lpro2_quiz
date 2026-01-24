@@ -10,4 +10,7 @@ class FirestorePaths {
 
   static const String currentDoc = 'current';
   static const String history = 'history';
+
+  // News Ticker
+  static const String newsTickerItems = 'news_ticker_items';
 }

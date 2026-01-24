@@ -20,6 +20,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/firestore_paths.dart';
 import '../../features/pro_card/repositories/pro_card_repository.dart';
 
 class AdminPanel extends StatefulWidget {
@@ -64,7 +65,7 @@ class _AdminPanelState extends State<AdminPanel>
   // =========================
   // Tab 3: News Ticker (CRUD)
   // =========================
-  static const String _tickerCol = "news_ticker_items";
+  static const String _tickerCol = FirestorePaths.newsTickerItems;
   final TextEditingController _tickerText = TextEditingController();
   int _tickerPriority = 0;
   bool _tickerNotify = false;

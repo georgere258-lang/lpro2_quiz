@@ -3,11 +3,12 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:lpro2_quiz/core/constants/firestore_paths.dart';
 
 class NewsTickerService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  static const String _col = 'news_ticker_items';
+  static const String _col = FirestorePaths.newsTickerItems;
   static const Duration _pollInterval = Duration(seconds: 5);
 
   /// Realtime + Polling(Server) => guarantees fresh updates even if listener lags.
