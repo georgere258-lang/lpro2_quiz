@@ -4,21 +4,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// IAdminControlled - Interface for admin-controlled content
-// ═══════════════════════════════════════════════════════════════════════════
-
-/// Marker interface for entities that support admin control fields.
-abstract class IAdminControlled {
-  AdminControlFields get adminFields;
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // UtcNormalizer - Utility for UTC date handling
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// Utility class for normalizing DateTime values to UTC.
 class UtcNormalizer {
   UtcNormalizer._();
+
+  /// Returns current time in UTC.
+  static DateTime nowUtc() => DateTime.now().toUtc();
 
   /// Normalizes a DateTime to UTC. Returns null if input is null.
   static DateTime? normalize(DateTime? dt) => dt?.toUtc();
@@ -36,6 +30,37 @@ class UtcNormalizer {
     if (dt == null) return null;
     return Timestamp.fromDate(dt.toUtc());
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// IAdminControlled - Interface for admin-controlled content
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Interface for entities that support admin control fields.
+abstract class IAdminControlled {
+  /// Unique identifier for the entity.
+  String get id;
+
+  /// Whether the content is active/visible.
+  bool get isActive;
+
+  /// Scheduled publish time (UTC).
+  DateTime? get publishAt;
+
+  /// Scheduled expiration time (UTC).
+  DateTime? get expireAt;
+
+  /// Last update timestamp (UTC).
+  DateTime? get updatedAt;
+
+  /// Section key for grouping.
+  String get sectionKey;
+
+  /// Converts the entity to a Firestore-compatible map.
+  Map<String, dynamic> toFirestore();
+
+  /// Validates the entity. Throws [ArgumentError] if invalid.
+  void validate();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -87,73 +112,56 @@ class AdminControlFields {
   // Constructor
   // ─────────────────────────────────────────────────────────────────────────
 
-  AdminControlFields._({
-    required this.isActive,
-    this.publishAt,
-    this.expireAt,
-    required this.featured,
-    this.featuredUntil,
-    this.featuredOrder,
-    required this.sectionKey,
-    required this.orderInSection,
-    required this.notify,
-    required this.tags,
-    this.createdAt,
-    this.updatedAt,
-  });
-
-  /// Creates AdminControlFields with validation and UTC normalization.
-  ///
-  /// Throws [ArgumentError] if:
-  /// - [tags] has more than 5 items
-  /// - [publishAt] is after [expireAt] (when both are set)
-  factory AdminControlFields({
-    bool isActive = false,
+  /// Creates AdminControlFields with UTC normalization.
+  /// Call [validate] to check constraints.
+  AdminControlFields({
+    this.isActive = false,
     DateTime? publishAt,
     DateTime? expireAt,
-    bool featured = false,
+    this.featured = false,
     DateTime? featuredUntil,
-    int? featuredOrder,
-    required String sectionKey,
-    int orderInSection = 0,
-    bool notify = false,
+    this.featuredOrder,
+    required this.sectionKey,
+    this.orderInSection = 0,
+    this.notify = false,
     List<String> tags = const [],
     DateTime? createdAt,
     DateTime? updatedAt,
-  }) {
-    // Normalize all DateTime to UTC
-    final publishAtUtc = UtcNormalizer.normalize(publishAt);
-    final expireAtUtc = UtcNormalizer.normalize(expireAt);
-    final featuredUntilUtc = UtcNormalizer.normalize(featuredUntil);
-    final createdAtUtc = UtcNormalizer.normalize(createdAt);
-    final updatedAtUtc = UtcNormalizer.normalize(updatedAt);
+  })  : publishAt = UtcNormalizer.normalize(publishAt),
+        expireAt = UtcNormalizer.normalize(expireAt),
+        featuredUntil = UtcNormalizer.normalize(featuredUntil),
+        createdAt = UtcNormalizer.normalize(createdAt),
+        updatedAt = UtcNormalizer.normalize(updatedAt),
+        tags = List<String>.unmodifiable(tags);
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Validation
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Validates the fields. Throws [ArgumentError] if invalid.
+  ///
+  /// Checks:
+  /// - [tags] must have at most 5 items
+  /// - [publishAt] must be <= [expireAt] (when both are set)
+  /// - [featuredUntil] must be in the future if featured is true
+  void validate() {
     // Validation: tags max 5
     if (tags.length > 5) {
       throw ArgumentError('tags cannot exceed 5 items (got ${tags.length})');
     }
 
     // Validation: publishAt must be <= expireAt
-    if (publishAtUtc != null &&
-        expireAtUtc != null &&
-        publishAtUtc.isAfter(expireAtUtc)) {
+    if (publishAt != null && expireAt != null && publishAt!.isAfter(expireAt!)) {
       throw ArgumentError('publishAt must be before or equal to expireAt');
     }
 
-    return AdminControlFields._(
-      isActive: isActive,
-      publishAt: publishAtUtc,
-      expireAt: expireAtUtc,
-      featured: featured,
-      featuredUntil: featuredUntilUtc,
-      featuredOrder: featuredOrder,
-      sectionKey: sectionKey,
-      orderInSection: orderInSection,
-      notify: notify,
-      tags: List<String>.unmodifiable(tags),
-      createdAt: createdAtUtc,
-      updatedAt: updatedAtUtc,
-    );
+    // Validation: featuredUntil must be in the future if featured
+    if (featured && featuredUntil != null) {
+      final now = UtcNormalizer.nowUtc();
+      if (featuredUntil!.isBefore(now)) {
+        throw ArgumentError('featuredUntil must be in the future (UTC)');
+      }
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -162,10 +170,11 @@ class AdminControlFields {
 
   /// Converts to Firestore-compatible map.
   ///
-  /// - [includeCreatedAt]: if true, sets createdAt to serverTimestamp
-  /// - updatedAt is always set to serverTimestamp
-  /// - null DateTime fields are omitted (caller can use FieldValue.delete externally)
-  Map<String, dynamic> toFirestore({bool includeCreatedAt = false}) {
+  /// - DateTime fields are converted to Timestamp (UTC)
+  /// - null DateTime fields are omitted (caller can use FieldValue.serverTimestamp)
+  /// - createdAt/updatedAt: if provided as DateTime, converts to Timestamp;
+  ///   if null, omitted (caller may use FieldValue.serverTimestamp)
+  Map<String, dynamic> toFirestore() {
     final map = <String, dynamic>{
       'isActive': isActive,
       'featured': featured,
@@ -173,13 +182,7 @@ class AdminControlFields {
       'orderInSection': orderInSection,
       'notify': notify,
       'tags': tags,
-      'updatedAt': FieldValue.serverTimestamp(),
     };
-
-    // Include createdAt only when requested (typically on create)
-    if (includeCreatedAt) {
-      map['createdAt'] = FieldValue.serverTimestamp();
-    }
 
     // DateTime fields - only include if not null
     if (publishAt != null) {
@@ -194,17 +197,24 @@ class AdminControlFields {
     if (featuredOrder != null) {
       map['featuredOrder'] = featuredOrder;
     }
+    if (createdAt != null) {
+      map['createdAt'] = UtcNormalizer.toTimestamp(createdAt);
+    }
+    if (updatedAt != null) {
+      map['updatedAt'] = UtcNormalizer.toTimestamp(updatedAt);
+    }
 
     return map;
   }
 
   /// Creates AdminControlFields from Firestore document data.
   ///
-  /// - [sectionKeyFallback]: used if sectionKey is not present in data
+  /// - [sectionKey]: fallback used if sectionKey is not present in data
+  /// - orderInSection defaults to current UTC timestamp milliseconds if not present
   factory AdminControlFields.fromFirestore(
-    Map<String, dynamic> data, {
-    required String sectionKeyFallback,
-  }) {
+    Map<String, dynamic> data,
+    String sectionKey,
+  ) {
     return AdminControlFields(
       isActive: data['isActive'] == true,
       publishAt: UtcNormalizer.fromTimestamp(data['publishAt']),
@@ -212,8 +222,10 @@ class AdminControlFields {
       featured: data['featured'] == true,
       featuredUntil: UtcNormalizer.fromTimestamp(data['featuredUntil']),
       featuredOrder: data['featuredOrder'] is int ? data['featuredOrder'] : null,
-      sectionKey: (data['sectionKey'] as String?) ?? sectionKeyFallback,
-      orderInSection: data['orderInSection'] is int ? data['orderInSection'] : 0,
+      sectionKey: (data['sectionKey'] as String?) ?? sectionKey,
+      orderInSection: data['orderInSection'] is int
+          ? data['orderInSection']
+          : UtcNormalizer.nowUtc().millisecondsSinceEpoch,
       notify: data['notify'] == true,
       tags: _parseTags(data['tags']),
       createdAt: UtcNormalizer.fromTimestamp(data['createdAt']),
@@ -225,10 +237,7 @@ class AdminControlFields {
   static List<String> _parseTags(dynamic value) {
     if (value == null) return const [];
     if (value is List) {
-      return value
-          .whereType<String>()
-          .take(5) // Enforce max 5 even from Firestore
-          .toList();
+      return value.whereType<String>().take(5).toList();
     }
     return const [];
   }
@@ -238,41 +247,25 @@ class AdminControlFields {
   // ─────────────────────────────────────────────────────────────────────────
 
   /// Returns true if the content should be visible based on schedule.
-  ///
-  /// Checks:
-  /// - isActive must be true
-  /// - now must be >= publishAt (if set)
-  /// - now must be < expireAt (if set)
   bool isVisibleAt(DateTime now) {
     if (!isActive) return false;
-
     final nowUtc = now.toUtc();
-
-    if (publishAt != null && nowUtc.isBefore(publishAt!)) {
-      return false;
-    }
-    if (expireAt != null && !nowUtc.isBefore(expireAt!)) {
-      return false;
-    }
-
+    if (publishAt != null && nowUtc.isBefore(publishAt!)) return false;
+    if (expireAt != null && !nowUtc.isBefore(expireAt!)) return false;
     return true;
   }
 
-  /// Returns true if the content is currently visible (uses DateTime.now()).
+  /// Returns true if the content is currently visible.
   bool get isCurrentlyVisible => isVisibleAt(DateTime.now());
 
-  /// Returns true if the content is currently featured.
-  ///
-  /// Checks:
-  /// - featured must be true
-  /// - if featuredUntil is set, now must be < featuredUntil
+  /// Returns true if the content is featured at the given time.
   bool isFeaturedAt(DateTime now) {
     if (!featured) return false;
     if (featuredUntil == null) return true;
     return now.toUtc().isBefore(featuredUntil!);
   }
 
-  /// Returns true if the content is currently featured (uses DateTime.now()).
+  /// Returns true if the content is currently featured.
   bool get isCurrentlyFeatured => isFeaturedAt(DateTime.now());
 
   /// Creates a copy with updated fields.
