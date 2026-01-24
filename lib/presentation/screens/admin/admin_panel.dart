@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/admin/admin_panel.dart
-// Admin panel with 6 tabs: Pro | Quiz | News | KYC | Support | Users
+// Admin panel with 7 tabs: Content | Pro | Quiz | News | KYC | Support | Users
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -11,6 +11,7 @@ import '../../../features/pro_card/repositories/pro_card_repository.dart';
 import '../../../features/quizzes/repositories/quiz_repository.dart';
 import '../../../features/support/repositories/support_repository.dart';
 import '../../../features/users/repositories/users_admin_repository.dart';
+import 'tabs/admin_content_tab.dart';
 import 'tabs/admin_kyc_tab.dart';
 import 'tabs/admin_news_tab.dart';
 import 'tabs/admin_pro_tab.dart';
@@ -44,7 +45,7 @@ class _AdminPanelState extends State<AdminPanel>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 7, vsync: this);
   }
 
   @override
@@ -85,6 +86,7 @@ class _AdminPanelState extends State<AdminPanel>
             labelStyle: GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 12),
             unselectedLabelStyle: GoogleFonts.cairo(fontWeight: FontWeight.w800, fontSize: 11),
             tabs: const [
+              AdminTabLabel("Content"),
               AdminTabLabel("Pro"),
               AdminTabLabel("Quiz"),
               AdminTabLabel("News"),
@@ -100,6 +102,10 @@ class _AdminPanelState extends State<AdminPanel>
           TabBarView(
             controller: _tabController,
             children: [
+              AdminContentTab(
+                setSaving: _setSaving,
+                snack: _snack,
+              ),
               AdminProTab(
                 proCardRepo: _proCardRepo,
                 configService: _configService,
