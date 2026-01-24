@@ -1,6 +1,5 @@
 // PATH: lib/presentation/screens/main_wrapper.dart
-// STATUS: ELITE PREMIUM WRAPPER (Dynamic Header & Spacing Precision)
-// ✅ UPDATED: Premium Radial Gradient Header
+// STATUS: SEAMLESS HEADER INTEGRATION ✅ (FULL FILE)
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -112,14 +111,13 @@ class _MainWrapperState extends State<MainWrapper> {
       centerTitle: true,
       automaticallyImplyLeading: false,
       toolbarHeight: 60,
-      // ✅ التعديل: تدرج شعاعي بريميوم بدلاً من التدرج الخطي
       flexibleSpace: Container(
         decoration: const BoxDecoration(
           gradient: RadialGradient(
             center: Alignment(0, -0.6),
             radius: 1.6,
             colors: [
-              Color(0xFF136161), // إضاءة خلف اللوجو
+              Color(0xFF136161),
               AppColors.primaryDeepTeal,
             ],
           ),
@@ -131,9 +129,10 @@ class _MainWrapperState extends State<MainWrapper> {
             height: 22, fit: BoxFit.contain),
       ),
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(48),
+        preferredSize: const Size.fromHeight(42),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+          // ✅ تم تصفير الهوامش الجانبية لضمان امتداد الشريط
+          padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
           child: _user == null
               ? const _TickerBox(userName: "Pro")
               : StreamBuilder<DocumentSnapshot>(
@@ -159,7 +158,6 @@ class _MainWrapperState extends State<MainWrapper> {
       elevation: 0,
       centerTitle: true,
       automaticallyImplyLeading: false,
-      // ✅ التعديل: تدرج شعاعي لشاشات الترتيب والبروفايل
       flexibleSpace: Container(
         decoration: const BoxDecoration(
           gradient: RadialGradient(
@@ -175,8 +173,8 @@ class _MainWrapperState extends State<MainWrapper> {
       title: Text(
         title,
         style: GoogleFonts.cairo(
-            fontWeight: FontWeight.w900, 
-            color: Colors.white, 
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
             fontSize: 18,
             shadows: [
               Shadow(
@@ -199,26 +197,11 @@ class _TickerBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          height: 32,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          color: AppColors.secondaryOrange,
-          alignment: Alignment.center,
-          child: NewsTickerWidget(userName: userName),
-        ),
-      ),
+      height: 34,
+      width: double.infinity,
+      color: Colors.transparent, // ✅ شفاف تماماً
+      alignment: Alignment.center,
+      child: NewsTickerWidget(userName: userName),
     );
   }
 }

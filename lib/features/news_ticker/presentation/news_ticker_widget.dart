@@ -1,5 +1,5 @@
 // PATH: lib/features/news_ticker/presentation/news_ticker_widget.dart
-// STATUS: ULTRA-PREMIUM UPGRADE (Visual Depth & Digital Gradient)
+// STATUS: CLEAN SEAMLESS TEXT ✅ (FULL FILE)
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -113,65 +113,22 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
         return Container(
           height: 34,
           width: double.infinity,
-          // ✅ التحسين الجوهري: إضافة تدرج لوني وعمق بصري للشريط
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                AppColors.secondaryOrange, // لون الأساس
-                AppColors.secondaryOrange.withValues(alpha: 0.85), // تدرج للعمق
-              ],
+          color: Colors.transparent, // ✅ شفاف تماماً للاندماج مع الهيدر
+          child: IgnorePointer(
+            child: ListView.builder(
+              controller: _scrollController,
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: looped.length,
+              itemBuilder: (context, index) {
+                return Row(
+                  children: [
+                    _buildText(looped[index]),
+                    _divider(),
+                  ],
+                );
+              },
             ),
-            boxShadow: [
-              // ظل علوي داخلي خفيف لإعطاء إيحاء بالاحتواء (Inset Effect)
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.15),
-                offset: const Offset(0, 1),
-                blurRadius: 2,
-                spreadRadius: 0,
-              ),
-            ],
-            border: Border(
-              bottom: BorderSide(
-                color: Colors.black.withValues(alpha: 0.1),
-                width: 0.5,
-              ),
-            ),
-          ),
-          child: Stack(
-            children: [
-              // الطبقة الشفافة العلوية لزيادة اللمعان (Premium Sheen)
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    stops: const [0.0, 0.5],
-                    colors: [
-                      Colors.white.withValues(alpha: 0.12),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-              IgnorePointer(
-                child: ListView.builder(
-                  controller: _scrollController,
-                  scrollDirection: Axis.horizontal,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: looped.length,
-                  itemBuilder: (context, index) {
-                    return Row(
-                      children: [
-                        _buildText(looped[index]),
-                        _divider(),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ],
           ),
         );
       },
@@ -184,13 +141,12 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
       child: Text(
         text,
         style: GoogleFonts.cairo(
-          fontSize: 12.5, // تكبير طفيف جداً للوضوح
+          fontSize: 12.5,
           fontWeight: FontWeight.w800,
-          color: Colors.white,
-          // إضافة ظل خفيف جداً للنص لزيادة التباين
+          color: const Color(0xFFFDFBF7), // العاجي الفخم
           shadows: [
             Shadow(
-              color: Colors.black.withValues(alpha: 0.2),
+              color: Colors.black.withValues(alpha: 0.15),
               offset: const Offset(0, 1),
               blurRadius: 1,
             ),
@@ -202,25 +158,12 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
 
   Widget _divider() {
     return Container(
-      margin: const EdgeInsets.symmetric(
-          horizontal: 22), // تقليل المسافة لرشاقة أكبر
+      margin: const EdgeInsets.symmetric(horizontal: 22),
       width: 8,
       height: 3,
       decoration: BoxDecoration(
-        // استخدام تدرج داخل الفاصل لجعله يبدو "محفوراً"
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF1A535C),
-            const Color(0xFF1A535C).withValues(alpha: 0.7),
-          ],
-        ),
+        color: AppColors.secondaryOrange.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(4),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.white.withValues(alpha: 0.1),
-            offset: const Offset(0, 1),
-          ),
-        ],
       ),
     );
   }
