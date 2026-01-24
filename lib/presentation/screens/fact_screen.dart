@@ -1,6 +1,6 @@
 // PATH: lib/presentation/screens/fact_screen.dart
-// STATUS: Landing Page Only – No filtering, no ListView
-// ORDER: Intro → Sections Button → Last Seen → Favorites → Recent → Featured
+// STATUS: Landing Page Gateway + Favorites BottomSheet
+// ORDER: Intro → Sections → Last Seen → Favorites → Recent → Featured
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -22,12 +22,14 @@ class FactScreen extends StatefulWidget {
 
 class _FactScreenState extends State<FactScreen> {
   static const String _collectionName = 'pro_insight';
+  static const String _prefsFavKey = 'pro_insight_fav_titles';
   static const String _prefsLastSeenKey = 'pro_insight_last_seen_title';
 
-  // ✅ Recent window (feel free to change later)
+  // ✅ Recent window
   static const int _recentDaysWindow = 7;
 
   String _lastSeenTitle = '';
+  Set<String> _favoriteTitles = {};
 
   @override
   void initState() {
@@ -47,9 +49,14 @@ class _FactScreenState extends State<FactScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final last = prefs.getString(_prefsLastSeenKey) ?? '';
+      final favList = prefs.getStringList(_prefsFavKey) ?? <String>[];
       if (!mounted) return;
       setState(() {
         _lastSeenTitle = last.trim();
+        _favoriteTitles = favList
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toSet();
       });
     } catch (_) {}
   }
@@ -62,6 +69,21 @@ class _FactScreenState extends State<FactScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_prefsLastSeenKey, t);
+    } catch (_) {}
+  }
+
+  Future<void> _removeFavoriteLocal(String title) async {
+    final t = title.trim();
+    if (t.isEmpty) return;
+
+    final next = Set<String>.from(_favoriteTitles);
+    next.remove(t);
+
+    setState(() => _favoriteTitles = next);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_prefsFavKey, next.toList());
     } catch (_) {}
   }
 
@@ -88,6 +110,177 @@ class _FactScreenState extends State<FactScreen> {
         onOpen: (title) async => _openTopic(title),
       ),
     );
+  }
+
+  // ✅ Favorites BottomSheet
+  Future<void> _openFavoritesSheet() async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (_) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final favList = _favoriteTitles.toList();
+
+            return SafeArea(
+              child: Directionality(
+                textDirection: TextDirection.rtl,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Handle
+                      Center(
+                        child: Container(
+                          width: 42,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Title
+                      Row(
+                        children: [
+                          const Icon(Icons.bookmark_rounded,
+                              size: 22, color: AppColors.secondaryOrange),
+                          const SizedBox(width: 8),
+                          Text(
+                            "المفضلة",
+                            style: GoogleFonts.cairo(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              color: AppColors.primaryDeepTeal,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            "${favList.length} موضوع",
+                            style: GoogleFonts.cairo(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Content
+                      if (favList.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 32),
+                          child: Column(
+                            children: [
+                              Icon(Icons.bookmark_border_rounded,
+                                  size: 48, color: Colors.grey[400]),
+                              const SizedBox(height: 12),
+                              Text(
+                                "لا توجد مواضيع في المفضلة الآن.",
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.cairo(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                "أضف مواضيع للمفضلة من داخل أي موضوع.",
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.cairo(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 11.5,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxHeight: MediaQuery.of(context).size.height * 0.5,
+                          ),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: favList.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 10),
+                            itemBuilder: (context, index) {
+                              final title = favList[index];
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: AppColors.primaryDeepTeal
+                                        .withValues(alpha: 0.10),
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.04),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 4),
+                                  title: Text(
+                                    title,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.cairo(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 13,
+                                      color: AppColors.primaryDeepTeal,
+                                    ),
+                                  ),
+                                  trailing: IconButton(
+                                    tooltip: "إزالة من المفضلة",
+                                    icon: const Icon(
+                                      Icons.bookmark_remove_rounded,
+                                      color: AppColors.secondaryOrange,
+                                      size: 22,
+                                    ),
+                                    onPressed: () async {
+                                      await _removeFavoriteLocal(title);
+                                      setSheetState(() {});
+                                    },
+                                  ),
+                                  onTap: () async {
+                                    Navigator.pop(context);
+                                    await _openTopic(title);
+                                  },
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    // Refresh state after sheet closes
+    await _loadLocalState();
   }
 
   @override
@@ -189,15 +382,16 @@ class _FactScreenState extends State<FactScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1️⃣ Intro Card (bigger + longer description)
+              // 1️⃣ Intro Card (bigger + stronger shadow)
               _introCard(),
 
               const SizedBox(height: 16),
 
-              // 2️⃣ Sections Button (Full width)
+              // 2️⃣ Sections Button (Full width + prominent)
               _fullWidthButton(
                 icon: Icons.category_outlined,
-                label: 'تصفّح الأقسام',
+                label: 'تصفّح كل الأقسام',
+                isPrimary: true,
                 onTap: () {
                   Navigator.push(
                     context,
@@ -216,22 +410,14 @@ class _FactScreenState extends State<FactScreen> {
                 const SizedBox(height: 12),
               ],
 
-              // 4️⃣ Favorites Button (Placeholder)
+              // 4️⃣ Favorites Button (Working!)
               _fullWidthButton(
-                icon: Icons.bookmark_outline_rounded,
+                icon: Icons.bookmark_rounded,
                 label: 'المفضلة',
-                subtitle: 'قريباً',
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'المفضلة قريباً إن شاء الله',
-                        style: GoogleFonts.cairo(fontWeight: FontWeight.w700),
-                      ),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                },
+                badge: _favoriteTitles.isNotEmpty
+                    ? '${_favoriteTitles.length}'
+                    : null,
+                onTap: _openFavoritesSheet,
               ),
 
               const SizedBox(height: 16),
@@ -263,19 +449,24 @@ class _FactScreenState extends State<FactScreen> {
 
   Widget _introCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: AppColors.primaryDeepTeal.withValues(alpha: 0.12),
-          width: 1.2,
+          color: AppColors.primaryDeepTeal.withValues(alpha: 0.15),
+          width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
+            color: AppColors.primaryDeepTeal.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -289,19 +480,19 @@ class _FactScreenState extends State<FactScreen> {
                   "بوابة المعلومة اللي بتفرق",
                   textAlign: TextAlign.right,
                   style: GoogleFonts.cairo(
-                    fontSize: 16,
-                    height: 1.5,
+                    fontSize: 17,
+                    height: 1.4,
                     fontWeight: FontWeight.w900,
                     color: AppColors.primaryDeepTeal,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Text(
-                  "مواضيع قصيرة ومركزة، كل موضوع فيه معلومة عملية تقدر تطبقها فوراً.\nفي نهاية كل موضوع سلوك عملي يساعدك تستفيد بشكل مباشر.",
+                  "مواضيع قصيرة ومركزة، كل موضوع فيه معلومة عملية تقدر تطبقها فوراً في شغلك العقاري.\n\nفي نهاية كل موضوع سلوك عملي يساعدك تستفيد بشكل مباشر.",
                   textAlign: TextAlign.right,
                   style: GoogleFonts.cairo(
                     fontSize: 12.5,
-                    height: 1.7,
+                    height: 1.75,
                     fontWeight: FontWeight.w600,
                     color: Colors.black54,
                   ),
@@ -309,15 +500,22 @@ class _FactScreenState extends State<FactScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 16),
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.secondaryOrange.withValues(alpha: 0.1),
+              color: AppColors.secondaryOrange.withValues(alpha: 0.12),
               shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.secondaryOrange.withValues(alpha: 0.15),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: const Icon(Icons.auto_awesome,
-                color: AppColors.secondaryOrange, size: 26),
+                color: AppColors.secondaryOrange, size: 28),
           ),
         ],
       ),
@@ -327,7 +525,8 @@ class _FactScreenState extends State<FactScreen> {
   Widget _fullWidthButton({
     required IconData icon,
     required String label,
-    String? subtitle,
+    String? badge,
+    bool isPrimary = false,
     required VoidCallback onTap,
   }) {
     return InkWell(
@@ -336,14 +535,22 @@ class _FactScreenState extends State<FactScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isPrimary
+              ? AppColors.primaryDeepTeal.withValues(alpha: 0.06)
+              : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-              color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
+            color: isPrimary
+                ? AppColors.primaryDeepTeal.withValues(alpha: 0.20)
+                : AppColors.primaryDeepTeal.withValues(alpha: 0.10),
+            width: isPrimary ? 1.5 : 1,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
+              color: isPrimary
+                  ? AppColors.primaryDeepTeal.withValues(alpha: 0.10)
+                  : Colors.black.withValues(alpha: 0.06),
+              blurRadius: 12,
               offset: const Offset(0, 6),
             ),
           ],
@@ -362,20 +569,20 @@ class _FactScreenState extends State<FactScreen> {
                 ),
               ),
             ),
-            if (subtitle != null)
+            if (badge != null)
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.secondaryOrange.withValues(alpha: 0.1),
+                  color: AppColors.secondaryOrange,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  subtitle,
+                  badge,
                   style: GoogleFonts.cairo(
                     fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.secondaryOrange,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -398,12 +605,12 @@ class _FactScreenState extends State<FactScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-              color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
+              color: AppColors.primaryDeepTeal.withValues(alpha: 0.12)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
+              color: AppColors.secondaryOrange.withValues(alpha: 0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -449,31 +656,38 @@ class _FactScreenState extends State<FactScreen> {
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-            color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
+            color: AppColors.primaryDeepTeal.withValues(alpha: 0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, size: 18, color: AppColors.secondaryOrange),
+              Icon(icon, size: 20, color: AppColors.secondaryOrange),
               const SizedBox(width: 8),
               Text(
                 title,
                 style: GoogleFonts.cairo(
-                  fontSize: 13.5,
+                  fontSize: 14,
                   fontWeight: FontWeight.w900,
                   color: AppColors.primaryDeepTeal,
                 ),
               ),
             ],
           ),
-          const Divider(height: 16, thickness: 0.5),
+          const Divider(height: 18, thickness: 0.5),
           const SizedBox(height: 4),
           ...items.map((item) => _verticalTopicRow(item)),
         ],
@@ -485,7 +699,7 @@ class _FactScreenState extends State<FactScreen> {
     return GestureDetector(
       onTap: () => _openTopic(item.title),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: 7),
         child: Row(
           children: [
             Expanded(

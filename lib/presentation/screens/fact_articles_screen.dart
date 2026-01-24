@@ -765,15 +765,16 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                         ),
 
                         const SizedBox(height: 14),
-                        // ✅ Save button: fixed width ~220, height 46, Cairo 15 w900
+                        // ✅ Save button: adaptive height, no clipping
                         Align(
                           alignment: Alignment.center,
-                          child: SizedBox(
-                            width: 220,
-                            height: 46,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 48),
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.secondaryOrange,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 14, horizontal: 28),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14),
                                 ),
@@ -810,9 +811,11 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                               },
                               child: Text(
                                 "حفظ التحكم",
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.cairo(
                                   fontWeight: FontWeight.w900,
-                                  fontSize: 15,
+                                  fontSize: 14,
                                   color: Colors.white,
                                 ),
                               ),
@@ -901,15 +904,16 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                     const SizedBox(height: 10),
                     _tf(lockC, "إغلاق/سلوك عملي (lock)", maxLines: 4),
                     const SizedBox(height: 12),
-                    // ✅ Save button: fixed width ~220, height 46, Cairo 15 w900
+                    // ✅ Save button: adaptive height, no clipping
                     Align(
                       alignment: Alignment.center,
-                      child: SizedBox(
-                        width: 220,
-                        height: 46,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 48),
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.secondaryOrange,
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 14, horizontal: 28),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
@@ -961,9 +965,11 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                           },
                           child: Text(
                             "حفظ التعديل",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.cairo(
                               fontWeight: FontWeight.w900,
-                              fontSize: 15,
+                              fontSize: 14,
                               color: Colors.white,
                             ),
                           ),
@@ -1010,11 +1016,19 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
             child: ActionChip(
               onPressed: onTap,
               avatar: Icon(icon, size: 18, color: color),
+              visualDensity: VisualDensity.compact,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              labelPadding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               label: Text(
                 text,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.cairo(
                   fontWeight: FontWeight.w900,
-                  fontSize: 12.5,
+                  fontSize: 12,
+                  height: 1.3,
                   color: color,
                 ),
               ),
@@ -1045,12 +1059,12 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                   ),
                   const SizedBox(height: 12),
                   Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       chip(
                         icon: Icons.star_outline_rounded,
-                        text: "ترشيحات + ترتيب",
+                        text: "ترشيحات\n+ ترتيب",
                         tooltip: "ترشيحات Pro + ترتيب",
                         color: AppColors.secondaryOrange,
                         onTap: () {
@@ -1092,7 +1106,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                       ),
                       chip(
                         icon: Icons.schedule_send,
-                        text: "جدولة نشر",
+                        text: "جدولة\nنشر",
                         tooltip: "جدولة نشر",
                         color: Colors.black87,
                         onTap: () {
@@ -1102,7 +1116,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                       ),
                       chip(
                         icon: Icons.delete_outline,
-                        text: "حذف نهائي",
+                        text: "حذف",
                         tooltip: "حذف نهائي",
                         color: Colors.red,
                         onTap: () {
