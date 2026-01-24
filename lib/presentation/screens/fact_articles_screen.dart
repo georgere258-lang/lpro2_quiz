@@ -3,7 +3,7 @@
 //         + ✅ Admin Tools (role-based)
 //         + ✅ Improved Admin UI (compact chips, readable text)
 //         + ✅ Featured control: isFeatured + featuredOrder + featuredUntil
-//         + ✅ Section control: Tags-based (aligned with FactScreen sections)
+//         + ✅ Section control: sectionKey + orderInSection (with dropdown + arrows)
 //         + ✅ FIX: bottom favorite now clickable
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -60,16 +60,18 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
   bool _isFeatured = false; // مختارات اليوم
   int _featuredOrder = 0; // ترتيب داخل مختارات اليوم
   DateTime? _featuredUntil; // انتهاء التثبيت (اختياري)
-  List<String> _tags = []; // ✅ Tags-based sections (replacing sectionKey)
+  String _sectionKey = ''; // داخل "المعلومة بتفرق"
+  int _orderInSection = 0; // ترتيب داخل القسم
 
-  // ✅ Section names used in FactScreen (tags-based)
-  static const List<String> _sectionNames = [
-    'البداية الصح',
-    'لغة العقارات',
-    'سيستم السوق',
-    'سيستم الشركات',
-    'التعاقدات والإجراءات',
-    'دراسة المشاريع',
+  // ✅ Known section keys (adjust anytime later)
+  static const List<String> _sectionKeys = [
+    'start',
+    'language',
+    'market_system',
+    'company_system',
+    'projects',
+    'contracts',
+    'broker',
   ];
 
   String get _rawTitle => widget.title;
@@ -242,12 +244,12 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
     final fu = data['featuredUntil'];
     if (fu is Timestamp) featuredUntil = fu.toDate();
 
-    // ✅ Read tags
-    List<String> tags = [];
-    final tagsRaw = data['tags'];
-    if (tagsRaw is List) {
-      tags = tagsRaw.map((e) => e.toString().trim()).where((t) => t.isNotEmpty).toList();
-    }
+    final sectionKey = (data['sectionKey'] ?? '').toString();
+
+    final orderRaw = data['orderInSection'];
+    final orderInSection = (orderRaw is int)
+        ? orderRaw
+        : int.tryParse((orderRaw ?? '0').toString()) ?? 0;
 
     setState(() {
       _hook = (data['hook'] ?? '').toString();
@@ -260,7 +262,8 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
       _isFeatured = isFeatured;
       _featuredOrder = featuredOrder;
       _featuredUntil = featuredUntil;
-      _tags = tags;
+      _sectionKey = sectionKey;
+      _orderInSection = orderInSection;
 
       _loadingArticle = false;
       _articleExists = true;
@@ -460,7 +463,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
     }
   }
 
-  // ✅ Featured + Tags-based section control (aligned with FactScreen)
+  // ✅ Featured + Ordering + Section control (compact + no red screen)
   Future<void> _openFeaturedControl() async {
     if (_docId.isEmpty) {
       _snack("لا يوجد docId للموضوع.");
@@ -471,8 +474,17 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
     int featuredOrderLocal = _featuredOrder;
     DateTime? untilLocal = _featuredUntil;
 
-    // ✅ Tags-based section: use first tag as selected section, or empty
-    String selectedSection = _tags.isNotEmpty ? _tags.first : '';
+    String sectionKeyLocal = _sectionKey.isEmpty
+        ? (_sectionKeys.isNotEmpty ? _sectionKeys.first : '')
+        : _sectionKey;
+
+    // لو sectionKey غير موجود في القائمة (لسبب ما)، نخليه موجود كـ custom
+    final sectionOptions = <String>{
+      ..._sectionKeys,
+      if (_sectionKey.isNotEmpty) _sectionKey,
+    }.toList();
+
+    int orderInSectionLocal = _orderInSection;
 
     await showModalBottomSheet(
       context: context,
@@ -557,7 +569,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          "ترشيحات Pro + نقل القسم",
+                          "تحكم التثبيت والترتيب",
                           textAlign: TextAlign.right,
                           style: GoogleFonts.cairo(
                             fontWeight: FontWeight.w900,
@@ -664,7 +676,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
 
                         const SizedBox(height: 14),
                         Text(
-                          "نقل إلى قسم",
+                          "نقل/ترتيب داخل الأقسام",
                           textAlign: TextAlign.right,
                           style: GoogleFonts.cairo(
                             fontWeight: FontWeight.w900,
@@ -674,29 +686,24 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                         ),
                         const SizedBox(height: 10),
 
-                        // ✅ Tags-based section dropdown
+                        // section dropdown
                         DropdownButtonFormField<String>(
-                          value: _sectionNames.contains(selectedSection)
-                              ? selectedSection
-                              : null,
-                          items: _sectionNames
-                              .map((name) => DropdownMenuItem(
-                                    value: name,
+                          initialValue:
+                              sectionKeyLocal.isEmpty ? null : sectionKeyLocal,
+                          items: sectionOptions
+                              .map((k) => DropdownMenuItem(
+                                    value: k,
                                     child: Text(
-                                      name,
+                                      k,
                                       style: GoogleFonts.cairo(
                                           fontWeight: FontWeight.w800),
                                     ),
                                   ))
                               .toList(),
                           onChanged: (v) =>
-                              setLocal(() => selectedSection = v ?? ''),
+                              setLocal(() => sectionKeyLocal = v ?? ''),
                           decoration: InputDecoration(
-                            hintText: "اختر القسم",
-                            hintStyle: GoogleFonts.cairo(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
+                            hintText: "اختر القسم (sectionKey)",
                             filled: true,
                             fillColor: Colors.grey[100],
                             border: OutlineInputBorder(
@@ -704,6 +711,18 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                               borderSide: BorderSide.none,
                             ),
                           ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        // orderInSection stepper
+                        stepperRow(
+                          label: "ترتيب داخل القسم",
+                          value: orderInSectionLocal,
+                          hint: "استخدم الأسهم ↑ ↓ لترتيبه داخل نفس القسم",
+                          onDown: () => setLocal(() {
+                            if (orderInSectionLocal > 0) orderInSectionLocal--;
+                          }),
+                          onUp: () => setLocal(() => orderInSectionLocal++),
                         ),
 
                         const SizedBox(height: 14),
@@ -719,18 +738,14 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                             onPressed: () async {
                               final nav = Navigator.of(context);
                               try {
-                                // ✅ Build tags list from selected section
-                                final newTags = selectedSection.trim().isEmpty
-                                    ? <String>[]
-                                    : <String>[selectedSection.trim()];
-
                                 await _proInsightRepo.update(_docId, {
                                   'isFeatured': isFeaturedLocal,
                                   'featuredOrder': featuredOrderLocal,
                                   'featuredUntil': untilLocal == null
                                       ? FieldValue.delete()
                                       : untilLocal,
-                                  'tags': newTags,
+                                  'sectionKey': sectionKeyLocal.trim(),
+                                  'orderInSection': orderInSectionLocal,
                                   'updatedAt': FieldValue.serverTimestamp(),
                                 });
 
@@ -739,7 +754,8 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                                   _isFeatured = isFeaturedLocal;
                                   _featuredOrder = featuredOrderLocal;
                                   _featuredUntil = untilLocal;
-                                  _tags = newTags;
+                                  _sectionKey = sectionKeyLocal.trim();
+                                  _orderInSection = orderInSectionLocal;
                                 });
 
                                 nav.pop();
@@ -977,7 +993,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                     children: [
                       chip(
                         icon: Icons.star_outline_rounded,
-                        text: "ترشيحات Pro + نقل",
+                        text: "تثبيت/ترتيب/نقل",
                         color: AppColors.secondaryOrange,
                         onTap: () {
                           Navigator.pop(context);
