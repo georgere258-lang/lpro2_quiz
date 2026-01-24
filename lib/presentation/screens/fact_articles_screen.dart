@@ -14,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/firestore_paths.dart';
 import '../../features/pro_insight/repositories/pro_insight_repository.dart';
 
 class FactArticlesScreen extends StatefulWidget {
@@ -25,7 +26,7 @@ class FactArticlesScreen extends StatefulWidget {
 }
 
 class _FactArticlesScreenState extends State<FactArticlesScreen> {
-  static const String _collectionName = 'pro_insight';
+  static const String _collectionName = FirestorePaths.proInsight;
 
   static const String _prefsFavKey = 'pro_insight_fav_titles';
   static const String _prefsLastSeenKey = 'pro_insight_last_seen_title';
@@ -387,7 +388,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
         return;
       }
 
-      await _docRef.delete();
+      await _proInsightRepo.delete(_docId);
       if (!mounted) return;
       _snack("تم الحذف ✅");
       Navigator.pop(context);

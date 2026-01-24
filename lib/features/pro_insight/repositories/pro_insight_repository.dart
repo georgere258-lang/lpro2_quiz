@@ -67,4 +67,9 @@ class ProInsightRepository {
         .doc(docId)
         .update(_normalizeAndValidateUpdate(update));
   }
+
+  /// Delete a document.
+  Future<void> delete(String docId) async {
+    await _db.collection(_col).doc(docId).delete();
+  }
 }
