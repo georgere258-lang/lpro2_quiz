@@ -18,7 +18,7 @@ import 'package:lpro2_quiz/presentation/screens/login_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/complete_profile_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/main_wrapper.dart';
 import 'package:lpro2_quiz/presentation/screens/about_screen.dart';
-import 'package:lpro2_quiz/presentation/screens/admin_panel.dart';
+import 'package:lpro2_quiz/presentation/screens/admin/admin_panel.dart';
 import 'package:lpro2_quiz/presentation/screens/know_client_screen.dart';
 
 import 'core/curriculum/unit_repository.dart';

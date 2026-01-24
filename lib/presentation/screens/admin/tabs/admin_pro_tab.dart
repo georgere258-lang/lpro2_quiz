@@ -1,0 +1,229 @@
+// PATH: lib/presentation/screens/admin/tabs/admin_pro_tab.dart
+// Pro Card tab for admin panel
+
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/app_config_service.dart';
+import '../../../../features/pro_card/models/pro_card_banner.dart';
+import '../../../../features/pro_card/repositories/pro_card_repository.dart';
+import '../widgets/admin_shared_widgets.dart';
+
+class AdminProTab extends StatelessWidget {
+  final ProCardRepository proCardRepo;
+  final AppConfigService configService;
+  final void Function(bool) setSaving;
+  final void Function(String) snack;
+
+  const AdminProTab({
+    super.key,
+    required this.proCardRepo,
+    required this.configService,
+    required this.setSaving,
+    required this.snack,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              adminCenterBtn(onPressed: () => _openProEditor(context), bg: AppColors.primaryDeepTeal, child: adminBtnText('تعديل / إنشاء الرسالة', size: 12)),
+              const SizedBox(height: 16),
+              StreamBuilder<ProCardBanner?>(
+                stream: proCardRepo.watchCurrent(),
+                builder: (ctx, snap) {
+                  if (!snap.hasData || snap.data == null) {
+                    return Center(child: snap.connectionState == ConnectionState.waiting ? const CircularProgressIndicator() : Text('لا توجد رسالة.', style: GoogleFonts.cairo()));
+                  }
+                  final banner = snap.data!;
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.2))),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        adminStatusBadge(banner.isActive),
+                        const SizedBox(height: 10),
+                        Text(banner.text, style: GoogleFonts.cairo(fontSize: 14, height: 1.6)),
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            adminSmallBtn(banner.isActive ? 'إخفاء' : 'إظهار', Icons.visibility, () async {
+                              setSaving(true);
+                              try {
+                                await proCardRepo.toggleActive(!banner.isActive);
+                                snack(banner.isActive ? 'تم الإخفاء ✅' : 'تم الإظهار ✅');
+                              } catch (_) {
+                                snack('فشل');
+                              } finally {
+                                setSaving(false);
+                              }
+                            }),
+                            const SizedBox(width: 10),
+                            adminSmallBtn('تعديل', Icons.edit, () => _openProEditorWithBanner(context, banner)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+              _buildAppConfigSection(context),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openProEditor(BuildContext context) async {
+    final textC = TextEditingController();
+    bool isActive = true;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (_) => StatefulBuilder(
+        builder: (context, setLocal) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 16, right: 16, top: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('رسالة Pro الحية', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+              adminTextField(textC, 'نص الرسالة...', maxLines: 4),
+              SwitchListTile(value: isActive, onChanged: (v) => setLocal(() => isActive = v), title: Text('ظاهر', style: GoogleFonts.cairo(fontSize: 12))),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryDeepTeal), onPressed: () async {
+                    final nav = Navigator.of(context);
+                    setSaving(true);
+                    try {
+                      await proCardRepo.upsertCurrent(text: textC.text.trim(), isActive: isActive);
+                      snack('تم الحفظ ✅');
+                      nav.pop();
+                    } catch (_) {
+                      snack('فشل الحفظ.');
+                    } finally {
+                      setSaving(false);
+                    }
+                  }, child: adminBtnText('حفظ'))),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openProEditorWithBanner(BuildContext context, ProCardBanner banner) async {
+    final textC = TextEditingController(text: banner.text);
+    bool isActive = banner.isActive;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
+      builder: (_) => StatefulBuilder(
+        builder: (context, setLocal) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 16, right: 16, top: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('تعديل رسالة Pro', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+              adminTextField(textC, 'نص الرسالة...', maxLines: 4),
+              SwitchListTile(value: isActive, onChanged: (v) => setLocal(() => isActive = v), title: Text('ظاهر', style: GoogleFonts.cairo(fontSize: 12))),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryDeepTeal), onPressed: () async {
+                    final nav = Navigator.of(context);
+                    setSaving(true);
+                    try {
+                      await proCardRepo.upsertCurrent(text: textC.text.trim(), isActive: isActive, publishAt: banner.publishAt, expireAt: banner.expireAt);
+                      snack('تم الحفظ ✅');
+                      nav.pop();
+                    } catch (_) {
+                      snack('فشل الحفظ.');
+                    } finally {
+                      setSaving(false);
+                    }
+                  }, child: adminBtnText('حفظ'))),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppConfigSection(BuildContext context) {
+    return StreamBuilder<Map<String, dynamic>>(
+      stream: configService.watchCurrent(),
+      builder: (context, snap) {
+        final config = snap.data ?? AppConfigService.defaults;
+        final features = (config['features'] as Map<String, dynamic>?) ?? AppConfigService.defaultFeatures;
+        final limits = (config['limits'] as Map<String, dynamic>?) ?? AppConfigService.defaultLimits;
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.grey.withValues(alpha: 0.3))),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('App Controls', style: GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 14, color: AppColors.primaryDeepTeal)),
+              const Divider(),
+              _configSwitch(label: 'Push Notifications', value: features['pushNotificationsEnabled'] == true, onChanged: (v) => _saveFeature('pushNotificationsEnabled', v)),
+              _configSwitch(label: 'Support Chat', value: features['supportChatEnabled'] == true, onChanged: (v) => _saveFeature('supportChatEnabled', v)),
+              _configSwitch(label: 'Quiz Share', value: features['quizShareEnabled'] == true, onChanged: (v) => _saveFeature('quizShareEnabled', v)),
+              const SizedBox(height: 8),
+              Text('Limits', style: GoogleFonts.cairo(fontWeight: FontWeight.w800, fontSize: 12)),
+              _configLimitRow(label: 'Max Fetch', value: limits['maxFetchPerPage'] ?? 50, onSave: (v) => _saveLimit('maxFetchPerPage', v)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _configSwitch({required String label, required bool value, required ValueChanged<bool> onChanged}) {
+    return SwitchListTile(dense: true, contentPadding: EdgeInsets.zero, title: Text(label, style: GoogleFonts.cairo(fontSize: 12)), value: value, onChanged: onChanged);
+  }
+
+  Widget _configLimitRow({required String label, required int value, required ValueChanged<int> onSave}) {
+    final controller = TextEditingController(text: value.toString());
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(flex: 2, child: Text(label, style: GoogleFonts.cairo(fontSize: 11))),
+          SizedBox(width: 70, child: TextField(controller: controller, keyboardType: TextInputType.number, textAlign: TextAlign.center, style: GoogleFonts.cairo(fontSize: 12), decoration: InputDecoration(isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)))),
+          const SizedBox(width: 6),
+          SizedBox(width: 50, height: 32, child: ElevatedButton(onPressed: () { final p = int.tryParse(controller.text.trim()); if (p != null && p > 0) onSave(p); }, style: ElevatedButton.styleFrom(padding: EdgeInsets.zero, backgroundColor: AppColors.primaryDeepTeal), child: Text('Save', style: GoogleFonts.cairo(fontSize: 10)))),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveFeature(String key, bool value) async {
+    setSaving(true);
+    try { await configService.upsertCurrent({'features': {key: value}}); snack('✅'); } catch (_) { snack('فشل'); } finally { setSaving(false); }
+  }
+
+  Future<void> _saveLimit(String key, int value) async {
+    setSaving(true);
+    try { await configService.upsertCurrent({'limits': {key: value}}); snack('✅'); } catch (_) { snack('فشل'); } finally { setSaving(false); }
+  }
+}

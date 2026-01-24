@@ -12,7 +12,7 @@ import 'package:lpro2_quiz/core/data/models/user_model.dart';
 
 import 'about_screen.dart';
 import 'login_screen.dart';
-import 'admin_panel.dart';
+import 'admin/admin_panel.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onSupportPressed;
