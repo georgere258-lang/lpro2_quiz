@@ -27,4 +27,14 @@ class FirestorePaths {
 
   // Legacy alias (kept for backward compatibility)
   static const String proCardCurrent = homeProCard;
+
+  // ─────────────────────────────────────────────────────────────
+  // Section Keys (for AdminControlFields.sectionKey)
+  // ─────────────────────────────────────────────────────────────
+
+  static const String sectionKeyProInsight = 'pro_insight';
+  static const String sectionKeyKyc = 'kyc';
+  static const String sectionKeyRadar = 'radar';
+  static const String sectionKeyMoney = 'money';
+  static const String sectionKeyProCard = 'pro_card';
 }
