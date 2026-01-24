@@ -1,9 +1,6 @@
 // PATH: lib/presentation/screens/fact_screen.dart
-// STATUS: Full File – Firestore Topics (pro_insight) + Fixed Sections Plan
-//         + Favorites (SharedPreferences) + Last Seen Badge
-//         + Tag Normalization (fix: "سيستم الشركة" => "سيستم الشركات")
-//         + ✅ NEW: Top Blocks (Zero Cost): Featured "مختارات اليوم" + Recent "حديثًا"
-//         + ✅ ADDED: Bottom Navigation Bar ONLY
+// STATUS: Landing Page Only – No filtering, no ListView
+// ORDER: Intro → Sections Button → Last Seen → Favorites → Recent → Featured
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -42,11 +39,7 @@ class _FactScreenState extends State<FactScreen> {
   String _normalizeTag(String raw) {
     final t = raw.trim();
     if (t.isEmpty) return t;
-
-    // أهم تصحيح عندك:
     if (t == 'سيستم الشركة') return 'سيستم الشركات';
-
-    // ممكن توسّع هنا لاحقًا لو ظهر اختلافات كتابة
     return t;
   }
 
@@ -84,6 +77,19 @@ class _FactScreenState extends State<FactScreen> {
     await _loadLocalState();
   }
 
+  Future<void> _openSearch() async {
+    final items = await _fetchOnceItems();
+    if (!mounted) return;
+    if (!context.mounted) return;
+    showSearch(
+      context: context,
+      delegate: _FactSearchDelegate(
+        items: items,
+        onOpen: (title) async => _openTopic(title),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -96,6 +102,12 @@ class _FactScreenState extends State<FactScreen> {
           'المعلومة بتفرق',
           style: GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 18),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: _openSearch,
+          ),
+        ],
       ),
       bottomNavigationBar: LProBottomNavBar(
         activeIndex: 0,
@@ -111,129 +123,12 @@ class _FactScreenState extends State<FactScreen> {
       ),
       body: Directionality(
         textDirection: TextDirection.rtl,
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-
-            // ===== Header Row =====
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  _PillButton(
-                    icon: Icons.category_outlined,
-                    label: 'الأقسام',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const FactSectionsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const Spacer(),
-                  _PillButton(
-                    icon: Icons.search,
-                    label: 'بحث',
-                    onTap: () async {
-                      final items = await _fetchOnceItems();
-                      if (!mounted) return;
-                      if (!context.mounted) return;
-                      showSearch(
-                        context: context,
-                        delegate: _FactSearchDelegate(
-                          items: items,
-                          onOpen: (title) async => _openTopic(title),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            // ===== Intro Card =====
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _introCard(),
-            ),
-
-            const SizedBox(height: 8),
-
-            Expanded(child: _topicsList()),
-          ],
-        ),
+        child: _landingContent(),
       ),
     );
   }
 
-  Widget _introCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: AppColors.primaryDeepTeal.withValues(alpha: 0.12),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  "بوابة المعلومة اللي بتفرق",
-                  textAlign: TextAlign.right,
-                  style: GoogleFonts.cairo(
-                    fontSize: 14.5,
-                    height: 1.5,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.primaryDeepTeal,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  "مواضيع قصيرة، مركزة، وفي نهايتها سلوك عملي.",
-                  textAlign: TextAlign.right,
-                  style: GoogleFonts.cairo(
-                    fontSize: 12.5,
-                    height: 1.6,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black54,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.secondaryOrange.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.auto_awesome,
-                color: AppColors.secondaryOrange, size: 22),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _topicsList() {
+  Widget _landingContent() {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream:
           FirebaseFirestore.instance.collection(_collectionName).snapshots(),
@@ -285,224 +180,335 @@ class _FactScreenState extends State<FactScreen> {
                 e.createdAtMs > 0 &&
                 DateTime.fromMillisecondsSinceEpoch(e.createdAtMs)
                     .isAfter(recentCutoff))
-            .take(12)
-            .toList();
-
-        // Section preview lookup
-        const String previewSectionName = 'البداية الصح';
-        final previewItems = allItems
-            .where((e) => e.tags.contains(_normalizeTag(previewSectionName)))
-            .take(3)
+            .take(5)
             .toList();
 
         return SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ✅ تابع من حيث توقفت (single card)
+              // 1️⃣ Intro Card (bigger + longer description)
+              _introCard(),
+
+              const SizedBox(height: 16),
+
+              // 2️⃣ Sections Button (Full width)
+              _fullWidthButton(
+                icon: Icons.category_outlined,
+                label: 'تصفّح الأقسام',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const FactSectionsScreen(),
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              // 3️⃣ تابع من حيث توقفت (if exists)
               if (_lastSeenTitle.trim().isNotEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-                  child: GestureDetector(
-                    onTap: () => _openTopic(_lastSeenTitle),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                            color: AppColors.primaryDeepTeal
-                                .withValues(alpha: 0.10)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.history_rounded,
-                                  size: 16, color: AppColors.secondaryOrange),
-                              const SizedBox(width: 6),
-                              Text(
-                                "تابع من حيث توقفت",
-                                style: GoogleFonts.cairo(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.black54,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            _lastSeenTitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.cairo(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.primaryDeepTeal,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
+                _lastSeenCard(),
+                const SizedBox(height: 12),
               ],
 
-              // ✅ ترشيحات Pro
-              if (featured.isNotEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                          color:
-                              AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
+              // 4️⃣ Favorites Button (Placeholder)
+              _fullWidthButton(
+                icon: Icons.bookmark_outline_rounded,
+                label: 'المفضلة',
+                subtitle: 'قريباً',
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'المفضلة قريباً إن شاء الله',
+                        style: GoogleFonts.cairo(fontWeight: FontWeight.w700),
+                      ),
+                      duration: const Duration(seconds: 2),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.star_rounded,
-                                size: 18, color: AppColors.secondaryOrange),
-                            const SizedBox(width: 8),
-                            Text(
-                              "ترشيحات Pro",
-                              style: GoogleFonts.cairo(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w900,
-                                color: AppColors.primaryDeepTeal,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 16, thickness: 0.5),
-                        const SizedBox(height: 4),
-                        ...featured
-                            .take(5)
-                            .map((item) => _verticalTopicRow(item)),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-              ],
+                  );
+                },
+              ),
 
-              // ✅ جديد Pro
+              const SizedBox(height: 16),
+
+              // 5️⃣ جديد Pro (last 5)
               if (recent.isNotEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                          color:
-                              AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.new_releases_rounded,
-                                size: 18, color: AppColors.secondaryOrange),
-                            const SizedBox(width: 8),
-                            Text(
-                              "جديد Pro",
-                              style: GoogleFonts.cairo(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w900,
-                                color: AppColors.primaryDeepTeal,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 16, thickness: 0.5),
-                        const SizedBox(height: 4),
-                        ...recent.take(5).map((item) => _verticalTopicRow(item)),
-                      ],
-                    ),
-                  ),
+                _topicsCard(
+                  title: 'جديد Pro',
+                  icon: Icons.new_releases_rounded,
+                  items: recent.take(5).toList(),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 12),
               ],
 
-              // ✅ Section preview (البداية الصح) with link to sections
-              if (previewItems.isNotEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                          color:
-                              AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                previewSectionName,
-                                style: GoogleFonts.cairo(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppColors.primaryDeepTeal,
-                                ),
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const FactSectionsScreen(),
-                                  ),
-                                );
-                              },
-                              child: const Icon(
-                                Icons.grid_view_rounded,
-                                size: 20,
-                                color: AppColors.secondaryOrange,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        ...previewItems.map((item) => _verticalTopicRow(item)),
-                      ],
-                    ),
-                  ),
+              // 6️⃣ ترشيحات Pro (last 5)
+              if (featured.isNotEmpty) ...[
+                _topicsCard(
+                  title: 'ترشيحات Pro',
+                  icon: Icons.star_rounded,
+                  items: featured.take(5).toList(),
                 ),
               ],
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _introCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: AppColors.primaryDeepTeal.withValues(alpha: 0.12),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  "بوابة المعلومة اللي بتفرق",
+                  textAlign: TextAlign.right,
+                  style: GoogleFonts.cairo(
+                    fontSize: 16,
+                    height: 1.5,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.primaryDeepTeal,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "مواضيع قصيرة ومركزة، كل موضوع فيه معلومة عملية تقدر تطبقها فوراً.\nفي نهاية كل موضوع سلوك عملي يساعدك تستفيد بشكل مباشر.",
+                  textAlign: TextAlign.right,
+                  style: GoogleFonts.cairo(
+                    fontSize: 12.5,
+                    height: 1.7,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black54,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 14),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.secondaryOrange.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.auto_awesome,
+                color: AppColors.secondaryOrange, size: 26),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _fullWidthButton({
+    required IconData icon,
+    required String label,
+    String? subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+              color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 22, color: AppColors.primaryDeepTeal),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: GoogleFonts.cairo(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.primaryDeepTeal,
+                ),
+              ),
+            ),
+            if (subtitle != null)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.secondaryOrange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  subtitle,
+                  style: GoogleFonts.cairo(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.secondaryOrange,
+                  ),
+                ),
+              ),
+            const SizedBox(width: 8),
+            const Icon(Icons.arrow_forward_ios,
+                size: 16, color: AppColors.secondaryOrange),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _lastSeenCard() {
+    return GestureDetector(
+      onTap: () => _openTopic(_lastSeenTitle),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+              color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.history_rounded,
+                    size: 16, color: AppColors.secondaryOrange),
+                const SizedBox(width: 6),
+                Text(
+                  "تابع من حيث توقفت",
+                  style: GoogleFonts.cairo(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black54,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _lastSeenTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.cairo(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: AppColors.primaryDeepTeal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _topicsCard({
+    required String title,
+    required IconData icon,
+    required List<_FactTopicItem> items,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+            color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 18, color: AppColors.secondaryOrange),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: GoogleFonts.cairo(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.primaryDeepTeal,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 16, thickness: 0.5),
+          const SizedBox(height: 4),
+          ...items.map((item) => _verticalTopicRow(item)),
+        ],
+      ),
+    );
+  }
+
+  Widget _verticalTopicRow(_FactTopicItem item) {
+    return GestureDetector(
+      onTap: () => _openTopic(item.title),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                item.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.cairo(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primaryDeepTeal,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 12,
+              color: Colors.black26,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -543,89 +549,6 @@ class _FactScreenState extends State<FactScreen> {
             fontWeight: FontWeight.w900,
             color: AppColors.primaryDeepTeal,
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _verticalTopicRow(_FactTopicItem item) {
-    return GestureDetector(
-      onTap: () => _openTopic(item.title),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                item.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.cairo(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primaryDeepTeal,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              size: 12,
-              color: Colors.black26,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // دالة الشريط السفلي
-}
-
-class _PillButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _PillButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-              color: AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 18, color: AppColors.primaryDeepTeal),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: GoogleFonts.cairo(
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-                color: AppColors.primaryDeepTeal,
-              ),
-            ),
-          ],
         ),
       ),
     );

@@ -8,6 +8,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/constants/app_colors.dart';
 import 'fact_articles_screen.dart';
+import '../widgets/lpro_bottom_nav_bar.dart';
+import 'main_wrapper.dart';
 
 class FactSectionTopicsScreen extends StatelessWidget {
   final String sectionName;
@@ -39,6 +41,18 @@ class FactSectionTopicsScreen extends StatelessWidget {
           sectionName,
           style: GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 18),
         ),
+      ),
+      bottomNavigationBar: LProBottomNavBar(
+        activeIndex: 0,
+        onTap: (index) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MainWrapper(initialIndex: index),
+            ),
+            (route) => false,
+          );
+        },
       ),
       body: Directionality(
         textDirection: TextDirection.rtl,

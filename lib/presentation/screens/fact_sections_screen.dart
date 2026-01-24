@@ -7,6 +7,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/constants/app_colors.dart';
 import 'fact_section_topics_screen.dart';
+import '../widgets/lpro_bottom_nav_bar.dart';
+import 'main_wrapper.dart';
 
 class FactSectionsScreen extends StatelessWidget {
   const FactSectionsScreen({super.key});
@@ -33,6 +35,18 @@ class FactSectionsScreen extends StatelessWidget {
           'أقسام المعلومة بتفرق',
           style: GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 18),
         ),
+      ),
+      bottomNavigationBar: LProBottomNavBar(
+        activeIndex: 0,
+        onTap: (index) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MainWrapper(initialIndex: index),
+            ),
+            (route) => false,
+          );
+        },
       ),
       body: Directionality(
         textDirection: TextDirection.rtl,
