@@ -62,9 +62,9 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
   DateTime? _featuredUntil; // انتهاء التثبيت (اختياري)
   String _sectionKey = ''; // داخل "المعلومة بتفرق"
   int _orderInSection = 0; // ترتيب داخل القسم
-  List<String> _tags = []; // ✅ Tags (read-only here, not modified by admin)
+  List<String> _tags = []; // ✅ Tags (used for Move Section)
 
-  // ✅ Known section keys with Arabic labels
+  // ✅ Known section keys with Arabic labels (legacy sectionKey)
   static const Map<String, String> _sectionLabels = {
     'start': 'البداية الصح',
     'language': 'لغة العقارات',
@@ -75,6 +75,23 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
     'broker': 'البروكر',
   };
   static List<String> get _sectionKeys => _sectionLabels.keys.toList();
+
+  // ✅ Pro_insight SECTION TAGS (Arabic strings used in tags field)
+  static const List<String> _proInsightSections = [
+    'البداية الصح',
+    'لغة العقارات',
+    'سيستم السوق',
+    'سيستم الشركات',
+    'التعاقدات والإجراءات',
+    'دراسة المشاريع',
+  ];
+
+  // ✅ Tag normalization for pro_insight
+  static String _normalizeTag(String tag) {
+    final t = tag.trim();
+    if (t == 'سيستم الشركة') return 'سيستم الشركات';
+    return t;
+  }
 
   String get _rawTitle => widget.title;
   String get _normTitle => _norm(widget.title);
@@ -835,6 +852,188 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
     );
   }
 
+  // ✅ Move Section via tags (within pro_insight only)
+  Future<void> _openMoveSectionSheet() async {
+    if (_docId.isEmpty) {
+      _snack("الملف غير جاهز.");
+      return;
+    }
+
+    // Detect current section from tags
+    String currentSection = '';
+    for (final tag in _tags) {
+      final norm = _normalizeTag(tag);
+      if (_proInsightSections.contains(norm)) {
+        currentSection = norm;
+        break;
+      }
+    }
+    // Default to first section if none found
+    if (currentSection.isEmpty) {
+      currentSection = _proInsightSections.first;
+    }
+
+    String selectedSection = currentSection;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (_) {
+        return StatefulBuilder(
+          builder: (context, setLocal) {
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 12,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 14,
+                ),
+                child: Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 42,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        "نقل القسم",
+                        textAlign: TextAlign.right,
+                        style: GoogleFonts.cairo(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14.5,
+                          color: AppColors.primaryDeepTeal,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "تغيير قسم ظهور الموضوع داخل \"المعلومة بتفرق\"",
+                        textAlign: TextAlign.right,
+                        style: GoogleFonts.cairo(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      DropdownButtonFormField<String>(
+                        value: selectedSection,
+                        items: _proInsightSections
+                            .map((s) => DropdownMenuItem(
+                                  value: s,
+                                  child: Text(
+                                    s,
+                                    style: GoogleFonts.cairo(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 13),
+                                  ),
+                                ))
+                            .toList(),
+                        onChanged: (v) =>
+                            setLocal(() => selectedSection = v ?? selectedSection),
+                        decoration: InputDecoration(
+                          labelText: "القسم الجديد",
+                          labelStyle: GoogleFonts.cairo(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[100],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Align(
+                        alignment: Alignment.center,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 48),
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.secondaryOrange,
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 14, horizontal: 28),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            onPressed: () async {
+                              final nav = Navigator.of(context);
+                              try {
+                                // Build nextTags:
+                                // 1) Start from existing tags, trim, remove empties
+                                // 2) Remove any existing pro_insight section tags
+                                // 3) Add selected section tag
+                                // 4) Ensure unique
+                                final existingTags = _tags
+                                    .map((t) => _normalizeTag(t))
+                                    .where((t) => t.isNotEmpty)
+                                    .toList();
+
+                                final nonSectionTags = existingTags
+                                    .where((t) => !_proInsightSections.contains(t))
+                                    .toList();
+
+                                final nextTags = <String>{
+                                  ...nonSectionTags,
+                                  selectedSection,
+                                }.toList();
+
+                                await _docRef.update({
+                                  'tags': nextTags,
+                                  'updatedAt': FieldValue.serverTimestamp(),
+                                });
+
+                                if (!mounted) return;
+                                setState(() => _tags = nextTags);
+
+                                nav.pop();
+                                _snack("تم نقل القسم ✅");
+                              } catch (_) {
+                                _snack("فشل نقل القسم.");
+                              }
+                            },
+                            child: Text(
+                              "حفظ",
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.cairo(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Future<void> _openEditor() async {
     if (_docId.isEmpty) {
       _snack("لا يوجد docId للموضوع.");
@@ -1080,6 +1279,16 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                         onTap: () {
                           Navigator.pop(context);
                           _openEditor();
+                        },
+                      ),
+                      chip(
+                        icon: Icons.drive_file_move_outline,
+                        text: "نقل\nالقسم",
+                        tooltip: "تغيير قسم ظهور الموضوع داخل المعلومة بتفرق",
+                        color: Colors.indigo,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _openMoveSectionSheet();
                         },
                       ),
                       chip(
