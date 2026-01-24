@@ -487,30 +487,21 @@ class _AdminPanelState extends State<AdminPanel>
     DateTime? startDate,
     DateTime? endDate,
   }) {
-    // Convert to UTC for consistent storage
-    final DateTime? startUtc = startDate?.toUtc();
-    final DateTime? endUtc = endDate?.toUtc();
-
-    // Validate invariant: startDate must be before endDate if both are set
-    if (startUtc != null && endUtc != null && !startUtc.isBefore(endUtc)) {
-      throw Exception('startDate must be before endDate');
-    }
-
     final data = <String, dynamic>{
       'text_ar': textAr.trim(),
       'priority': priority,
       'isActive': isActive,
       'notify': notify,
       'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(), // ✅ FIX
+      'updatedAt': FieldValue.serverTimestamp(),
       'source': 'admin',
     };
 
-    if (startUtc != null) {
-      data['startDate'] = Timestamp.fromDate(startUtc);
+    if (startDate != null) {
+      data['startDate'] = Timestamp.fromDate(startDate);
     }
-    if (endUtc != null) {
-      data['endDate'] = Timestamp.fromDate(endUtc);
+    if (endDate != null) {
+      data['endDate'] = Timestamp.fromDate(endDate);
     }
 
     return data;
@@ -689,26 +680,17 @@ class _AdminPanelState extends State<AdminPanel>
                   final nav = Navigator.of(context);
                   setState(() => _saving = true);
                   try {
-                    // Convert to UTC for consistent storage
-                    final DateTime? startUtc = start?.toUtc();
-                    final DateTime? endUtc = end?.toUtc();
-
-                    // Validate invariant: startDate must be before endDate if both are set
-                    if (startUtc != null && endUtc != null && !startUtc.isBefore(endUtc)) {
-                      throw Exception('startDate must be before endDate');
-                    }
-
                     final update = <String, dynamic>{
                       'text_ar': text,
                       'priority': pr,
                       'isActive': active,
                       'notify': notify,
                       'source': 'admin',
-                      'updatedAt': FieldValue.serverTimestamp(), // ✅ FIX
+                      'updatedAt': FieldValue.serverTimestamp(),
                     };
 
-                    update['startDate'] = startUtc != null ? Timestamp.fromDate(startUtc) : FieldValue.delete();
-                    update['endDate'] = endUtc != null ? Timestamp.fromDate(endUtc) : FieldValue.delete();
+                    update['startDate'] = start != null ? Timestamp.fromDate(start) : FieldValue.delete();
+                    update['endDate'] = end != null ? Timestamp.fromDate(end) : FieldValue.delete();
 
                     await _tickerRepo.updateItem(docId, update);
 
