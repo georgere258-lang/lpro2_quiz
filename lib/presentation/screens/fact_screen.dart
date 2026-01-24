@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/app_colors.dart';
 import 'fact_articles_screen.dart';
+import 'fact_sections_screen.dart';
 import '../widgets/lpro_bottom_nav_bar.dart';
 import 'main_wrapper.dart';
 
@@ -24,26 +25,11 @@ class FactScreen extends StatefulWidget {
 
 class _FactScreenState extends State<FactScreen> {
   static const String _collectionName = 'pro_insight';
-
-  static const List<String> _sectionsPlan = [
-    'كل المواضيع',
-    'المفضلة',
-    'البداية الصح',
-    'لغة العقارات',
-    'سيستم السوق',
-    'سيستم الشركات',
-    'التعاقدات والإجراءات',
-    'دراسة المشاريع',
-  ];
-
-  static const String _prefsFavKey = 'pro_insight_fav_titles';
   static const String _prefsLastSeenKey = 'pro_insight_last_seen_title';
 
   // ✅ Recent window (feel free to change later)
   static const int _recentDaysWindow = 7;
 
-  String _selectedSection = 'كل المواضيع';
-  Set<String> _favoriteTitles = {};
   String _lastSeenTitle = '';
 
   @override
@@ -67,12 +53,9 @@ class _FactScreenState extends State<FactScreen> {
   Future<void> _loadLocalState() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final fav = prefs.getStringList(_prefsFavKey) ?? <String>[];
       final last = prefs.getString(_prefsLastSeenKey) ?? '';
       if (!mounted) return;
       setState(() {
-        _favoriteTitles =
-            fav.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
         _lastSeenTitle = last.trim();
       });
     } catch (_) {}
@@ -88,27 +71,6 @@ class _FactScreenState extends State<FactScreen> {
       await prefs.setString(_prefsLastSeenKey, t);
     } catch (_) {}
   }
-
-  Future<void> _toggleFavorite(String title) async {
-    final t = title.trim();
-    if (t.isEmpty) return;
-
-    final next = Set<String>.from(_favoriteTitles);
-    if (next.contains(t)) {
-      next.remove(t);
-    } else {
-      next.add(t);
-    }
-
-    setState(() => _favoriteTitles = next);
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList(_prefsFavKey, _favoriteTitles.toList());
-    } catch (_) {}
-  }
-
-  bool _isFavorite(String title) => _favoriteTitles.contains(title.trim());
 
   Future<void> _openTopic(String title) async {
     await _setLastSeen(title);
@@ -161,42 +123,16 @@ class _FactScreenState extends State<FactScreen> {
                   _PillButton(
                     icon: Icons.category_outlined,
                     label: 'الأقسام',
-                    onTap: () => _openSectionsSheet(context),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color:
-                              AppColors.primaryDeepTeal.withValues(alpha: 0.10),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const FactSectionsScreen(),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        _selectedSection,
-                        textAlign: TextAlign.right,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.cairo(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.primaryDeepTeal,
-                        ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
-                  const SizedBox(width: 10),
+                  const Spacer(),
                   _PillButton(
                     icon: Icons.search,
                     label: 'بحث',
@@ -352,26 +288,6 @@ class _FactScreenState extends State<FactScreen> {
             .take(12)
             .toList();
 
-        // ✅ Filter list by selected section
-        List<_FactTopicItem> filtered;
-        if (_selectedSection == 'كل المواضيع') {
-          filtered = allItems;
-        } else if (_selectedSection == 'المفضلة') {
-          filtered = allItems.where((e) => _isFavorite(e.title)).toList();
-        } else {
-          filtered = allItems
-              .where((e) => e.tags.contains(_normalizeTag(_selectedSection)))
-              .toList();
-        }
-
-        if (filtered.isEmpty) {
-          return _centerMsg(
-            _selectedSection == 'المفضلة'
-                ? "لا توجد مواضيع في المفضلة الآن."
-                : "لا توجد مواضيع في هذا القسم الآن.",
-          );
-        }
-
         // Section preview lookup
         const String previewSectionName = 'البداية الصح';
         final previewItems = allItems
@@ -379,14 +295,75 @@ class _FactScreenState extends State<FactScreen> {
             .take(3)
             .toList();
 
-        return Column(
-          children: [
-            // ✅ تابع من حيث توقفت (single card)
-            if (_lastSeenTitle.trim().isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-                child: GestureDetector(
-                  onTap: () => _openTopic(_lastSeenTitle),
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            children: [
+              // ✅ تابع من حيث توقفت (single card)
+              if (_lastSeenTitle.trim().isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+                  child: GestureDetector(
+                    onTap: () => _openTopic(_lastSeenTitle),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                            color: AppColors.primaryDeepTeal
+                                .withValues(alpha: 0.10)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.history_rounded,
+                                  size: 16, color: AppColors.secondaryOrange),
+                              const SizedBox(width: 6),
+                              Text(
+                                "تابع من حيث توقفت",
+                                style: GoogleFonts.cairo(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _lastSeenTitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.cairo(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.primaryDeepTeal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+              ],
+
+              // ✅ ترشيحات Pro
+              if (featured.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
                   child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
@@ -394,492 +371,138 @@ class _FactScreenState extends State<FactScreen> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                          color: AppColors.primaryDeepTeal
-                              .withValues(alpha: 0.10)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                          color:
+                              AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.history_rounded,
-                                size: 16, color: AppColors.secondaryOrange),
-                            const SizedBox(width: 6),
+                            const Icon(Icons.star_rounded,
+                                size: 18, color: AppColors.secondaryOrange),
+                            const SizedBox(width: 8),
                             Text(
-                              "تابع من حيث توقفت",
+                              "ترشيحات Pro",
                               style: GoogleFonts.cairo(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.black54,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _lastSeenTitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.cairo(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.primaryDeepTeal,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-            ],
-
-            // ✅ ترشيحات Pro
-            if (featured.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                        color:
-                            AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.star_rounded,
-                              size: 18, color: AppColors.secondaryOrange),
-                          const SizedBox(width: 8),
-                          Text(
-                            "ترشيحات Pro",
-                            style: GoogleFonts.cairo(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.primaryDeepTeal,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Divider(height: 16, thickness: 0.5),
-                      const SizedBox(height: 4),
-                      ...featured
-                          .take(5)
-                          .map((item) => _verticalTopicRow(item)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-            ],
-
-            // ✅ جديد Pro
-            if (recent.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                        color:
-                            AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.new_releases_rounded,
-                              size: 18, color: AppColors.secondaryOrange),
-                          const SizedBox(width: 8),
-                          Text(
-                            "جديد Pro",
-                            style: GoogleFonts.cairo(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.primaryDeepTeal,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Divider(height: 16, thickness: 0.5),
-                      const SizedBox(height: 4),
-                      ...recent.take(5).map((item) => _verticalTopicRow(item)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-            ],
-
-            // ✅ Section preview (البداية الصح)
-            if (previewItems.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                        color:
-                            AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              previewSectionName,
-                              style: GoogleFonts.cairo(
-                                fontSize: 13,
+                                fontSize: 13.5,
                                 fontWeight: FontWeight.w900,
                                 color: AppColors.primaryDeepTeal,
                               ),
                             ),
-                          ),
-                          GestureDetector(
-                            onTap: () => _openSectionsSheet(context),
-                            child: const Icon(
-                              Icons.grid_view_rounded,
-                              size: 20,
-                              color: AppColors.secondaryOrange,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      ...previewItems.map((item) => _verticalTopicRow(item)),
-                    ],
+                          ],
+                        ),
+                        const Divider(height: 16, thickness: 0.5),
+                        const SizedBox(height: 4),
+                        ...featured
+                            .take(5)
+                            .map((item) => _verticalTopicRow(item)),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 4),
-            ],
+                const SizedBox(height: 4),
+              ],
 
-            // ✅ Main filtered list
-            Expanded(
-              child: ListView.separated(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                itemCount: filtered.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final item = filtered[index];
-                  final isFav = _isFavorite(item.title);
-
-                  return GestureDetector(
-                    onTap: () => _openTopic(item.title),
-                    child: _topicCard(
-                      item: item,
-                      index: index,
-                      isLastSeen: false,
-                      isFavorite: isFav,
-                      onToggleFavorite: () => _toggleFavorite(item.title),
-                      showFavorite: false,
+              // ✅ جديد Pro
+              if (recent.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                          color:
+                              AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
                     ),
-                  );
-                },
-              ),
-            ),
-          ],
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.new_releases_rounded,
+                                size: 18, color: AppColors.secondaryOrange),
+                            const SizedBox(width: 8),
+                            Text(
+                              "جديد Pro",
+                              style: GoogleFonts.cairo(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.primaryDeepTeal,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 16, thickness: 0.5),
+                        const SizedBox(height: 4),
+                        ...recent.take(5).map((item) => _verticalTopicRow(item)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+              ],
+
+              // ✅ Section preview (البداية الصح) with link to sections
+              if (previewItems.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                          color:
+                              AppColors.primaryDeepTeal.withValues(alpha: 0.10)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                previewSectionName,
+                                style: GoogleFonts.cairo(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.primaryDeepTeal,
+                                ),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const FactSectionsScreen(),
+                                  ),
+                                );
+                              },
+                              child: const Icon(
+                                Icons.grid_view_rounded,
+                                size: 20,
+                                color: AppColors.secondaryOrange,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        ...previewItems.map((item) => _verticalTopicRow(item)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         );
       },
-    );
-  }
-
-  // ignore: unused_element
-  Widget _blockHeader({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-            color: AppColors.primaryDeepTeal.withValues(alpha: 0.08)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.secondaryOrange, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  title,
-                  textAlign: TextAlign.right,
-                  style: GoogleFonts.cairo(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.primaryDeepTeal,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  textAlign: TextAlign.right,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.cairo(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black54,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ignore: unused_element
-  Widget _miniTopicCard({
-    required _FactTopicItem item,
-    required bool isFavorite,
-    required VoidCallback onToggleFavorite,
-    required VoidCallback onTap,
-    required String badgeText,
-  }) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: onTap,
-      child: Container(
-        width: 260,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-              color: AppColors.primaryDeepTeal.withValues(alpha: 0.08)),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.secondaryOrange.withValues(alpha: 0.08),
-              blurRadius: 12,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            InkWell(
-              onTap: onToggleFavorite,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.all(6),
-                child: Icon(
-                  isFavorite
-                      ? Icons.bookmark_rounded
-                      : Icons.bookmark_border_rounded,
-                  color: isFavorite
-                      ? AppColors.secondaryOrange
-                      : AppColors.primaryDeepTeal,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (badgeText.trim().isNotEmpty)
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color:
-                              AppColors.primaryDeepTeal.withValues(alpha: 0.06),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: AppColors.primaryDeepTeal
-                                .withValues(alpha: 0.12),
-                          ),
-                        ),
-                        child: Text(
-                          badgeText,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.cairo(
-                            fontSize: 10.8,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.primaryDeepTeal,
-                          ),
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 8),
-                  Text(
-                    item.title,
-                    textAlign: TextAlign.right,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.cairo(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.primaryDeepTeal,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 6),
-            const Icon(Icons.arrow_forward_ios,
-                size: 16, color: AppColors.secondaryOrange),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _topicCard({
-    required _FactTopicItem item,
-    required int index,
-    required bool isLastSeen,
-    required bool isFavorite,
-    required VoidCallback onToggleFavorite,
-    bool showFavorite = true,
-  }) {
-    final shadowTint = index.isEven
-        ? AppColors.primaryDeepTeal.withValues(alpha: 0.08)
-        : AppColors.secondaryOrange.withValues(alpha: 0.08);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-            color: AppColors.primaryDeepTeal.withValues(alpha: 0.08)),
-        boxShadow: [
-          BoxShadow(
-            color: shadowTint,
-            blurRadius: 14,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          if (showFavorite) ...[
-            InkWell(
-              onTap: onToggleFavorite,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.all(6),
-                child: Icon(
-                  isFavorite
-                      ? Icons.bookmark_rounded
-                      : Icons.bookmark_border_rounded,
-                  color: isFavorite
-                      ? AppColors.secondaryOrange
-                      : AppColors.primaryDeepTeal,
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-          ],
-          const Icon(Icons.arrow_forward_ios,
-              size: 16, color: AppColors.secondaryOrange),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (isLastSeen) ...[
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color:
-                            AppColors.secondaryOrange.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color:
-                              AppColors.secondaryOrange.withValues(alpha: 0.22),
-                        ),
-                      ),
-                      child: Text(
-                        "آخر مرة كنت هنا",
-                        style: GoogleFonts.cairo(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.secondaryOrange,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                Text(
-                  item.title,
-                  textAlign: TextAlign.right,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.cairo(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.primaryDeepTeal,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _openSectionsSheet(BuildContext context) async {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-      ),
-      builder: (_) => _SectionsSheet(
-        sections: _sectionsPlan,
-        selected: _selectedSection,
-        onSelect: (s) {
-          Navigator.pop(context);
-          setState(() => _selectedSection = s);
-        },
-      ),
     );
   }
 
@@ -1000,82 +623,6 @@ class _PillButton extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.w900,
                 color: AppColors.primaryDeepTeal,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionsSheet extends StatelessWidget {
-  final List<String> sections;
-  final String selected;
-  final ValueChanged<String> onSelect;
-
-  const _SectionsSheet({
-    required this.sections,
-    required this.selected,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              'اختر القسم',
-              textAlign: TextAlign.right,
-              style: GoogleFonts.cairo(
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                color: AppColors.primaryDeepTeal,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: sections.length,
-                itemBuilder: (_, i) {
-                  final s = sections[i];
-                  final isSel = s == selected;
-
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      s,
-                      textAlign: TextAlign.right,
-                      style: GoogleFonts.cairo(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                        color:
-                            isSel ? AppColors.secondaryOrange : Colors.black87,
-                      ),
-                    ),
-                    trailing: isSel
-                        ? const Icon(Icons.check_circle, color: Colors.green)
-                        : null,
-                    onTap: () => onSelect(s),
-                  );
-                },
               ),
             ),
           ],
