@@ -484,6 +484,15 @@ class _AdminPanelState extends State<AdminPanel>
     DateTime? startDate,
     DateTime? endDate,
   }) {
+    // Convert to UTC for consistent storage
+    final DateTime? startUtc = startDate?.toUtc();
+    final DateTime? endUtc = endDate?.toUtc();
+
+    // Validate invariant: startDate must be before endDate if both are set
+    if (startUtc != null && endUtc != null && !startUtc.isBefore(endUtc)) {
+      throw Exception('startDate must be before endDate');
+    }
+
     final data = <String, dynamic>{
       'text_ar': textAr.trim(),
       'priority': priority,
@@ -494,11 +503,11 @@ class _AdminPanelState extends State<AdminPanel>
       'source': 'admin',
     };
 
-    if (startDate != null) {
-      data['startDate'] = Timestamp.fromDate(startDate);
+    if (startUtc != null) {
+      data['startDate'] = Timestamp.fromDate(startUtc);
     }
-    if (endDate != null) {
-      data['endDate'] = Timestamp.fromDate(endDate);
+    if (endUtc != null) {
+      data['endDate'] = Timestamp.fromDate(endUtc);
     }
 
     return data;
@@ -686,6 +695,15 @@ class _AdminPanelState extends State<AdminPanel>
                   final nav = Navigator.of(context);
                   setState(() => _saving = true);
                   try {
+                    // Convert to UTC for consistent storage
+                    final DateTime? startUtc = start?.toUtc();
+                    final DateTime? endUtc = end?.toUtc();
+
+                    // Validate invariant: startDate must be before endDate if both are set
+                    if (startUtc != null && endUtc != null && !startUtc.isBefore(endUtc)) {
+                      throw Exception('startDate must be before endDate');
+                    }
+
                     final update = <String, dynamic>{
                       'text_ar': text,
                       'priority': pr,
@@ -695,17 +713,8 @@ class _AdminPanelState extends State<AdminPanel>
                       'updatedAt': FieldValue.serverTimestamp(), // ✅ FIX
                     };
 
-                    if (start != null) {
-                      update['startDate'] = Timestamp.fromDate(start!);
-                    } else {
-                      update['startDate'] = FieldValue.delete();
-                    }
-
-                    if (end != null) {
-                      update['endDate'] = Timestamp.fromDate(end!);
-                    } else {
-                      update['endDate'] = FieldValue.delete();
-                    }
+                    update['startDate'] = startUtc != null ? Timestamp.fromDate(startUtc) : FieldValue.delete();
+                    update['endDate'] = endUtc != null ? Timestamp.fromDate(endUtc) : FieldValue.delete();
 
                     await FirebaseFirestore.instance
                         .collection(_tickerCol)

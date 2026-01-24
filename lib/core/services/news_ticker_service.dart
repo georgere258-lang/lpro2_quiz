@@ -29,7 +29,7 @@ class NewsTickerService {
     List<Map<String, dynamic>> mapSnapshot(
       QuerySnapshot<Map<String, dynamic>> snapshot,
     ) {
-      final now = DateTime.now();
+      final now = DateTime.now().toUtc();
 
       return snapshot.docs
           .where((doc) {
@@ -38,8 +38,12 @@ class NewsTickerService {
             final Timestamp? start = data['startDate'] as Timestamp?;
             final Timestamp? end = data['endDate'] as Timestamp?;
 
-            if (start != null && now.isBefore(start.toDate())) return false;
-            if (end != null && now.isAfter(end.toDate())) return false;
+            // Convert timestamps to UTC for consistent comparison
+            final startUtc = start?.toDate().toUtc();
+            final endUtc = end?.toDate().toUtc();
+
+            if (startUtc != null && now.isBefore(startUtc)) return false;
+            if (endUtc != null && !now.isBefore(endUtc)) return false;
 
             final text = data['text_ar']?.toString().trim();
             if (text == null || text.isEmpty) return false;
