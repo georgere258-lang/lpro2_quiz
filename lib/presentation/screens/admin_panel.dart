@@ -689,8 +689,8 @@ class _AdminPanelState extends State<AdminPanel>
                       'updatedAt': FieldValue.serverTimestamp(),
                     };
 
-                    update['startDate'] = start != null ? Timestamp.fromDate(start) : FieldValue.delete();
-                    update['endDate'] = end != null ? Timestamp.fromDate(end) : FieldValue.delete();
+                    update['startDate'] = start != null ? Timestamp.fromDate(start!) : FieldValue.delete();
+                    update['endDate'] = end != null ? Timestamp.fromDate(end!) : FieldValue.delete();
 
                     await _tickerRepo.updateItem(docId, update);
 
