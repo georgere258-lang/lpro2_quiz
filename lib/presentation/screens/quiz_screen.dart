@@ -933,7 +933,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                           ? const ["مناسب للفريش", "ثبات وسط ضغط السوق"]
                           : const ["مناسب للمحترفين", "اختبار الفهم"],
                     ),
-                    const Spacer(),
+                    const SizedBox(height: 20),
                     _glassCard(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 12),
@@ -954,33 +954,32 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                           locked ? Colors.green : primaryColor))
                             ])),
                     const SizedBox(height: 16),
-                    // CTA button (disabled if no questions)
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _candidatePool.isEmpty ? Colors.grey[400] : accentColor,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          elevation: 0,
+                    // CTA button (compact pill, disabled if no questions)
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _candidatePool.isEmpty ? Colors.grey[400] : accentColor,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(0, 44),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
                         ),
-                        onPressed: _candidatePool.isEmpty
-                            ? null
-                            : () {
-                                SoundManager.playTap();
-                                _openDailyChallengeSheet();
-                              },
-                        child: Text(
-                          _candidatePool.isEmpty ? "لا توجد أسئلة حالياً" : _enterButtonText,
-                          style: GoogleFonts.cairo(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                          ),
+                        elevation: 0,
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: _candidatePool.isEmpty
+                          ? null
+                          : () {
+                              SoundManager.playTap();
+                              _openDailyChallengeSheet();
+                            },
+                      child: Text(
+                        _candidatePool.isEmpty ? "لا توجد أسئلة حالياً" : _enterButtonText,
+                        style: GoogleFonts.cairo(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
                         ),
                       ),
                     ),
@@ -991,7 +990,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                             style: GoogleFonts.cairo(
                                 fontWeight: FontWeight.w800,
                                 color: Colors.blueGrey))),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 14),
                   ],
                 ),
               ),
