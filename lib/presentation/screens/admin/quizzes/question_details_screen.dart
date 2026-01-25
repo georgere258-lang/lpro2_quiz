@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/admin/quizzes/question_details_screen.dart
-// Question details screen v2: Arabic categories + hard delete + isActive toggle
+// Question details screen v3: quizzes_v2 clean schema + Arabic categories only
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -7,9 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/firestore_paths.dart';
 import '../../../../core/services/app_config_service.dart';
-import '../../../../features/quizzes/models/quiz.dart';
 import '../widgets/admin_shared_widgets.dart';
 
 class QuestionDetailsScreen extends StatefulWidget {
@@ -32,21 +30,23 @@ class QuestionDetailsScreen extends StatefulWidget {
 
 class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
   // ═══════════════════════════════════════════════════════════════════════════
-  // Category Values (Arabic - stored directly in Firestore)
+  // Collection & Category Values (quizzes_v2 clean schema)
   // ═══════════════════════════════════════════════════════════════════════════
+
+  static const String _collection = 'quizzes_v2';
 
   static const List<String> _categoryValues = [
     'دوري النجوم',
     'دوري المحترفين',
-    'عام',
   ];
+
+  static const List<int> _difficultyValues = [1, 2, 3, 4, 5];
 
   // ═══════════════════════════════════════════════════════════════════════════
   // State
   // ═══════════════════════════════════════════════════════════════════════════
 
   bool _loading = true;
-  Quiz? _quiz;
   bool _changed = false;
 
   // Edit form
@@ -57,7 +57,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
   final _o3C = TextEditingController();
   int _correctIndex = 0;
   String _category = 'دوري النجوم';
-  String _league = QuizLeague.bronze;
+  int _difficulty = 3;
   bool _isActive = true;
 
   @override
@@ -77,7 +77,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Load Question
+  // Load Question (quizzes_v2 clean schema)
   // ═══════════════════════════════════════════════════════════════════════════
 
   Future<void> _loadQuestion() async {
@@ -85,7 +85,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
 
     try {
       final doc = await FirebaseFirestore.instance
-          .collection(FirestorePaths.quizzes)
+          .collection(_collection)
           .doc(widget.docId)
           .get();
 
@@ -95,26 +95,26 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
         return;
       }
 
-      final quiz = Quiz.fromFirestore(doc.data()!, doc.id);
+      final data = doc.data()!;
+      final options = ((data['options'] as List?) ?? []).cast<String>();
 
-      _qC.text = quiz.question;
-      _o0C.text = quiz.options.isNotEmpty ? quiz.options[0] : '';
-      _o1C.text = quiz.options.length > 1 ? quiz.options[1] : '';
-      _o2C.text = quiz.options.length > 2 ? quiz.options[2] : '';
-      _o3C.text = quiz.options.length > 3 ? quiz.options[3] : '';
-      _correctIndex = quiz.correctOptionIndex.clamp(0, 3);
+      _qC.text = (data['question'] ?? '').toString();
+      _o0C.text = options.isNotEmpty ? options[0] : '';
+      _o1C.text = options.length > 1 ? options[1] : '';
+      _o2C.text = options.length > 2 ? options[2] : '';
+      _o3C.text = options.length > 3 ? options[3] : '';
+      _correctIndex = ((data['correctAnswer'] as int?) ?? 0).clamp(0, 3);
 
-      // Use category directly (Arabic), fallback to default
-      _category = _categoryValues.contains(quiz.category)
-          ? quiz.category
-          : 'دوري النجوم';
-      _league = quiz.league;
-      _isActive = quiz.isActive;
+      // Category (Arabic only)
+      final cat = (data['category'] ?? '').toString();
+      _category = _categoryValues.contains(cat) ? cat : 'دوري النجوم';
+      
+      // Difficulty (1-5)
+      _difficulty = ((data['difficulty'] as int?) ?? 3).clamp(1, 5);
+      
+      _isActive = data['isActive'] == true;
 
-      setState(() {
-        _quiz = quiz;
-        _loading = false;
-      });
+      setState(() => _loading = false);
     } catch (e) {
       widget.snack('خطأ في التحميل: $e');
       if (mounted) Navigator.pop(context);
@@ -122,7 +122,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Actions
+  // Actions (quizzes_v2 clean schema)
   // ═══════════════════════════════════════════════════════════════════════════
 
   Future<void> _saveChanges() async {
@@ -150,17 +150,17 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
     widget.setSaving(true);
 
     try {
+      // quizzes_v2 clean schema: only required fields
       await FirebaseFirestore.instance
-          .collection(FirestorePaths.quizzes)
+          .collection(_collection)
           .doc(widget.docId)
           .update({
+        'category': _category,
+        'difficulty': _difficulty,
         'question': question,
         'options': options,
-        'correctOptionIndex': _correctIndex,
-        'category': _category,
-        'league': _league,
+        'correctAnswer': _correctIndex,
         'isActive': _isActive,
-        'updatedAt': FieldValue.serverTimestamp(),
       });
 
       widget.snack('تم الحفظ ✅');
@@ -180,12 +180,9 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
     try {
       final newValue = !_isActive;
       await FirebaseFirestore.instance
-          .collection(FirestorePaths.quizzes)
+          .collection(_collection)
           .doc(widget.docId)
-          .update({
-        'isActive': newValue,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+          .update({'isActive': newValue});
       setState(() {
         _isActive = newValue;
         _changed = true;
@@ -211,7 +208,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
 
     try {
       await FirebaseFirestore.instance
-          .collection(FirestorePaths.quizzes)
+          .collection(_collection)
           .doc(widget.docId)
           .delete();
 
@@ -226,7 +223,6 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
   /// Move league - only updates category field to Arabic value
   Future<void> _moveLeague() async {
     String newCategory = _category;
-    String newLeague = _league;
 
     await showDialog(
       context: context,
@@ -236,36 +232,19 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
           child: AlertDialog(
             title: Text('نقل السؤال',
                 style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  value: newCategory,
-                  decoration: adminDropDecor().copyWith(labelText: 'الدوري'),
-                  items: _categoryValues
-                      .map((c) => DropdownMenuItem(
-                            value: c,
-                            child: Text(
-                              c,
-                              style: GoogleFonts.cairo(fontSize: 12),
-                            ),
-                          ))
-                      .toList(),
-                  onChanged: (v) => setLocal(() => newCategory = v ?? newCategory),
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  value: newLeague,
-                  decoration: adminDropDecor().copyWith(labelText: 'المستوى'),
-                  items: QuizLeague.values
-                      .map((l) => DropdownMenuItem(
-                            value: l,
-                            child: Text(l, style: GoogleFonts.cairo(fontSize: 12)),
-                          ))
-                      .toList(),
-                  onChanged: (v) => setLocal(() => newLeague = v ?? newLeague),
-                ),
-              ],
+            content: DropdownButtonFormField<String>(
+              value: newCategory,
+              decoration: adminDropDecor().copyWith(labelText: 'الدوري'),
+              items: _categoryValues
+                  .map((c) => DropdownMenuItem(
+                        value: c,
+                        child: Text(
+                          c,
+                          style: GoogleFonts.cairo(fontSize: 12),
+                        ),
+                      ))
+                  .toList(),
+              onChanged: (v) => setLocal(() => newCategory = v ?? newCategory),
             ),
             actions: [
               TextButton(
@@ -279,16 +258,11 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
                   try {
                     // Simply update category field (Arabic string)
                     await FirebaseFirestore.instance
-                        .collection(FirestorePaths.quizzes)
+                        .collection(_collection)
                         .doc(widget.docId)
-                        .update({
-                      'category': newCategory,
-                      'league': newLeague,
-                      'updatedAt': FieldValue.serverTimestamp(),
-                    });
+                        .update({'category': newCategory});
                     setState(() {
                       _category = newCategory;
-                      _league = newLeague;
                       _changed = true;
                     });
                     widget.snack('تم النقل ✅');
@@ -313,8 +287,6 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
   }
 
   void _shareQuestion() {
-    if (_quiz == null) return;
-
     if (!AppConfigService().quizShareEnabled) {
       widget.snack('المشاركة غير متاحة حالياً');
       return;
@@ -372,7 +344,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                '$_category • $_league',
+                                '$_category • صعوبة $_difficulty',
                                 style: GoogleFonts.cairo(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
@@ -435,7 +407,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
                       _sectionHeader('تعديل السؤال'),
                       const SizedBox(height: 12),
 
-                      // Category + League
+                      // Category + Difficulty
                       Row(
                         children: [
                           Expanded(
@@ -461,15 +433,15 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: _league,
+                            child: DropdownButtonFormField<int>(
+                              value: _difficulty,
                               decoration:
-                                  adminDropDecor().copyWith(labelText: 'المستوى'),
-                              items: QuizLeague.values
-                                  .map((l) => DropdownMenuItem(
-                                        value: l,
+                                  adminDropDecor().copyWith(labelText: 'الصعوبة (1-5)'),
+                              items: _difficultyValues
+                                  .map((d) => DropdownMenuItem(
+                                        value: d,
                                         child: Text(
-                                          l,
+                                          '$d',
                                           style: GoogleFonts.cairo(
                                               fontWeight: FontWeight.w800,
                                               fontSize: 12),
@@ -477,7 +449,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
                                       ))
                                   .toList(),
                               onChanged: (v) {
-                                if (v != null) setState(() => _league = v);
+                                if (v != null) setState(() => _difficulty = v);
                               },
                             ),
                           ),
@@ -501,7 +473,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
 
                       // Correct answer
                       DropdownButtonFormField<int>(
-                        value: _correctIndex,
+                        initialValue: _correctIndex,
                         decoration: adminDropDecor()
                             .copyWith(labelText: 'الإجابة الصحيحة'),
                         items: List.generate(
@@ -622,7 +594,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: AppColors.secondaryOrange,
+            activeThumbColor: AppColors.secondaryOrange,
           ),
         ],
       ),

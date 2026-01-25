@@ -1,10 +1,10 @@
 // PATH: lib/presentation/screens/quiz_screen.dart
-// STATUS: FULL COMPLETED FILE – ✅ Hardened Quiz Engine v4
+// STATUS: FULL COMPLETED FILE – ✅ Hardened Quiz Engine v5 (quizzes_v2)
+//         ✅ Collection: quizzes_v2 (clean schema, no legacy fields)
 //         ✅ No repetition in same run (usedThisRun by docId)
 //         ✅ Variety across runs (recentlySeen per-league, FIFO bounded)
 //         ✅ Difficulty progression using Firestore 'difficulty' field (1-5)
-//         ✅ Backward compat: difficulty → level (legacy) → default 3
-//         ✅ Safe correct answer resolution (correctAnswer → correctOptionIndex → 0)
+//         ✅ Clean fields only: correctAnswer, difficulty (no fallbacks)
 //         ✅ Safe transactional points update
 //         ✅ Per-question duplicate submission guard
 //         ✅ Active-only query filter
@@ -123,8 +123,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   // PART A: Question Sampling (No Repetition + Per-League Cache)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /// Per-league SharedPreferences key (includes category)
-  String get _recentlySeenPrefsKey => 'quiz_recent_seen_${widget.categoryTitle}';
+  /// Per-league SharedPreferences key (includes category, v2 collection)
+  String get _recentlySeenPrefsKey => 'quiz_v2_recent_seen_${widget.categoryTitle}';
 
   Future<void> _initQuizEngine() async {
     await _loadRecentlySeen();
@@ -167,9 +167,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
   Future<void> _loadCandidatePool() async {
     try {
-      // Query with isActive filter at Firestore level
+      // Query quizzes_v2 with isActive filter at Firestore level
       final snapshot = await FirebaseFirestore.instance
-          .collection('quizzes')
+          .collection('quizzes_v2')
           .where('category', isEqualTo: widget.categoryTitle)
           .where('isActive', isEqualTo: true)
           .orderBy('createdAt', descending: true)
@@ -180,31 +180,13 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         final data = d.data();
         final options = ((data['options'] as List?) ?? []).cast<String>();
         
-        // Safe correct answer resolution: correctAnswer -> correctOptionIndex -> 0
-        // Then clamp to valid range [0, options.length-1]
-        int rawCorrect;
-        if (data['correctAnswer'] != null) {
-          rawCorrect = (data['correctAnswer'] as int?) ?? 0;
-        } else if (data['correctOptionIndex'] != null) {
-          rawCorrect = (data['correctOptionIndex'] as int?) ?? 0;
-        } else {
-          rawCorrect = 0;
-        }
+        // Clean schema: only correctAnswer (0-3), clamp to valid range
         final correctAnswer = options.isNotEmpty
-            ? rawCorrect.clamp(0, options.length - 1)
+            ? ((data['correctAnswer'] as int?) ?? 0).clamp(0, options.length - 1)
             : 0;
         
-        // Read difficulty field with fallback chain: difficulty → level (legacy) → 3
-        int rawDifficulty;
-        if (data['difficulty'] != null) {
-          rawDifficulty = (data['difficulty'] as int?) ?? 3;
-        } else if (data['level'] != null) {
-          // Legacy: level was 0-3, convert to 1-5 range (level+1 gives 1-4, close enough)
-          final legacyLevel = (data['level'] as int?) ?? 0;
-          rawDifficulty = (legacyLevel + 1).clamp(1, 5);
-        } else {
-          rawDifficulty = 3; // Default medium difficulty
-        }
+        // Clean schema: only difficulty (1-5)
+        final difficulty = ((data['difficulty'] as int?) ?? 3).clamp(1, 5);
         
         return _QuizQuestion(
           docId: d.id,
@@ -212,7 +194,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           options: options,
           correctAnswer: correctAnswer,
           createdAtMs: (data['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0,
-          difficulty: rawDifficulty.clamp(1, 5), // Clamp difficulty to valid range [1-5]
+          difficulty: difficulty,
         );
       }).toList();
     } catch (_) {

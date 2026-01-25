@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/admin/tabs/admin_quiz_tab.dart
-// Quiz CMS v2: Arabic categories + hard delete + stable behavior
+// Quiz CMS v3: quizzes_v2 clean schema + Arabic categories only
 
 import 'dart:convert';
 
@@ -7,21 +7,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/firestore_paths.dart';
-import '../../../../features/quizzes/models/quiz.dart';
-import '../../../../features/quizzes/repositories/quiz_repository.dart';
 import '../widgets/admin_shared_widgets.dart';
 import '../quizzes/question_details_screen.dart';
 
 class AdminQuizTab extends StatefulWidget {
-  final QuizRepository quizRepo;
   final void Function(bool) setSaving;
   final void Function(String) snack;
   final Future<bool> Function(String, String) confirm;
 
   const AdminQuizTab({
     super.key,
-    required this.quizRepo,
     required this.setSaving,
     required this.snack,
     required this.confirm,
@@ -33,21 +28,23 @@ class AdminQuizTab extends StatefulWidget {
 
 class _AdminQuizTabState extends State<AdminQuizTab> {
   // ═══════════════════════════════════════════════════════════════════════════
-  // Category Values (Arabic - stored directly in Firestore)
+  // Collection & Category Values (quizzes_v2 clean schema)
   // ═══════════════════════════════════════════════════════════════════════════
+
+  static const String _collection = 'quizzes_v2';
 
   static const List<String> _categoryValues = [
     'دوري النجوم',
     'دوري المحترفين',
-    'عام',
   ];
 
   static const List<String> _filterOptions = [
     'كل الدوريات',
     'دوري النجوم',
     'دوري المحترفين',
-    'عام',
   ];
+
+  static const List<int> _difficultyValues = [1, 2, 3, 4, 5];
 
   // ═══════════════════════════════════════════════════════════════════════════
   // State
@@ -55,7 +52,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
 
   String _selectedFilter = 'كل الدوريات';
   final _searchC = TextEditingController();
-  List<Quiz> _searchResults = [];
+  List<_QuizItem> _searchResults = [];
   bool _isSearching = false;
   bool _showAddForm = false;
   bool _showBulkImport = false;
@@ -68,7 +65,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
   final _o3C = TextEditingController();
   int _correctIndex = 0;
   String _addCategory = 'دوري النجوم';
-  String _addLevel = QuizLeague.bronze;
+  int _addDifficulty = 3;
   bool _addIsActive = true;
 
   // Bulk import controller
@@ -97,7 +94,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
       final searchText = _searchC.text.trim().toLowerCase();
 
       Query<Map<String, dynamic>> query =
-          FirebaseFirestore.instance.collection(FirestorePaths.quizzes);
+          FirebaseFirestore.instance.collection(_collection);
 
       // Filter by category if not "all"
       if (_selectedFilter != 'كل الدوريات') {
@@ -109,8 +106,16 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
 
       final snap = await query.get();
 
-      List<Quiz> results =
-          snap.docs.map((d) => Quiz.fromFirestore(d.data(), d.id)).toList();
+      List<_QuizItem> results = snap.docs.map((d) {
+        final data = d.data();
+        return _QuizItem(
+          id: d.id,
+          question: (data['question'] ?? '').toString(),
+          category: (data['category'] ?? '').toString(),
+          difficulty: (data['difficulty'] as int?) ?? 3,
+          isActive: data['isActive'] == true,
+        );
+      }).toList();
 
       // Client-side search filter
       if (searchText.isNotEmpty) {
@@ -146,6 +151,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
     _o3C.clear();
     setState(() {
       _correctIndex = 0;
+      _addDifficulty = 3;
       _addIsActive = true;
     });
   }
@@ -180,22 +186,18 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
     widget.setSaving(true);
 
     try {
+      // quizzes_v2 clean schema: only required fields
       final data = <String, dynamic>{
+        'category': _addCategory,
+        'difficulty': _addDifficulty,
         'question': question,
         'options': options,
-        'correctOptionIndex': _correctIndex,
-        'category': _addCategory,
-        'league': _addLevel,
-        'difficulty': 3,
+        'correctAnswer': _correctIndex,
         'isActive': _addIsActive,
-        'sectionKey': FirestorePaths.sectionKeyQuiz,
         'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      await FirebaseFirestore.instance
-          .collection(FirestorePaths.quizzes)
-          .add(data);
+      await FirebaseFirestore.instance.collection(_collection).add(data);
 
       widget.snack('تم إضافة السؤال ✅');
       _clearAddForm();
@@ -208,7 +210,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Bulk Import
+  // Bulk Import (quizzes_v2 clean schema)
   // ═══════════════════════════════════════════════════════════════════════════
 
   Future<void> _runBulkImport() async {
@@ -250,11 +252,21 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
             continue;
           }
 
-          // Validate category (must be Arabic string)
+          // Validate category (must be Arabic string, only 2 allowed)
           final category = (item['category'] ?? '').toString().trim();
           if (!_categoryValues.contains(category)) {
             failures.add(
                 '[$index] category يجب أن يكون: ${_categoryValues.join(" / ")}');
+            continue;
+          }
+
+          // Validate difficulty (1-5)
+          final diffRaw = item['difficulty'];
+          final difficulty = (diffRaw is int)
+              ? diffRaw
+              : int.tryParse((diffRaw ?? '').toString()) ?? -1;
+          if (difficulty < 1 || difficulty > 5) {
+            failures.add('[$index] difficulty يجب أن يكون 1-5');
             continue;
           }
 
@@ -265,7 +277,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
             continue;
           }
 
-          // Validate options
+          // Validate options (exactly 4)
           final rawOptions = item['options'];
           if (rawOptions is! List || rawOptions.length != 4) {
             failures.add('[$index] options يجب أن تكون 4 عناصر');
@@ -285,7 +297,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
           }
           if (!optionsValid) continue;
 
-          // Validate correctAnswer
+          // Validate correctAnswer (0-3)
           final correctRaw = item['correctAnswer'];
           final correct = (correctRaw is int)
               ? correctRaw
@@ -296,28 +308,20 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
             continue;
           }
 
-          // Build data
+          // Build quizzes_v2 clean schema data
           final isActive = item['isActive'] != false;
-          final league = (item['league'] ?? QuizLeague.bronze).toString();
-          final validLeague =
-              QuizLeague.isValid(league) ? league : QuizLeague.bronze;
 
           final data = <String, dynamic>{
+            'category': category,
+            'difficulty': difficulty,
             'question': question,
             'options': options,
-            'correctOptionIndex': correct,
-            'category': category,
-            'league': validLeague,
-            'difficulty': 3,
+            'correctAnswer': correct,
             'isActive': isActive,
-            'sectionKey': FirestorePaths.sectionKeyQuiz,
             'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
           };
 
-          final docRef = FirebaseFirestore.instance
-              .collection(FirestorePaths.quizzes)
-              .doc();
+          final docRef = FirebaseFirestore.instance.collection(_collection).doc();
           batch.set(docRef, data);
           importedCount++;
         }
@@ -370,7 +374,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
 
             // Category filter
             DropdownButtonFormField<String>(
-              value: _selectedFilter,
+              initialValue: _selectedFilter,
               decoration: adminDropDecor().copyWith(labelText: 'الدوري'),
               items: _filterOptions
                   .map((c) => DropdownMenuItem(
@@ -448,7 +452,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
                 children: [
                   const SizedBox(height: 12),
 
-                  // Category + Level
+                  // Category + Difficulty
                   Row(
                     children: [
                       Expanded(
@@ -474,15 +478,15 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: _addLevel,
+                        child: DropdownButtonFormField<int>(
+                          value: _addDifficulty,
                           decoration:
-                              adminDropDecor().copyWith(labelText: 'المستوى'),
-                          items: QuizLeague.values
-                              .map((l) => DropdownMenuItem(
-                                    value: l,
+                              adminDropDecor().copyWith(labelText: 'الصعوبة (1-5)'),
+                          items: _difficultyValues
+                              .map((d) => DropdownMenuItem(
+                                    value: d,
                                     child: Text(
-                                      l,
+                                      '$d',
                                       style: GoogleFonts.cairo(
                                           fontWeight: FontWeight.w800,
                                           fontSize: 12),
@@ -490,7 +494,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
                                   ))
                               .toList(),
                           onChanged: (v) {
-                            if (v != null) setState(() => _addLevel = v);
+                            if (v != null) setState(() => _addDifficulty = v);
                           },
                         ),
                       ),
@@ -515,7 +519,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
 
                   // Correct answer
                   DropdownButtonFormField<int>(
-                    value: _correctIndex,
+                    initialValue: _correctIndex,
                     decoration:
                         adminDropDecor().copyWith(labelText: 'الإجابة الصحيحة'),
                     items: List.generate(
@@ -590,7 +594,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
                     style: GoogleFonts.robotoMono(fontSize: 11),
                     decoration: InputDecoration(
                       hintText:
-                          '[\n  {"category": "دوري النجوم", "question": "...", "options": ["a","b","c","d"], "correctAnswer": 0}\n]',
+                          '[\n  {"category": "دوري النجوم", "difficulty": 2, "question": "...", "options": ["a","b","c","d"], "correctAnswer": 0, "isActive": true}\n]',
                       hintStyle:
                           GoogleFonts.robotoMono(fontSize: 10, color: Colors.grey),
                       filled: true,
@@ -635,7 +639,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
   // Quiz Card (Result)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  Widget _quizCard(Quiz q) {
+  Widget _quizCard(_QuizItem q) {
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: () async {
@@ -676,7 +680,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
                 adminStatusBadge(q.isActive),
                 const Spacer(),
                 Text(
-                  '${q.category} • ${q.league}',
+                  '${q.category} • صعوبة ${q.difficulty}',
                   style: GoogleFonts.cairo(fontSize: 10, color: Colors.grey),
                 ),
               ],
@@ -805,7 +809,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: AppColors.secondaryOrange,
+            activeThumbColor: AppColors.secondaryOrange,
           ),
         ],
       ),
@@ -840,4 +844,24 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
       ),
     );
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Internal Quiz Item Model (for search results display)
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _QuizItem {
+  final String id;
+  final String question;
+  final String category;
+  final int difficulty;
+  final bool isActive;
+
+  _QuizItem({
+    required this.id,
+    required this.question,
+    required this.category,
+    required this.difficulty,
+    required this.isActive,
+  });
 }
