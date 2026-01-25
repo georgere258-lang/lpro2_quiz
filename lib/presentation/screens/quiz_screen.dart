@@ -588,7 +588,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   void _startRound({required bool freePlay}) {
-    if (_candidatePool.isEmpty) return;
+    // Hard guard: cannot start unless enough questions available
+    if (_candidatePool.length < _questionsPerRound) return;
     
     // Reset stage and streak for new round
     _stage = 0;
@@ -954,35 +955,54 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                           locked ? Colors.green : primaryColor))
                             ])),
                     const SizedBox(height: 16),
-                    // CTA button (compact pill, disabled if no questions)
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _candidatePool.isEmpty ? Colors.grey[400] : accentColor,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(0, 44),
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        elevation: 0,
-                        visualDensity: VisualDensity.compact,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      onPressed: _candidatePool.isEmpty
-                          ? null
-                          : () {
-                              SoundManager.playTap();
-                              _openDailyChallengeSheet();
-                            },
-                      child: Text(
-                        _candidatePool.isEmpty ? "لا توجد أسئلة حالياً" : _enterButtonText,
-                        style: GoogleFonts.cairo(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
+                    // CTA button (compact pill, disabled if not enough questions)
+                    Builder(builder: (context) {
+                      final canStart = _candidatePool.length >= _questionsPerRound;
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: canStart ? accentColor : Colors.grey[400],
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(0, 44),
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              elevation: 0,
+                              visualDensity: VisualDensity.compact,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: canStart
+                                ? () {
+                                    SoundManager.playTap();
+                                    _openDailyChallengeSheet();
+                                  }
+                                : null,
+                            child: Text(
+                              canStart ? _enterButtonText : "لا توجد أسئلة كافية",
+                              style: GoogleFonts.cairo(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          if (!canStart) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              "المتاح ${_candidatePool.length}/$_questionsPerRound",
+                              style: GoogleFonts.cairo(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ],
+                      );
+                    }),
                     const SizedBox(height: 10),
                     TextButton(
                         onPressed: () => Navigator.pop(context),
