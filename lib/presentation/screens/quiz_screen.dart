@@ -97,10 +97,20 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   int _questionIndexInRound = 0;
   int _roundScore = 0;
   int _correctAnswersCount = 0;
-  int _roundsDoneToday = 0;
+  
+  // Per-league daily rounds tracking
+  int _starsRoundsToday = 0;
+  int _prosRoundsToday = 0;
+  int _freePlayRoundsToday = 0;
+  
   Timer? _timer;
   int _timeLeft = 0;
   bool _isFreePlaySession = false;
+  
+  // Computed getters for current league status
+  int get _roundsDoneToday => _isStars ? _starsRoundsToday : _prosRoundsToday;
+  bool get _isCurrentLeagueLocked => _roundsDoneToday >= _roundsPerDay;
+  bool get _areBothLeaguesLocked => _starsRoundsToday >= _roundsPerDay && _prosRoundsToday >= _roundsPerDay;
   late AnimationController _glowController;
 
   /// Per-question duplicate submission guard (docIds already submitted this run)
@@ -542,7 +552,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       if (doc.exists) {
         final data = doc.data() as Map<String, dynamic>;
         final Timestamp? lastTs = data['lastQuizDate'] as Timestamp?;
-        final int currentCount = data['dailyQuestionsCount'] ?? 0;
+        
+        // Per-league round counts
+        final int starsRounds = (data['dailyStarsRounds'] as int?) ?? 0;
+        final int prosRounds = (data['dailyProsRounds'] as int?) ?? 0;
+        final int freePlayRounds = (data['dailyFreePlayRounds'] as int?) ?? 0;
 
         final now = DateTime.now();
         bool isSameDay = false;
@@ -554,18 +568,30 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
               lastDate.year == now.year;
         }
 
-        if (!isSameDay && currentCount > 0) {
+        if (!isSameDay && (starsRounds > 0 || prosRounds > 0 || freePlayRounds > 0)) {
+          // Reset all daily counters on new day
           await FirebaseFirestore.instance
               .collection('users')
               .doc(user.uid)
               .update({
-            'dailyQuestionsCount': 0,
+            'dailyStarsRounds': 0,
+            'dailyProsRounds': 0,
+            'dailyFreePlayRounds': 0,
           });
-          if (mounted) setState(() => _roundsDoneToday = 0);
+          if (mounted) {
+            setState(() {
+              _starsRoundsToday = 0;
+              _prosRoundsToday = 0;
+              _freePlayRoundsToday = 0;
+            });
+          }
         } else {
           if (mounted) {
-            setState(() => _roundsDoneToday =
-                (currentCount ~/ _questionsPerRound).clamp(0, _roundsPerDay));
+            setState(() {
+              _starsRoundsToday = starsRounds.clamp(0, _roundsPerDay);
+              _prosRoundsToday = prosRounds.clamp(0, _roundsPerDay);
+              _freePlayRoundsToday = freePlayRounds;
+            });
           }
         }
       }
@@ -666,12 +692,35 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   // ═══════════════════════════════════════════════════════════════════════════
 
   Future<void> _finishRound() async {
-    if (!_isFreePlaySession) {
+    if (_isFreePlaySession) {
+      // Track Free Play for analytics (no points)
+      await _incrementFreePlayRound();
+      setState(() => _freePlayRoundsToday++);
+    } else {
       await _submitResultSafely();
-      setState(() =>
-          _roundsDoneToday = (_roundsDoneToday + 1).clamp(0, _roundsPerDay));
+      setState(() {
+        if (_isStars) {
+          _starsRoundsToday = (_starsRoundsToday + 1).clamp(0, _roundsPerDay);
+        } else {
+          _prosRoundsToday = (_prosRoundsToday + 1).clamp(0, _roundsPerDay);
+        }
+      });
     }
     _showResultSheet();
+  }
+  
+  /// Increment Free Play round counter (analytics only, no points)
+  Future<void> _incrementFreePlayRound() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'dailyFreePlayRounds': FieldValue.increment(1),
+        'lastQuizDate': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint("Error incrementing free play: $e");
+    }
   }
 
   /// Submit result with per-question duplicate guard and transaction
@@ -707,19 +756,19 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         final currentPoints = (currentData['points'] as int?) ?? 0;
         final currentStarsPoints = (currentData['starsPoints'] as int?) ?? 0;
         final currentProPoints = (currentData['proPoints'] as int?) ?? 0;
-        final currentDailyCount = (currentData['dailyQuestionsCount'] as int?) ?? 0;
 
         final updates = <String, dynamic>{
           'points': currentPoints + _roundScore,
-          'dailyQuestionsCount': currentDailyCount + _questionsPerRound,
           'lastQuizDate': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         };
 
         if (_isStars) {
           updates['starsPoints'] = currentStarsPoints + _roundScore;
+          updates['dailyStarsRounds'] = (currentData['dailyStarsRounds'] ?? 0) + 1;
         } else {
           updates['proPoints'] = currentProPoints + _roundScore;
+          updates['dailyProsRounds'] = (currentData['dailyProsRounds'] ?? 0) + 1;
         }
 
         transaction.set(userRef, updates, SetOptions(merge: true));
@@ -731,7 +780,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'points': FieldValue.increment(_roundScore),
           _isStars ? 'starsPoints' : 'proPoints': FieldValue.increment(_roundScore),
-          'dailyQuestionsCount': FieldValue.increment(_questionsPerRound),
+          _isStars ? 'dailyStarsRounds' : 'dailyProsRounds': FieldValue.increment(1),
           'lastQuizDate': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       } catch (_) {}
@@ -875,7 +924,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildIntro() {
-    final bool locked = _roundsDoneToday >= _roundsPerDay;
     return Scaffold(
       backgroundColor: const Color(0xFFFDFBF7),
       appBar: AppBar(
@@ -945,14 +993,14 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                   color: primaryColor, size: 18),
                               const SizedBox(width: 8),
                               Text(
-                                  locked
-                                      ? "أنهيت جولات اليوم ✅"
+                                  _isCurrentLeagueLocked
+                                      ? "أنهيت جولات هذا الدوري ✅"
                                       : "تحدي اليوم: $_roundsDoneToday/$_roundsPerDay جولات",
                                   style: GoogleFonts.cairo(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w900,
                                       color:
-                                          locked ? Colors.green : primaryColor))
+                                          _isCurrentLeagueLocked ? Colors.green : primaryColor))
                             ])),
                     const SizedBox(height: 16),
                     // CTA button (compact pill, disabled if not enough questions)
@@ -1025,8 +1073,21 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (_) {
-        final locked = _roundsDoneToday >= _roundsPerDay;
+        final locked = _isCurrentLeagueLocked;
+        final bothLocked = _areBothLeaguesLocked;
+        
+        // Motivational messages per user requirement
+        String lockedMessage;
+        if (bothLocked) {
+          lockedMessage = "إنجاز كامل 💪\nأنهيت كل الجولات التنافسية اليوم.\nالتعلم لا يتوقف: Free Play مفتوح للتدريب.";
+        } else if (_isStars) {
+          lockedMessage = "أنهيت جولات دوري النجوم اليوم ✅\nالخطوة الجاية: طوّر مهاراتك أكتر.\nالعب Free Play للتدريب، أو ادخل دوري المحترفين لما تكون جاهز 💪";
+        } else {
+          lockedMessage = "أداء قوي 👏 خلّصت جولات دوري المحترفين النهارده.\nالمحترفين الحقيقيين بيتطوروا بالتدريب المستمر.\nكمّل في Free Play وارجع أقوى بكرة 🔥";
+        }
+        
         return ClipRRect(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
           child: BackdropFilter(
@@ -1047,65 +1108,97 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                           color: Colors.grey[300],
                           borderRadius: BorderRadius.circular(10))),
                   const SizedBox(height: 14),
-                  Text("تحدي اليوم",
+                  Text(locked ? "إنجاز اليوم" : "تحدي اليوم",
                       style: GoogleFonts.cairo(
                           fontSize: 16,
                           fontWeight: FontWeight.w900,
                           color: primaryColor)),
                   const SizedBox(height: 8),
-                  Text(
-                      locked
-                          ? "أنهيت حصتك الرسمية ✅"
-                          : "جولتك القادمة: ${_roundsDoneToday + 1}/$_roundsPerDay",
-                      style: GoogleFonts.cairo(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w900,
-                          color: locked ? Colors.green : accentColor)),
+                  if (locked)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                          lockedMessage,
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.cairo(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              height: 1.6,
+                              color: Colors.grey[800])),
+                    )
+                  else
+                    Text(
+                        "جولتك القادمة: ${_roundsDoneToday + 1}/$_roundsPerDay",
+                        style: GoogleFonts.cairo(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                            color: accentColor)),
                   const SizedBox(height: 16),
+                  // Dashboard counters
+                  if (locked) ...[
+                    _buildDashboardCounters(),
+                    const SizedBox(height: 16),
+                  ],
                   Center(
                       child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 280),
                           child: Column(children: [
+                            if (!locked)
+                              SizedBox(
+                                  width: double.infinity,
+                                  height: 48,
+                                  child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                          backgroundColor: accentColor,
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(25))),
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                        _startRound(freePlay: false);
+                                      },
+                                      child: FittedBox(
+                                          child: Text("ابدأ الجولة الآن",
+                                              style: GoogleFonts.cairo(
+                                                  color: Colors.white,
+                                                  fontWeight:
+                                                      FontWeight.w900))))),
+                            if (!locked) const SizedBox(height: 12),
                             SizedBox(
                                 width: double.infinity,
                                 height: 48,
-                                child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                        backgroundColor: accentColor,
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(25))),
-                                    onPressed: locked
-                                        ? null
-                                        : () {
-                                            Navigator.pop(context);
-                                            _startRound(freePlay: false);
-                                          },
-                                    child: FittedBox(
-                                        child: Text("ابدأ الجولة الآن",
-                                            style: GoogleFonts.cairo(
-                                                color: Colors.white,
-                                                fontWeight:
-                                                    FontWeight.w900))))),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                                width: double.infinity,
-                                height: 48,
-                                child: OutlinedButton(
-                                    style: OutlinedButton.styleFrom(
-                                        side: BorderSide(color: primaryColor),
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(25))),
-                                    onPressed: () {
-                                      Navigator.pop(context);
-                                      _startRound(freePlay: true);
-                                    },
-                                    child: FittedBox(
-                                        child: Text("Free Play — تدريب",
-                                            style: GoogleFonts.cairo(
-                                                fontWeight: FontWeight.w900,
-                                                color: primaryColor))))),
+                                child: locked
+                                    ? ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                            backgroundColor: accentColor,
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(25))),
+                                        onPressed: () {
+                                          Navigator.pop(context);
+                                          _startRound(freePlay: true);
+                                        },
+                                        child: FittedBox(
+                                            child: Text("Free Play — تدريب",
+                                                style: GoogleFonts.cairo(
+                                                    color: Colors.white,
+                                                    fontWeight:
+                                                        FontWeight.w900))))
+                                    : OutlinedButton(
+                                        style: OutlinedButton.styleFrom(
+                                            side: BorderSide(color: primaryColor),
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(25))),
+                                        onPressed: () {
+                                          Navigator.pop(context);
+                                          _startRound(freePlay: true);
+                                        },
+                                        child: FittedBox(
+                                            child: Text("Free Play — تدريب",
+                                                style: GoogleFonts.cairo(
+                                                    fontWeight: FontWeight.w900,
+                                                    color: primaryColor))))),
                           ]))),
                   const SizedBox(height: 10),
                 ],
@@ -1114,6 +1207,39 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           ),
         );
       },
+    );
+  }
+  
+  /// Dashboard counters widget showing daily progress
+  Widget _buildDashboardCounters() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _counterItem("نجوم", "$_starsRoundsToday/$_roundsPerDay", Icons.auto_awesome_rounded),
+          Container(width: 1, height: 30, color: Colors.grey[300]),
+          _counterItem("محترفين", "$_prosRoundsToday/$_roundsPerDay", Icons.workspace_premium),
+          Container(width: 1, height: 30, color: Colors.grey[300]),
+          _counterItem("تدريب", "$_freePlayRoundsToday", Icons.fitness_center),
+        ],
+      ),
+    );
+  }
+  
+  Widget _counterItem(String label, String value, IconData icon) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: primaryColor),
+        const SizedBox(height: 4),
+        Text(value, style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.w900, color: primaryColor)),
+        Text(label, style: GoogleFonts.cairo(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.grey[600])),
+      ],
     );
   }
 
@@ -1125,7 +1251,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       backgroundColor: Colors.transparent,
       builder: (_) {
         final bool canPlayMore =
-            !_isFreePlaySession && (_roundsDoneToday < _roundsPerDay);
+            !_isFreePlaySession && !_isCurrentLeagueLocked;
         return Container(
           padding: const EdgeInsets.all(24),
           decoration: const BoxDecoration(
