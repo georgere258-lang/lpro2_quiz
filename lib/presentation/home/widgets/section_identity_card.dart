@@ -44,20 +44,15 @@ class SectionIdentityCard extends StatelessWidget {
   }
 
   String get _headline {
-    if (_isStars) return "اجمع نقاطك واستعد لمفاجآت قادمة 🎯\nلكن خليك فاكر:\nالتطور الحقيقي مش بالنقاط بس…\nالتطور يبدأ بالاستمرارية، الفهم، وبناء الأساس الصح.";
-    if (_isPro) return "اجمع نقاطك بقوة واستنى مفاجآت قادمة 🚀\nإنت مش جديد على السوق.\nإنت محترف… والمعلومة هي ثروتك الحقيقية.\nالاحتراف مش إنك تعرف معلومة،\nالاحتراف إن خيوط المعلومة كلها تكون في إيدك.";
+    if (_isStars) return "اجمع نقاط دوري النجوم واستعد لمفاجآت قادمة 🎯\nلكن خلي بالك…\nالتطور الحقيقي مش بالنقاط بس،\nالتطور بيبدأ بالاستمرارية والفهم وبناء الأساس الصح.";
+    if (_isPro) return "اجمع نقاطك بقوة… واستنى مفاجآت قادمة 🚀\nإنت هنا مش جديد على السوق،\nإنت محترف، والمعلومة هي ثروتك الحقيقية.";
     return "خُد خطوة ثابتة… وكمّل صح.";
   }
 
   String get _subLine {
-    if (_isStars) return "بداية الطريق الصح";
-    if (_isPro) return "مستوى Pro";
+    if (_isStars) return "بداية الطريق الصح ✨";
+    if (_isPro) return "مستوى Pro 🔥";
     return "تعلم • تطور • نجاح";
-  }
-  
-  String get _structuredLine {
-    if (_isPro) return "سوق • عميل • توقيت • قرار";
-    return "";
   }
   
   String get _footerLine {
@@ -167,46 +162,84 @@ class SectionIdentityCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Headline (Core message)
+                  // Headline (روح الدوري)
                   Text(
                     _headline,
                     style: GoogleFonts.cairo(
-                      fontSize: 14,
-                      height: 1.7,
+                      fontSize: 15,
+                      height: 1.6,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.primaryDeepTeal,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Description (من النداء اللي بيجي من برا)
+                  Text(
+                    description,
+                    style: GoogleFonts.cairo(
+                      fontSize: 13,
+                      height: 1.75,
                       fontWeight: FontWeight.w700,
-                      color: Colors.grey[800],
+                      color: Colors.black87,
                     ),
                   ),
 
-                  // Structured line (Pro only)
-                  if (_structuredLine.isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: _badgeColor.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                  const SizedBox(height: 16),
+
+                  // Divider خفيف
+                  Container(
+                    height: 1,
+                    width: double.infinity,
+                    color: AppColors.primaryDeepTeal.withValues(alpha: 0.08),
+                  ),
+
+                  const SizedBox(height: 14),
+
+                  // Benefits
+                  ...benefits.map(
+                    (benefit) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            _structuredLine,
-                            style: GoogleFonts.cairo(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                              color: AppColors.primaryDeepTeal,
-                              letterSpacing: 1.0,
+                          Container(
+                            margin: const EdgeInsets.only(top: 3),
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: _badgeColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: _badgeColor.withValues(alpha: 0.25),
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.stars_rounded,
+                              size: 14,
+                              color: _badgeColor,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              benefit,
+                              style: GoogleFonts.cairo(
+                                fontSize: 13,
+                                height: 1.6,
+                                color: Colors.grey[800],
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
+                  ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 6),
 
-                  // Footer motivational line
+                  // Accent line
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 10),
