@@ -8,7 +8,6 @@ import '../../../core/services/app_config_service.dart';
 import '../../../features/kyc/repositories/kyc_repository.dart';
 import '../../../features/news_ticker/repositories/news_ticker_repository.dart';
 import '../../../features/pro_card/repositories/pro_card_repository.dart';
-import '../../../features/quizzes/repositories/quiz_repository.dart';
 import '../../../features/support/repositories/support_repository.dart';
 import '../../../features/users/repositories/users_admin_repository.dart';
 import 'tabs/admin_content_tab.dart';
@@ -33,7 +32,6 @@ class _AdminPanelState extends State<AdminPanel>
 
   // Repositories
   final ProCardRepository _proCardRepo = ProCardRepository();
-  final QuizRepository _quizRepo = QuizRepository();
   final KycRepository _kycRepo = KycRepository();
   final SupportRepository _supportRepo = SupportRepository();
   final UsersAdminRepository _usersRepo = UsersAdminRepository();
@@ -113,7 +111,6 @@ class _AdminPanelState extends State<AdminPanel>
                 snack: _snack,
               ),
               AdminQuizTab(
-                quizRepo: _quizRepo,
                 setSaving: _setSaving,
                 snack: _snack,
                 confirm: _confirm,
