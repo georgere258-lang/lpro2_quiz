@@ -912,11 +912,12 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             textDirection: TextDirection.rtl,
             child: SafeArea(
               bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(18, 20, 18, 14),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    const SizedBox(height: 8),
                     Text("الدوريات",
                         style: GoogleFonts.cairo(
                             fontSize: 14,
@@ -1013,17 +1014,77 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                             style: GoogleFonts.cairo(
                                 fontWeight: FontWeight.w800,
                                 color: Colors.blueGrey))),
-                    // Debug diagnostic panel (debug builds only)
+                    // Debug button (debug builds only) - opens diagnostic sheet
                     if (const bool.fromEnvironment('dart.vm.product') == false) ...[
-                      const SizedBox(height: 16),
-                      _buildDiagnosticPanel(),
+                      const SizedBox(height: 12),
+                      ActionChip(
+                        avatar: Icon(Icons.bug_report, size: 16, color: Colors.grey[600]),
+                        label: Text('Debug', style: GoogleFonts.robotoMono(fontSize: 10, color: Colors.grey[700])),
+                        backgroundColor: Colors.grey[200],
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        onPressed: _showDiagnosticSheet,
+                      ),
                     ],
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Show diagnostic panel in a bottom sheet (debug builds only)
+  void _showDiagnosticSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => SafeArea(
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.5,
+          ),
+          margin: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.bug_report, color: Colors.grey[700], size: 20),
+                    const SizedBox(width: 8),
+                    Text('Debug Diagnostic', style: GoogleFonts.robotoMono(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.pop(ctx),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+              ),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(12),
+                  child: _buildDiagnosticPanel(),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1348,35 +1409,45 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             ),
           ),
           centerTitle: true),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 40),
-            Icon(Icons.quiz_outlined, size: 64, color: primaryColor.withValues(alpha: 0.5)),
-            const SizedBox(height: 16),
-            Text("انتهت الجولة",
-                textAlign: TextAlign.center,
-                style: GoogleFonts.cairo(
-                    fontWeight: FontWeight.w900, fontSize: 18, color: primaryColor)),
-            const SizedBox(height: 8),
-            Text("يمكنك بدء جولة جديدة من الشاشة الرئيسية",
-                textAlign: TextAlign.center,
-                style: GoogleFonts.cairo(
-                    fontWeight: FontWeight.w600, fontSize: 14, color: Colors.grey[600])),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
-              child: Text("رجوع", style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.w800)),
-            ),
-            // Debug diagnostic panel (debug builds only)
-            if (const bool.fromEnvironment('dart.vm.product') == false) ...[
+      body: SafeArea(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 40),
+              Icon(Icons.quiz_outlined, size: 64, color: primaryColor.withValues(alpha: 0.5)),
+              const SizedBox(height: 16),
+              Text("انتهت الجولة",
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.cairo(
+                      fontWeight: FontWeight.w900, fontSize: 18, color: primaryColor)),
+              const SizedBox(height: 8),
+              Text("يمكنك بدء جولة جديدة من الشاشة الرئيسية",
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.cairo(
+                      fontWeight: FontWeight.w600, fontSize: 14, color: Colors.grey[600])),
               const SizedBox(height: 24),
-              _buildDiagnosticPanel(),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+                child: Text("رجوع", style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.w800)),
+              ),
+              // Debug button (debug builds only)
+              if (const bool.fromEnvironment('dart.vm.product') == false) ...[
+                const SizedBox(height: 20),
+                ActionChip(
+                  avatar: Icon(Icons.bug_report, size: 16, color: Colors.grey[600]),
+                  label: Text('Debug', style: GoogleFonts.robotoMono(fontSize: 10, color: Colors.grey[700])),
+                  backgroundColor: Colors.grey[200],
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  onPressed: _showDiagnosticSheet,
+                ),
+              ],
+              const SizedBox(height: 20),
             ],
-          ],
+          ),
         ),
       ));
 
