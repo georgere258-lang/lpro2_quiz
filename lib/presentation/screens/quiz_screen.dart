@@ -1,10 +1,10 @@
 // PATH: lib/presentation/screens/quiz_screen.dart
-// STATUS: FULL COMPLETED FILE – ✅ Hardened Quiz Engine v5 (quizzes_v2)
-//         ✅ Collection: quizzes_v2 (clean schema, no legacy fields)
+// STATUS: FULL COMPLETED FILE – ✅ Hardened Quiz Engine v6 (quizzes)
+//         ✅ Collection: quizzes (original collection)
 //         ✅ No repetition in same run (usedThisRun by docId)
 //         ✅ Variety across runs (recentlySeen per-league, FIFO bounded)
 //         ✅ Difficulty progression using Firestore 'difficulty' field (1-5)
-//         ✅ Clean fields only: correctAnswer, difficulty (no fallbacks)
+//         ✅ Backward compat: correctAnswer → correctOptionIndex → 0
 //         ✅ Safe transactional points update
 //         ✅ Per-question duplicate submission guard
 //         ✅ Active-only query filter
@@ -123,8 +123,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   // PART A: Question Sampling (No Repetition + Per-League Cache)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /// Per-league SharedPreferences key (includes category, v2 collection)
-  String get _recentlySeenPrefsKey => 'quiz_v2_recent_seen_${widget.categoryTitle}';
+  /// Per-league SharedPreferences key (includes category)
+  String get _recentlySeenPrefsKey => 'quiz_recent_seen_${widget.categoryTitle}';
 
   Future<void> _initQuizEngine() async {
     await _loadRecentlySeen();
@@ -167,25 +167,42 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
   Future<void> _loadCandidatePool() async {
     try {
-      // Query quizzes_v2 with isActive filter at Firestore level
+      // Query 'quizzes' collection with isActive filter
       final snapshot = await FirebaseFirestore.instance
-          .collection('quizzes_v2')
+          .collection('quizzes')
           .where('category', isEqualTo: widget.categoryTitle)
           .where('isActive', isEqualTo: true)
           .orderBy('createdAt', descending: true)
           .limit(kPoolLimit)
           .get();
 
+      // Debug logging
+      debugPrint('═══ QUIZ LOAD DEBUG ═══');
+      debugPrint('Collection: quizzes');
+      debugPrint('categoryTitle: "${widget.categoryTitle}"');
+      debugPrint('Docs found: ${snapshot.docs.length}');
+      if (snapshot.docs.isNotEmpty) {
+        debugPrint('First doc category: "${snapshot.docs.first.data()['category']}"');
+      }
+
       _candidatePool = snapshot.docs.map((d) {
         final data = d.data();
         final options = ((data['options'] as List?) ?? []).cast<String>();
         
-        // Clean schema: only correctAnswer (0-3), clamp to valid range
+        // Backward compat: correctAnswer → correctOptionIndex → 0
+        int rawCorrect;
+        if (data['correctAnswer'] != null) {
+          rawCorrect = (data['correctAnswer'] as int?) ?? 0;
+        } else if (data['correctOptionIndex'] != null) {
+          rawCorrect = (data['correctOptionIndex'] as int?) ?? 0;
+        } else {
+          rawCorrect = 0;
+        }
         final correctAnswer = options.isNotEmpty
-            ? ((data['correctAnswer'] as int?) ?? 0).clamp(0, options.length - 1)
+            ? rawCorrect.clamp(0, options.length - 1)
             : 0;
         
-        // Clean schema: only difficulty (1-5)
+        // Difficulty with fallback
         final difficulty = ((data['difficulty'] as int?) ?? 3).clamp(1, 5);
         
         return _QuizQuestion(
@@ -197,7 +214,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           difficulty: difficulty,
         );
       }).toList();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Quiz load error: $e');
       _candidatePool = [];
     }
   }
@@ -1138,9 +1156,39 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           ),
           centerTitle: true),
       body: Center(
-          child: Text("لا توجد أسئلة حاليًا.",
-              style: GoogleFonts.cairo(
-                  fontWeight: FontWeight.w900, color: primaryColor))));
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.quiz_outlined, size: 64, color: primaryColor.withValues(alpha: 0.5)),
+                const SizedBox(height: 16),
+                Text("لا توجد أسئلة نشطة في هذا الدوري الآن.",
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.cairo(
+                        fontWeight: FontWeight.w900, fontSize: 16, color: primaryColor)),
+                const SizedBox(height: 24),
+                // Debug info (visible in debug builds)
+                if (const bool.fromEnvironment('dart.vm.product') == false)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('DEBUG:', style: GoogleFonts.robotoMono(fontWeight: FontWeight.bold, fontSize: 11)),
+                        Text('collection: quizzes', style: GoogleFonts.robotoMono(fontSize: 10)),
+                        Text('categoryTitle: "${widget.categoryTitle}"', style: GoogleFonts.robotoMono(fontSize: 10)),
+                        Text('pool count: ${_candidatePool.length}', style: GoogleFonts.robotoMono(fontSize: 10)),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          )));
   Widget _glassCard(
           {required Widget child,
           EdgeInsets padding = const EdgeInsets.all(18)}) =>
