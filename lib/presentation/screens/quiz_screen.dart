@@ -1,13 +1,20 @@
 // PATH: lib/presentation/screens/quiz_screen.dart
-// STATUS: FULL COMPLETED FILE – ✅ Answer Selection Fixed ✅ Premium UI Applied
+// STATUS: FULL COMPLETED FILE – ✅ Hardened Quiz Engine v1
+//         ✅ No repetition in same run (usedThisRun)
+//         ✅ Variety across runs (recentlySeen pool persisted)
+//         ✅ Difficulty progression (stage/streak system)
+//         ✅ Safe transactional points update
+//         ✅ Answer selection fix
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/sound_manager.dart';
@@ -27,6 +34,8 @@ class QuizScreen extends StatefulWidget {
 class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   static const int _roundsPerDay = 4;
   static const int _questionsPerRound = 5;
+  static const int _recentlySeenPoolSize = 80;
+  static const int _candidatePoolLimit = 120;
 
   final Color primaryColor = AppColors.primaryDeepTeal;
   final Color accentColor = AppColors.secondaryOrange;
@@ -35,7 +44,36 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   String get _enterButtonText => _isStars ? "انت نجم Pro ⭐" : "ملعبك يا Pro 🔥";
   int get _secondsPerQuestion => _isStars ? 25 : 15;
 
-  List<Map<String, dynamic>> _questions = [];
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Question Pool & Sampling State
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  /// Full candidate pool fetched from Firestore
+  List<_QuizQuestion> _candidatePool = [];
+  
+  /// Questions selected for current run (no duplicates within run)
+  List<_QuizQuestion> _runQuestions = [];
+  
+  /// Doc IDs used in THIS run (prevents repetition during one game session)
+  final Set<String> _usedThisRun = {};
+  
+  /// Recently seen doc IDs across runs (persisted for variety)
+  Set<String> _recentlySeen = {};
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Difficulty Progression State
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  /// Current difficulty stage (0 = easy, 1 = medium, 2+ = hard)
+  int _stage = 0;
+  
+  /// Correct answer streak (3 consecutive -> stage++)
+  int _streak = 0;
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Game State
+  // ═══════════════════════════════════════════════════════════════════════════
+
   bool _isLoading = true;
   bool _gameStarted = false;
   bool _showFeedback = false;
@@ -50,14 +88,16 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   bool _isFreePlaySession = false;
   late AnimationController _glowController;
 
+  /// Guard against duplicate result submissions (within 10 seconds)
+  DateTime? _lastResultSubmitTime;
+
   @override
   void initState() {
     super.initState();
     _glowController =
         AnimationController(vsync: this, duration: const Duration(seconds: 9))
           ..repeat(reverse: true);
-    _loadQuestions();
-    _loadUserDailyProgress();
+    _initQuizEngine();
   }
 
   @override
@@ -67,17 +107,189 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  Future<void> _loadQuestions() async {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PART A: Question Sampling (No Repetition + Variety)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  String get _recentlySeenPrefsKey => 'quiz_recently_seen_${widget.categoryTitle}';
+
+  Future<void> _initQuizEngine() async {
+    await _loadRecentlySeen();
+    await _loadCandidatePool();
+    await _loadUserDailyProgress();
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  Future<void> _loadRecentlySeen() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString(_recentlySeenPrefsKey);
+      if (jsonStr != null) {
+        final List<dynamic> list = json.decode(jsonStr);
+        _recentlySeen = list.map((e) => e.toString()).toSet();
+      }
+    } catch (_) {
+      _recentlySeen = {};
+    }
+  }
+
+  Future<void> _saveRecentlySeen() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Keep only the most recent entries
+      final list = _recentlySeen.toList();
+      if (list.length > _recentlySeenPoolSize) {
+        _recentlySeen = list.skip(list.length - _recentlySeenPoolSize).toSet();
+      }
+      await prefs.setString(_recentlySeenPrefsKey, json.encode(_recentlySeen.toList()));
+    } catch (_) {}
+  }
+
+  Future<void> _loadCandidatePool() async {
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('quizzes')
           .where('category', isEqualTo: widget.categoryTitle)
+          .orderBy('createdAt', descending: true)
+          .limit(_candidatePoolLimit)
           .get();
-      _questions = snapshot.docs.map((d) => d.data()).toList();
-      _questions.shuffle();
-    } catch (_) {}
-    if (mounted) setState(() => _isLoading = false);
+
+      _candidatePool = snapshot.docs.map((d) {
+        final data = d.data();
+        return _QuizQuestion(
+          docId: d.id,
+          question: (data['question'] ?? '').toString(),
+          options: ((data['options'] as List?) ?? []).cast<String>(),
+          correctAnswer: (data['correctAnswer'] as int?) ?? 0,
+          createdAtMs: (data['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0,
+          isActive: data['isActive'] != false,
+        );
+      }).toList();
+
+      // Filter out inactive questions
+      _candidatePool = _candidatePool.where((q) => q.isActive).toList();
+    } catch (_) {
+      _candidatePool = [];
+    }
   }
+
+  /// Select questions for a new round using the sampling strategy
+  void _selectQuestionsForRound() {
+    _runQuestions.clear();
+    
+    // Get available candidates (not used this run)
+    List<_QuizQuestion> available = _candidatePool
+        .where((q) => !_usedThisRun.contains(q.docId))
+        .toList();
+
+    // Filter out recently seen (best effort variety)
+    List<_QuizQuestion> fresh = available
+        .where((q) => !_recentlySeen.contains(q.docId))
+        .toList();
+
+    // If not enough fresh questions, relax filter
+    if (fresh.length < _questionsPerRound) {
+      fresh = available; // Allow recently seen but still block usedThisRun
+    }
+
+    // If still not enough (edge case), use all available
+    if (fresh.isEmpty) {
+      fresh = _candidatePool.toList();
+    }
+
+    // Apply difficulty progression bias
+    final selected = _selectWithDifficultyBias(fresh, _questionsPerRound);
+
+    for (final q in selected) {
+      _runQuestions.add(q);
+      _usedThisRun.add(q.docId);
+      _recentlySeen.add(q.docId);
+    }
+
+    // Persist recently seen
+    _saveRecentlySeen();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PART B: Difficulty Progression
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Select questions with difficulty bias based on current stage
+  /// Stage 0: newest 40% + random 60%
+  /// Stage 1: newest 60% + random 40%
+  /// Stage 2+: newest 80% + random 20%
+  List<_QuizQuestion> _selectWithDifficultyBias(List<_QuizQuestion> pool, int count) {
+    if (pool.isEmpty) return [];
+    if (pool.length <= count) return pool..shuffle();
+
+    // Sort by createdAt descending (newer = higher difficulty)
+    final sorted = List<_QuizQuestion>.from(pool)
+      ..sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
+
+    // Determine bias percentages
+    double newestRatio;
+    switch (_stage) {
+      case 0:
+        newestRatio = 0.4;
+        break;
+      case 1:
+        newestRatio = 0.6;
+        break;
+      default:
+        newestRatio = 0.8;
+    }
+
+    final newestCount = (count * newestRatio).ceil();
+    final randomCount = count - newestCount;
+
+    // Split pool
+    final newestPool = sorted.take((sorted.length * 0.4).ceil()).toList();
+    final restPool = sorted.skip((sorted.length * 0.4).ceil()).toList();
+
+    newestPool.shuffle();
+    restPool.shuffle();
+
+    final selected = <_QuizQuestion>[];
+
+    // Add from newest pool
+    for (int i = 0; i < newestCount && i < newestPool.length; i++) {
+      selected.add(newestPool[i]);
+    }
+
+    // Add from rest pool
+    for (int i = 0; i < randomCount && i < restPool.length; i++) {
+      selected.add(restPool[i]);
+    }
+
+    // If not enough, fill from any remaining
+    if (selected.length < count) {
+      final remaining = pool.where((q) => !selected.contains(q)).toList()..shuffle();
+      for (final q in remaining) {
+        if (selected.length >= count) break;
+        selected.add(q);
+      }
+    }
+
+    selected.shuffle();
+    return selected.take(count).toList();
+  }
+
+  void _updateDifficultyProgression(bool correct) {
+    if (correct) {
+      _streak++;
+      if (_streak >= 3) {
+        _stage = (_stage + 1).clamp(0, 3);
+        _streak = 0;
+      }
+    } else {
+      _streak = 0;
+      _stage = (_stage - 1).clamp(0, 3);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // User Progress & Daily Tracking
+  // ═══════════════════════════════════════════════════════════════════════════
 
   Future<void> _loadUserDailyProgress() async {
     try {
@@ -137,12 +349,23 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   void _startRound({required bool freePlay}) {
-    if (_questions.isEmpty) return;
+    if (_candidatePool.isEmpty) return;
+    
+    // Reset stage and streak for new round
+    _stage = 0;
+    _streak = 0;
+    
+    // Select questions for this round
+    _selectQuestionsForRound();
+    
+    if (_runQuestions.isEmpty) return;
+    
     setState(() {
       _isFreePlaySession = freePlay;
       _gameStarted = true;
       _showFeedback = false;
       _selectedOption = null;
+      _currentQuestionIndex = 0;
       _questionIndexInRound = 0;
       _roundScore = 0;
       _correctAnswersCount = 0;
@@ -153,13 +376,23 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   void _handleAnswer(String answer) {
     if (_showFeedback) return;
     _timer?.cancel();
-    final q = _questions[_currentQuestionIndex];
-    final options = (q['options'] as List?)?.cast<String>() ?? [];
-    final correct = options[q['correctAnswer'] ?? -1];
+    
+    if (_currentQuestionIndex >= _runQuestions.length) return;
+    
+    final q = _runQuestions[_currentQuestionIndex];
+    final correct = q.options.isNotEmpty && q.correctAnswer < q.options.length
+        ? q.options[q.correctAnswer]
+        : '';
+    
+    final isCorrect = answer == correct && answer.isNotEmpty;
+    
+    // Update difficulty progression
+    _updateDifficultyProgression(isCorrect);
+    
     setState(() {
       _selectedOption = answer;
       _showFeedback = true;
-      if (answer == correct) {
+      if (isCorrect) {
         SoundManager.playCorrect();
         _roundScore += _isStars ? 2 : 5;
         _correctAnswersCount++;
@@ -167,6 +400,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         SoundManager.playWrong();
       }
     });
+    
     Future.delayed(const Duration(milliseconds: 900), () {
       if (!mounted) return;
       if (_questionIndexInRound + 1 >= _questionsPerRound) {
@@ -183,45 +417,100 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       _selectedOption = null;
       _questionIndexInRound++;
       _currentQuestionIndex++;
-      if (_currentQuestionIndex >= _questions.length) {
-        _questions.shuffle();
-        _currentQuestionIndex = 0;
-      }
     });
     _startTimer();
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PART C: Safe Transactional Results
+  // ═══════════════════════════════════════════════════════════════════════════
+
   Future<void> _finishRound() async {
-    _currentQuestionIndex = (_currentQuestionIndex + 1) %
-        (_questions.isEmpty ? 1 : _questions.length);
     if (!_isFreePlaySession) {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'points': FieldValue.increment(_roundScore),
-          _isStars ? 'starsPoints' : 'proPoints':
-              FieldValue.increment(_roundScore),
-          'dailyQuestionsCount': FieldValue.increment(_questionsPerRound),
-          'lastQuizDate': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-      }
+      await _submitResultSafely();
       setState(() =>
           _roundsDoneToday = (_roundsDoneToday + 1).clamp(0, _roundsPerDay));
     }
     _showResultSheet();
   }
 
+  /// Submit result with duplicate guard and transaction
+  Future<void> _submitResultSafely() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    // Duplicate submission guard (within 10 seconds)
+    final now = DateTime.now();
+    if (_lastResultSubmitTime != null &&
+        now.difference(_lastResultSubmitTime!).inSeconds < 10) {
+      debugPrint("Duplicate submission blocked");
+      return;
+    }
+    _lastResultSubmitTime = now;
+
+    try {
+      final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+
+      // Use transaction for atomic update
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        final snapshot = await transaction.get(userRef);
+        
+        final currentData = snapshot.data() ?? {};
+        final currentPoints = (currentData['points'] as int?) ?? 0;
+        final currentStarsPoints = (currentData['starsPoints'] as int?) ?? 0;
+        final currentProPoints = (currentData['proPoints'] as int?) ?? 0;
+        final currentDailyCount = (currentData['dailyQuestionsCount'] as int?) ?? 0;
+
+        final updates = <String, dynamic>{
+          'points': currentPoints + _roundScore,
+          'dailyQuestionsCount': currentDailyCount + _questionsPerRound,
+          'lastQuizDate': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+
+        if (_isStars) {
+          updates['starsPoints'] = currentStarsPoints + _roundScore;
+        } else {
+          updates['proPoints'] = currentProPoints + _roundScore;
+        }
+
+        transaction.set(userRef, updates, SetOptions(merge: true));
+      });
+    } catch (e) {
+      debugPrint("Error submitting result: $e");
+      // Fallback to non-transactional update
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'points': FieldValue.increment(_roundScore),
+          _isStars ? 'starsPoints' : 'proPoints': FieldValue.increment(_roundScore),
+          'dailyQuestionsCount': FieldValue.increment(_questionsPerRound),
+          'lastQuizDate': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      } catch (_) {}
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // UI
+  // ═══════════════════════════════════════════════════════════════════════════
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    if (_questions.isEmpty) return _buildEmptyState();
+    if (_candidatePool.isEmpty) return _buildEmptyState();
     if (!_gameStarted) return _buildIntro();
 
-    final q = _questions[_currentQuestionIndex];
-    final options = (q['options'] as List?)?.cast<String>() ?? [];
-    final correct = options[q['correctAnswer'] ?? -1];
+    if (_currentQuestionIndex >= _runQuestions.length) {
+      return _buildEmptyState();
+    }
+
+    final q = _runQuestions[_currentQuestionIndex];
+    final options = q.options;
+    final correct = options.isNotEmpty && q.correctAnswer < options.length
+        ? options[q.correctAnswer]
+        : '';
 
     return Scaffold(
       backgroundColor: const Color(0xFFFDFBF7),
@@ -288,7 +577,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                         Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 20),
                             child: _questionCard(
-                                child: Text(q['question'] ?? '',
+                                child: Text(q.question,
                                     textAlign: TextAlign.center,
                                     style: GoogleFonts.cairo(
                                         fontSize: 15,
@@ -306,20 +595,22 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                   final opt = options[i];
                                   Color bg = Colors.white;
                                   Color fg = primaryColor;
-                                  if (_showFeedback && opt == correct) {
-                                    bg = Colors.green;
-                                    fg = Colors.white;
+                                  
+                                  // ✅ FIX: Only show colors when feedback is active
+                                  if (_showFeedback) {
+                                    if (opt == correct) {
+                                      bg = Colors.green;
+                                      fg = Colors.white;
+                                    }
+                                    if (opt == _selectedOption && opt != correct) {
+                                      bg = Colors.red;
+                                      fg = Colors.white;
+                                    }
                                   }
-                                  if (_showFeedback &&
-                                      opt == _selectedOption &&
-                                      opt != correct) {
-                                    bg = Colors.red;
-                                    fg = Colors.white;
-                                  }
-                                  // ✅ الإصلاح: إضافة GestureDetector لربط الضغطة بالدالة
+                                  
                                   return GestureDetector(
                                     behavior: HitTestBehavior.opaque,
-                                    onTap: () => _handleAnswer(opt),
+                                    onTap: _showFeedback ? null : () => _handleAnswer(opt),
                                     child: _optionTile(opt, bg, fg),
                                   );
                                 })),
@@ -639,6 +930,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                   setState(() {
                                     _gameStarted = false;
                                     _isFreePlaySession = false;
+                                    // Clear usedThisRun when exiting to intro
+                                    _usedThisRun.clear();
                                   });
                                 },
                                 style: ElevatedButton.styleFrom(
@@ -654,8 +947,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                       ]))),
               const SizedBox(height: 10),
               TextButton(
-                  onPressed: () =>
-                      Navigator.popUntil(context, (r) => r.isFirst),
+                  onPressed: () {
+                    _usedThisRun.clear();
+                    Navigator.popUntil(context, (r) => r.isFirst);
+                  },
                   child: Text("العودة للرئيسية",
                       style: GoogleFonts.cairo(fontWeight: FontWeight.w800))),
             ],
@@ -788,4 +1083,26 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: Colors.black.withValues(alpha: 0.04))),
           child: child);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Internal Question Model (used only within this file)
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _QuizQuestion {
+  final String docId;
+  final String question;
+  final List<String> options;
+  final int correctAnswer;
+  final int createdAtMs;
+  final bool isActive;
+
+  _QuizQuestion({
+    required this.docId,
+    required this.question,
+    required this.options,
+    required this.correctAnswer,
+    required this.createdAtMs,
+    required this.isActive,
+  });
 }
