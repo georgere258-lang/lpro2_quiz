@@ -344,6 +344,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     }
 
     debugPrint('ALL QUERIES FAILED - No matching questions found');
+    debugPrint('Strategy: $_queryStrategy | Errors: $_queryError');
     _queryStrategy = 'NONE';
     _candidatePool = [];
   }
@@ -911,13 +912,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           Directionality(
             textDirection: TextDirection.rtl,
             child: SafeArea(
-              bottom: false,
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(18, 20, 18, 14),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 26, 16, 16),
                 child: Column(
                   children: [
-                    const SizedBox(height: 8),
                     Text("الدوريات",
                         style: GoogleFonts.cairo(
                             fontSize: 14,
@@ -935,7 +933,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                           ? const ["مناسب للفريش", "ثبات وسط ضغط السوق"]
                           : const ["مناسب للمحترفين", "اختبار الفهم"],
                     ),
-                    const SizedBox(height: 14),
+                    const Spacer(),
                     _glassCard(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 12),
@@ -956,50 +954,33 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                           locked ? Colors.green : primaryColor))
                             ])),
                     const SizedBox(height: 16),
-                    // Show empty message if no questions available
-                    if (_candidatePool.isEmpty) ...[
-                      _glassCard(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            Icon(Icons.info_outline, color: Colors.orange, size: 28),
-                            const SizedBox(height: 8),
-                            Text("لا توجد أسئلة نشطة في هذا الدوري حالياً",
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.cairo(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.orange[800])),
-                          ],
+                    // CTA button (disabled if no questions)
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _candidatePool.isEmpty ? Colors.grey[400] : accentColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          elevation: 0,
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    // Start button (disabled if no questions)
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _candidatePool.isEmpty ? Colors.grey : accentColor,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(200, 48),
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        elevation: 0,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      onPressed: _candidatePool.isEmpty
-                          ? null
-                          : () {
-                              SoundManager.playTap();
-                              _openDailyChallengeSheet();
-                            },
-                      child: Text(
-                        _candidatePool.isEmpty ? "لا توجد أسئلة" : _enterButtonText,
-                        style: GoogleFonts.cairo(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
+                        onPressed: _candidatePool.isEmpty
+                            ? null
+                            : () {
+                                SoundManager.playTap();
+                                _openDailyChallengeSheet();
+                              },
+                        child: Text(
+                          _candidatePool.isEmpty ? "لا توجد أسئلة حالياً" : _enterButtonText,
+                          style: GoogleFonts.cairo(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
@@ -1010,77 +991,13 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                             style: GoogleFonts.cairo(
                                 fontWeight: FontWeight.w800,
                                 color: Colors.blueGrey))),
-                    // Debug button (debug builds only) - opens diagnostic sheet
-                    if (const bool.fromEnvironment('dart.vm.product') == false) ...[
-                      const SizedBox(height: 12),
-                      ActionChip(
-                        avatar: Icon(Icons.bug_report, size: 16, color: Colors.grey[600]),
-                        label: Text('Debug', style: GoogleFonts.robotoMono(fontSize: 10, color: Colors.grey[700])),
-                        backgroundColor: Colors.grey[200],
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        onPressed: _showDiagnosticSheet,
-                      ),
-                    ],
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 18),
                   ],
                 ),
               ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  /// Show diagnostic panel in a bottom sheet (debug builds only)
-  void _showDiagnosticSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => SafeArea(
-        child: Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(ctx).size.height * 0.5,
-          ),
-          margin: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.bug_report, color: Colors.grey[700], size: 20),
-                    const SizedBox(width: 8),
-                    Text('Debug Diagnostic', style: GoogleFonts.robotoMono(fontWeight: FontWeight.bold, fontSize: 13)),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close, size: 20),
-                      onPressed: () => Navigator.pop(ctx),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
-                ),
-              ),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(12),
-                  child: _buildDiagnosticPanel(),
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1406,13 +1323,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           ),
           centerTitle: true),
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
+        child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const SizedBox(height: 40),
               Icon(Icons.quiz_outlined, size: 64, color: primaryColor.withValues(alpha: 0.5)),
               const SizedBox(height: 16),
               Text("انتهت الجولة",
@@ -1430,78 +1345,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                 style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
                 child: Text("رجوع", style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.w800)),
               ),
-              // Debug button (debug builds only)
-              if (const bool.fromEnvironment('dart.vm.product') == false) ...[
-                const SizedBox(height: 20),
-                ActionChip(
-                  avatar: Icon(Icons.bug_report, size: 16, color: Colors.grey[600]),
-                  label: Text('Debug', style: GoogleFonts.robotoMono(fontSize: 10, color: Colors.grey[700])),
-                  backgroundColor: Colors.grey[200],
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  onPressed: _showDiagnosticSheet,
-                ),
-              ],
-              const SizedBox(height: 20),
             ],
           ),
         ),
       ));
-
-  /// Diagnostic panel for debugging query issues (shown in debug builds)
-  Widget _buildDiagnosticPanel() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[400]!),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('🔍 DEBUG DIAGNOSTIC', 
-              style: GoogleFonts.robotoMono(fontWeight: FontWeight.bold, fontSize: 11)),
-          const Divider(height: 8),
-          _diagRow('Collection', 'quizzes'),
-          _diagRow('Raw category', '"${widget.categoryTitle}"'),
-          _diagRow('Normalized', '"$_normalizedCategory"'),
-          _diagRow('Strategy', _queryStrategy.isEmpty ? 'N/A' : _queryStrategy),
-          const Divider(height: 8),
-          Text('Query Results:', style: GoogleFonts.robotoMono(fontWeight: FontWeight.bold, fontSize: 10)),
-          _diagRow('Q1 (cat+active+order)', _queryCount1 < 0 ? 'error' : '$_queryCount1 docs'),
-          _diagRow('Q2 (cat+active)', _queryCount2 < 0 ? 'error' : '$_queryCount2 docs'),
-          _diagRow('Q3 (active only)', _queryCount3 < 0 ? 'error' : '$_queryCount3 docs'),
-          if (_query3Categories.isNotEmpty)
-            _diagRow('Q3 categories', _query3Categories.take(3).join(', ')),
-          _diagRow('Pool loaded', '${_candidatePool.length} questions'),
-          if (_queryError.isNotEmpty) ...[
-            const Divider(height: 8),
-            Text('Errors:', style: GoogleFonts.robotoMono(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.red)),
-            Text(_queryError.trim(), style: GoogleFonts.robotoMono(fontSize: 9, color: Colors.red)),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _diagRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 110,
-            child: Text('$label:', style: GoogleFonts.robotoMono(fontSize: 9, color: Colors.grey[700])),
-          ),
-          Expanded(
-            child: Text(value, style: GoogleFonts.robotoMono(fontSize: 9, fontWeight: FontWeight.w600)),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _glassCard(
           {required Widget child,
