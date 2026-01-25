@@ -976,37 +976,33 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                       const SizedBox(height: 12),
                     ],
                     // Start button (disabled if no questions)
-                    Center(
-                        child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 280),
-                            child: SizedBox(
-                                height: 50,
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: _candidatePool.isEmpty 
-                                          ? Colors.grey 
-                                          : accentColor,
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(25)),
-                                      elevation: 0,
-                                    ),
-                                    onPressed: _candidatePool.isEmpty 
-                                        ? null 
-                                        : () {
-                                            SoundManager.playTap();
-                                            _openDailyChallengeSheet();
-                                          },
-                                    child: FittedBox(
-                                        child: Text(
-                                            _candidatePool.isEmpty 
-                                                ? "لا توجد أسئلة" 
-                                                : _enterButtonText,
-                                            style: GoogleFonts.cairo(
-                                                color: Colors.white,
-                                                fontWeight:
-                                                    FontWeight.w900))))))),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _candidatePool.isEmpty ? Colors.grey : accentColor,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(200, 48),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        elevation: 0,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: _candidatePool.isEmpty
+                          ? null
+                          : () {
+                              SoundManager.playTap();
+                              _openDailyChallengeSheet();
+                            },
+                      child: Text(
+                        _candidatePool.isEmpty ? "لا توجد أسئلة" : _enterButtonText,
+                        style: GoogleFonts.cairo(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 10),
                     TextButton(
                         onPressed: () => Navigator.pop(context),
