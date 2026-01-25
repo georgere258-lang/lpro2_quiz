@@ -976,11 +976,13 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                       icon: _isStars
                           ? Icons.auto_awesome_rounded
                           : Icons.workspace_premium,
-                      title: widget.categoryTitle,
-                      description: _isStars ? "تثبيت الأساس…" : "اختبار حقيقي…",
-                      benefits: _isStars
-                          ? const ["مناسب للفريش", "ثبات وسط ضغط السوق"]
-                          : const ["مناسب للمحترفين", "اختبار الفهم"],
+                      title: _isStars 
+                          ? "✨ دوري النجوم – بداية الطريق الصح"
+                          : "🔥 دوري المحترفين – مستوى Pro",
+                      description: _isStars 
+                          ? "" 
+                          : "الاحتراف مش إنك تعرف معلومة واحدة،\nالاحتراف إن كل خيوط المعلومة تبقى في إيدك\n– سوق، عميل، توقيت، قرار.",
+                      benefits: const [],
                     ),
                     const SizedBox(height: 20),
                     _glassCard(

@@ -44,15 +44,21 @@ class SectionIdentityCard extends StatelessWidget {
   }
 
   String get _headline {
-    if (_isStars) return "إنت لسه بتبني رجلك… متستعجلش.";
-    if (_isPro) return "المحترف مش اللي بيع أكتر… اللي بيغلط أقل.";
+    if (_isStars) return "اجمع نقاط دوري النجوم واستعد لمفاجآت قادمة 🎯\nلكن خلي بالك…\nالتطور الحقيقي مش بالنقاط بس،\nالتطور بيبدأ بالاستمرارية والفهم وبناء الأساس الصح.";
+    if (_isPro) return "اجمع نقاطك بقوة… واستنى مفاجآت قادمة 🚀\nإنت هنا مش جديد على السوق،\nإنت محترف، والمعلومة هي ثروتك الحقيقية.";
     return "خُد خطوة ثابتة… وكمّل صح.";
   }
 
   String get _subLine {
-    if (_isStars) return "تثبيت أساسك قبل ما السوق يكسرك.";
-    if (_isPro) return "مش حفظ… ده تركيز ومسؤولية.";
+    if (_isStars) return "بداية الطريق الصح ✨";
+    if (_isPro) return "مستوى Pro 🔥";
     return "تعلم • تطور • نجاح";
+  }
+  
+  String get _footerLine {
+    if (_isStars) return "تعلم مستمر ◀️ تطور كبير ◀️ نجاح أكيد 💪";
+    if (_isPro) return "تطوير مستمر ◀️ نجاحات أكتر ◀️ إنت قائد Pro 👑";
+    return "هدفنا: تثبيت فهمك… قبل ما نحسب نقاطك.";
   }
 
   @override
@@ -251,7 +257,7 @@ class SectionIdentityCard extends StatelessWidget {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            "هدفنا: تثبيت فهمك… قبل ما نحسب نقاطك.",
+                            _footerLine,
                             style: GoogleFonts.cairo(
                               fontSize: 12,
                               height: 1.4,
