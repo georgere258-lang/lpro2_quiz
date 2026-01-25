@@ -1,8 +1,9 @@
 // PATH: lib/presentation/screens/quiz_screen.dart
-// STATUS: FULL COMPLETED FILE – ✅ Hardened Quiz Engine v2
+// STATUS: FULL COMPLETED FILE – ✅ Hardened Quiz Engine v3
 //         ✅ No repetition in same run (usedThisRun by docId)
 //         ✅ Variety across runs (recentlySeen per-league, FIFO bounded)
-//         ✅ Difficulty progression (stage/streak system)
+//         ✅ Difficulty progression using Firestore 'level' field (0-3)
+//         ✅ Safe correct answer resolution (correctAnswer → correctOptionIndex → 0)
 //         ✅ Safe transactional points update
 //         ✅ Per-question duplicate submission guard
 //         ✅ Active-only query filter
@@ -61,7 +62,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   List<_QuizQuestion> _candidatePool = [];
   
   /// Questions selected for current run (no duplicates within run)
-  List<_QuizQuestion> _runQuestions = [];
+  final List<_QuizQuestion> _runQuestions = [];
   
   /// Doc IDs used in THIS run (prevents repetition during one game session)
   final Set<String> _usedThisRun = {};
@@ -176,12 +177,32 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
       _candidatePool = snapshot.docs.map((d) {
         final data = d.data();
+        final options = ((data['options'] as List?) ?? []).cast<String>();
+        
+        // Safe correct answer resolution: correctAnswer -> correctOptionIndex -> 0
+        // Then clamp to valid range [0, options.length-1]
+        int rawCorrect;
+        if (data['correctAnswer'] != null) {
+          rawCorrect = (data['correctAnswer'] as int?) ?? 0;
+        } else if (data['correctOptionIndex'] != null) {
+          rawCorrect = (data['correctOptionIndex'] as int?) ?? 0;
+        } else {
+          rawCorrect = 0;
+        }
+        final correctAnswer = options.isNotEmpty
+            ? rawCorrect.clamp(0, options.length - 1)
+            : 0;
+        
+        // Read level field for difficulty progression (fallback 0)
+        final level = (data['level'] as int?) ?? 0;
+        
         return _QuizQuestion(
           docId: d.id,
           question: (data['question'] ?? '').toString(),
-          options: ((data['options'] as List?) ?? []).cast<String>(),
-          correctAnswer: (data['correctAnswer'] as int?) ?? 0,
+          options: options,
+          correctAnswer: correctAnswer,
           createdAtMs: (data['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0,
+          level: level.clamp(0, 3), // Clamp level to valid range [0-3]
         );
       }).toList();
     } catch (_) {
@@ -232,62 +253,87 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // PART B: Difficulty Progression
+  // PART B: Difficulty Progression (Level-Based)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /// Select questions with difficulty bias based on current stage
-  /// Stage 0: newest 40% + random 60%
-  /// Stage 1: newest 60% + random 40%
-  /// Stage 2+: newest 80% + random 20%
+  /// Target levels for each stage
+  /// Stage 0: prefer levels [0,1] (easy)
+  /// Stage 1: prefer levels [1,2] (medium)
+  /// Stage 2: prefer levels [2,3] (hard)
+  /// Stage 3: prefer level [3] (expert)
+  List<int> _getTargetLevels(int stage) {
+    switch (stage) {
+      case 0:
+        return [0, 1];
+      case 1:
+        return [1, 2];
+      case 2:
+        return [2, 3];
+      case 3:
+        return [3];
+      default:
+        return [0, 1, 2, 3];
+    }
+  }
+
+  /// Expanded fallback levels when target levels don't have enough questions
+  List<int> _getExpandedLevels(int stage) {
+    switch (stage) {
+      case 0:
+        return [0, 1, 2]; // Expand to include level 2
+      case 1:
+        return [0, 1, 2, 3]; // Expand to include levels 0 and 3
+      case 2:
+        return [1, 2, 3]; // Expand to include level 1
+      case 3:
+        return [2, 3]; // Expand to include level 2
+      default:
+        return [0, 1, 2, 3];
+    }
+  }
+
+  /// Select questions with difficulty bias based on current stage using level field
   List<_QuizQuestion> _selectWithDifficultyBias(List<_QuizQuestion> pool, int count) {
     if (pool.isEmpty) return [];
     if (pool.length <= count) return pool..shuffle();
 
-    // Sort by createdAt descending (newer = higher difficulty)
-    final sorted = List<_QuizQuestion>.from(pool)
-      ..sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
-
-    // Determine bias percentages
-    double newestRatio;
-    switch (_stage) {
-      case 0:
-        newestRatio = 0.4;
-        break;
-      case 1:
-        newestRatio = 0.6;
-        break;
-      default:
-        newestRatio = 0.8;
-    }
-
-    final newestCount = (count * newestRatio).ceil();
-    final randomCount = count - newestCount;
-
-    // Split pool
-    final newestPool = sorted.take((sorted.length * 0.4).ceil()).toList();
-    final restPool = sorted.skip((sorted.length * 0.4).ceil()).toList();
-
-    newestPool.shuffle();
-    restPool.shuffle();
-
     final selected = <_QuizQuestion>[];
+    final usedDocIds = <String>{};
 
-    // Add from newest pool
-    for (int i = 0; i < newestCount && i < newestPool.length; i++) {
-      selected.add(newestPool[i]);
+    // Step 1: Try to fill from target levels
+    final targetLevels = _getTargetLevels(_stage);
+    final targetPool = pool.where((q) => targetLevels.contains(q.level)).toList()..shuffle();
+    
+    for (final q in targetPool) {
+      if (selected.length >= count) break;
+      if (!usedDocIds.contains(q.docId)) {
+        selected.add(q);
+        usedDocIds.add(q.docId);
+      }
     }
 
-    // Add from rest pool
-    for (int i = 0; i < randomCount && i < restPool.length; i++) {
-      selected.add(restPool[i]);
-    }
-
-    // If not enough, fill from any remaining
+    // Step 2: If not enough, expand to adjacent levels
     if (selected.length < count) {
-      final remaining = pool.where((q) => !selected.contains(q)).toList()..shuffle();
+      final expandedLevels = _getExpandedLevels(_stage);
+      final expandedPool = pool
+          .where((q) => expandedLevels.contains(q.level) && !usedDocIds.contains(q.docId))
+          .toList()..shuffle();
+      
+      for (final q in expandedPool) {
+        if (selected.length >= count) break;
+        selected.add(q);
+        usedDocIds.add(q.docId);
+      }
+    }
+
+    // Step 3: If still not enough, use any remaining questions
+    if (selected.length < count) {
+      final remaining = pool.where((q) => !usedDocIds.contains(q.docId)).toList()..shuffle();
+      
       for (final q in remaining) {
         if (selected.length >= count) break;
         selected.add(q);
+        usedDocIds.add(q.docId);
       }
     }
 
@@ -1126,6 +1172,7 @@ class _QuizQuestion {
   final List<String> options;
   final int correctAnswer;
   final int createdAtMs;
+  final int level; // Firestore 'level' field (0-3), used for difficulty progression
 
   _QuizQuestion({
     required this.docId,
@@ -1133,5 +1180,6 @@ class _QuizQuestion {
     required this.options,
     required this.correctAnswer,
     required this.createdAtMs,
+    required this.level,
   });
 }
