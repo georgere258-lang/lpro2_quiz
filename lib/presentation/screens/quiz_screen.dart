@@ -1042,7 +1042,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                           if (!canStart) ...[
                             const SizedBox(height: 6),
                             Text(
-                              "المتاح ${_candidatePool.length}/$_questionsPerRound",
+                              "جاري تحميل الأسئلة…",
                               style: GoogleFonts.cairo(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
