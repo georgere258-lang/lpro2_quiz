@@ -2,6 +2,7 @@
 // Quiz CMS: quizzes collection + Arabic categories only
 
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -238,8 +239,25 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Bulk Import (quizzes_v2 clean schema)
+  // Bulk Import (with duplicate prevention via deterministic docId)
   // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Normalize question text for deduplication
+  String _normalizeQuestion(String text) {
+    return text
+        .trim()
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .toLowerCase();
+  }
+  
+  /// Generate deterministic doc ID: sha1(category|normalizedQuestion)
+  String _generateDocId(String category, String question) {
+    final normalized = _normalizeQuestion(question);
+    final input = '$category|$normalized';
+    final bytes = utf8.encode(input);
+    final digest = sha1.convert(bytes);
+    return digest.toString();
+  }
 
   Future<void> _runBulkImport() async {
     final jsonText = _bulkJsonC.text.trim();
@@ -336,8 +354,11 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
             continue;
           }
 
-          // Build quizzes_v2 clean schema data
+          // Build document data
           final isActive = item['isActive'] != false;
+          
+          // Generate deterministic doc ID for duplicate prevention
+          final docId = _generateDocId(category, question);
 
           final data = <String, dynamic>{
             'category': category,
@@ -347,10 +368,12 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
             'correctAnswer': correct,
             'isActive': isActive,
             'createdAt': FieldValue.serverTimestamp(),
+            'questionKey': docId, // For admin reference
           };
 
-          final docRef = FirebaseFirestore.instance.collection(_collection).doc();
-          batch.set(docRef, data);
+          // Use deterministic doc reference with merge for idempotent writes
+          final docRef = FirebaseFirestore.instance.collection(_collection).doc(docId);
+          batch.set(docRef, data, SetOptions(merge: true));
           importedCount++;
         }
 

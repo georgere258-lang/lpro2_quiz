@@ -21,6 +21,9 @@ dependencies:
 
   # --- مكتبة التخزين المحلي (تمت إضافتها لحل مشكلة كسر التشغيل) ---
   shared_preferences: ^2.2.2
+  
+  # --- Crypto for deterministic hashing (bulk import deduplication) ---
+  crypto: ^3.0.3
 
   # الخطوط وتنسيق النصوص
   google_fonts: ^6.2.1
