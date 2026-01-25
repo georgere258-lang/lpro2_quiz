@@ -1,8 +1,9 @@
 // PATH: lib/presentation/screens/quiz_screen.dart
-// STATUS: FULL COMPLETED FILE – ✅ Hardened Quiz Engine v3
+// STATUS: FULL COMPLETED FILE – ✅ Hardened Quiz Engine v4
 //         ✅ No repetition in same run (usedThisRun by docId)
 //         ✅ Variety across runs (recentlySeen per-league, FIFO bounded)
-//         ✅ Difficulty progression using Firestore 'level' field (0-3)
+//         ✅ Difficulty progression using Firestore 'difficulty' field (1-5)
+//         ✅ Backward compat: difficulty → level (legacy) → default 3
 //         ✅ Safe correct answer resolution (correctAnswer → correctOptionIndex → 0)
 //         ✅ Safe transactional points update
 //         ✅ Per-question duplicate submission guard
@@ -193,8 +194,17 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             ? rawCorrect.clamp(0, options.length - 1)
             : 0;
         
-        // Read level field for difficulty progression (fallback 0)
-        final level = (data['level'] as int?) ?? 0;
+        // Read difficulty field with fallback chain: difficulty → level (legacy) → 3
+        int rawDifficulty;
+        if (data['difficulty'] != null) {
+          rawDifficulty = (data['difficulty'] as int?) ?? 3;
+        } else if (data['level'] != null) {
+          // Legacy: level was 0-3, convert to 1-5 range (level+1 gives 1-4, close enough)
+          final legacyLevel = (data['level'] as int?) ?? 0;
+          rawDifficulty = (legacyLevel + 1).clamp(1, 5);
+        } else {
+          rawDifficulty = 3; // Default medium difficulty
+        }
         
         return _QuizQuestion(
           docId: d.id,
@@ -202,7 +212,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           options: options,
           correctAnswer: correctAnswer,
           createdAtMs: (data['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0,
-          level: level.clamp(0, 3), // Clamp level to valid range [0-3]
+          difficulty: rawDifficulty.clamp(1, 5), // Clamp difficulty to valid range [1-5]
         );
       }).toList();
     } catch (_) {
@@ -253,46 +263,46 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // PART B: Difficulty Progression (Level-Based)
+  // PART B: Difficulty Progression (Firestore difficulty 1-5)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /// Target levels for each stage
-  /// Stage 0: prefer levels [0,1] (easy)
-  /// Stage 1: prefer levels [1,2] (medium)
-  /// Stage 2: prefer levels [2,3] (hard)
-  /// Stage 3: prefer level [3] (expert)
-  List<int> _getTargetLevels(int stage) {
+  /// Target difficulties for each internal stage (stage 0-3 maps to difficulty 1-5)
+  /// Stage 0: prefer difficulties [1,2] (easy/foundation)
+  /// Stage 1: prefer difficulties [2,3] (medium)
+  /// Stage 2: prefer difficulties [3,4] (hard)
+  /// Stage 3: prefer difficulties [4,5] (expert)
+  List<int> _getTargetDifficulties(int stage) {
     switch (stage) {
       case 0:
-        return [0, 1];
-      case 1:
         return [1, 2];
-      case 2:
+      case 1:
         return [2, 3];
+      case 2:
+        return [3, 4];
       case 3:
-        return [3];
+        return [4, 5];
       default:
-        return [0, 1, 2, 3];
+        return [1, 2, 3, 4, 5];
     }
   }
 
-  /// Expanded fallback levels when target levels don't have enough questions
-  List<int> _getExpandedLevels(int stage) {
+  /// Expanded fallback difficulties when target doesn't have enough questions
+  List<int> _getExpandedDifficulties(int stage) {
     switch (stage) {
       case 0:
-        return [0, 1, 2]; // Expand to include level 2
+        return [1, 2, 3]; // Expand to include difficulty 3
       case 1:
-        return [0, 1, 2, 3]; // Expand to include levels 0 and 3
+        return [1, 2, 3, 4]; // Expand to include 1 and 4
       case 2:
-        return [1, 2, 3]; // Expand to include level 1
+        return [2, 3, 4, 5]; // Expand to include 2 and 5
       case 3:
-        return [2, 3]; // Expand to include level 2
+        return [3, 4, 5]; // Expand to include difficulty 3
       default:
-        return [0, 1, 2, 3];
+        return [1, 2, 3, 4, 5];
     }
   }
 
-  /// Select questions with difficulty bias based on current stage using level field
+  /// Select questions with difficulty bias based on current stage using difficulty field (1-5)
   List<_QuizQuestion> _selectWithDifficultyBias(List<_QuizQuestion> pool, int count) {
     if (pool.isEmpty) return [];
     if (pool.length <= count) return pool..shuffle();
@@ -300,9 +310,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     final selected = <_QuizQuestion>[];
     final usedDocIds = <String>{};
 
-    // Step 1: Try to fill from target levels
-    final targetLevels = _getTargetLevels(_stage);
-    final targetPool = pool.where((q) => targetLevels.contains(q.level)).toList()..shuffle();
+    // Step 1: Try to fill from target difficulties
+    final targetDiffs = _getTargetDifficulties(_stage);
+    final targetPool = pool.where((q) => targetDiffs.contains(q.difficulty)).toList()..shuffle();
     
     for (final q in targetPool) {
       if (selected.length >= count) break;
@@ -312,11 +322,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       }
     }
 
-    // Step 2: If not enough, expand to adjacent levels
+    // Step 2: If not enough, expand to adjacent difficulties
     if (selected.length < count) {
-      final expandedLevels = _getExpandedLevels(_stage);
+      final expandedDiffs = _getExpandedDifficulties(_stage);
       final expandedPool = pool
-          .where((q) => expandedLevels.contains(q.level) && !usedDocIds.contains(q.docId))
+          .where((q) => expandedDiffs.contains(q.difficulty) && !usedDocIds.contains(q.docId))
           .toList()..shuffle();
       
       for (final q in expandedPool) {
@@ -326,7 +336,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       }
     }
 
-    // Step 3: If still not enough, use any remaining questions
+    // Step 3: If still not enough, use any remaining questions (graceful fallback)
     if (selected.length < count) {
       final remaining = pool.where((q) => !usedDocIds.contains(q.docId)).toList()..shuffle();
       
@@ -1172,7 +1182,7 @@ class _QuizQuestion {
   final List<String> options;
   final int correctAnswer;
   final int createdAtMs;
-  final int level; // Firestore 'level' field (0-3), used for difficulty progression
+  final int difficulty; // Firestore 'difficulty' field (1-5), used for progression
 
   _QuizQuestion({
     required this.docId,
@@ -1180,6 +1190,6 @@ class _QuizQuestion {
     required this.options,
     required this.correctAnswer,
     required this.createdAtMs,
-    required this.level,
+    required this.difficulty,
   });
 }
