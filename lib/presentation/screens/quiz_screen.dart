@@ -1,13 +1,16 @@
 // PATH: lib/presentation/screens/quiz_screen.dart
-// STATUS: FULL COMPLETED FILE – ✅ Hardened Quiz Engine v6 (quizzes)
+// STATUS: FULL COMPLETED FILE – ✅ Hardened Quiz Engine v7 (quizzes)
 //         ✅ Collection: quizzes (original collection)
+//         ✅ Robust category matching with Arabic normalization
+//         ✅ Multi-query fallback strategy (handles index/filter issues)
+//         ✅ Always shows intro UI even with 0 questions
+//         ✅ Debug diagnostic panel for troubleshooting
 //         ✅ No repetition in same run (usedThisRun by docId)
 //         ✅ Variety across runs (recentlySeen per-league, FIFO bounded)
 //         ✅ Difficulty progression using Firestore 'difficulty' field (1-5)
 //         ✅ Backward compat: correctAnswer → correctOptionIndex → 0
 //         ✅ Safe transactional points update
 //         ✅ Per-question duplicate submission guard
-//         ✅ Active-only query filter
 
 import 'dart:async';
 import 'dart:convert';
@@ -103,6 +106,37 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   /// Per-question duplicate submission guard (docIds already submitted this run)
   final Set<String> _submittedQuestionIds = {};
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Diagnostic State (for debugging category/query issues)
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  String _normalizedCategory = '';
+  int _queryCount1 = -1; // category + isActive
+  int _queryCount2 = -1; // category only
+  int _queryCount3 = -1; // isActive only (limit 10)
+  List<String> _query3Categories = [];
+  String _queryError = '';
+  String _queryStrategy = '';
+
+  /// Normalize Arabic text for matching (trim, collapse spaces, normalize variants)
+  static String _normalizeArabic(String s) {
+    String result = s.trim();
+    // Collapse multiple spaces
+    result = result.replaceAll(RegExp(r'\s+'), ' ');
+    // Normalize Arabic Yeh variants (ى -> ي)
+    result = result.replaceAll('ى', 'ي');
+    // Normalize Alef variants (أ إ آ -> ا)
+    result = result.replaceAll('أ', 'ا');
+    result = result.replaceAll('إ', 'ا');
+    result = result.replaceAll('آ', 'ا');
+    return result;
+  }
+
+  /// Check if two Arabic strings match after normalization
+  static bool _arabicMatch(String a, String b) {
+    return _normalizeArabic(a) == _normalizeArabic(b);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -166,58 +200,185 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _loadCandidatePool() async {
+    _normalizedCategory = _normalizeArabic(widget.categoryTitle);
+    _queryError = '';
+    _queryStrategy = '';
+    
+    debugPrint('═══════════════════════════════════════════════════════════════');
+    debugPrint('QUIZ LOAD DIAGNOSTIC');
+    debugPrint('═══════════════════════════════════════════════════════════════');
+    debugPrint('Raw categoryTitle: "${widget.categoryTitle}"');
+    debugPrint('Normalized: "$_normalizedCategory"');
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Query 1: category == raw + isActive == true + orderBy createdAt
+    // ─────────────────────────────────────────────────────────────────────────
     try {
-      // Query 'quizzes' collection with isActive filter
-      final snapshot = await FirebaseFirestore.instance
+      final snap1 = await FirebaseFirestore.instance
           .collection('quizzes')
           .where('category', isEqualTo: widget.categoryTitle)
           .where('isActive', isEqualTo: true)
           .orderBy('createdAt', descending: true)
           .limit(kPoolLimit)
           .get();
-
-      // Debug logging
-      debugPrint('═══ QUIZ LOAD DEBUG ═══');
-      debugPrint('Collection: quizzes');
-      debugPrint('categoryTitle: "${widget.categoryTitle}"');
-      debugPrint('Docs found: ${snapshot.docs.length}');
-      if (snapshot.docs.isNotEmpty) {
-        debugPrint('First doc category: "${snapshot.docs.first.data()['category']}"');
+      _queryCount1 = snap1.docs.length;
+      debugPrint('Query1 (category+isActive+orderBy): ${_queryCount1} docs');
+      
+      if (_queryCount1 > 0) {
+        _queryStrategy = 'Q1: category+isActive+orderBy';
+        _candidatePool = _parseQuestionDocs(snap1.docs);
+        debugPrint('SUCCESS via Query1');
+        return;
       }
-
-      _candidatePool = snapshot.docs.map((d) {
-        final data = d.data();
-        final options = ((data['options'] as List?) ?? []).cast<String>();
-        
-        // Backward compat: correctAnswer → correctOptionIndex → 0
-        int rawCorrect;
-        if (data['correctAnswer'] != null) {
-          rawCorrect = (data['correctAnswer'] as int?) ?? 0;
-        } else if (data['correctOptionIndex'] != null) {
-          rawCorrect = (data['correctOptionIndex'] as int?) ?? 0;
-        } else {
-          rawCorrect = 0;
-        }
-        final correctAnswer = options.isNotEmpty
-            ? rawCorrect.clamp(0, options.length - 1)
-            : 0;
-        
-        // Difficulty with fallback
-        final difficulty = ((data['difficulty'] as int?) ?? 3).clamp(1, 5);
-        
-        return _QuizQuestion(
-          docId: d.id,
-          question: (data['question'] ?? '').toString(),
-          options: options,
-          correctAnswer: correctAnswer,
-          createdAtMs: (data['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0,
-          difficulty: difficulty,
-        );
-      }).toList();
     } catch (e) {
-      debugPrint('Quiz load error: $e');
-      _candidatePool = [];
+      debugPrint('Query1 error: $e');
+      _queryError += 'Q1: $e\n';
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Query 2: category == raw + isActive == true (no orderBy - avoids index)
+    // ─────────────────────────────────────────────────────────────────────────
+    try {
+      final snap2 = await FirebaseFirestore.instance
+          .collection('quizzes')
+          .where('category', isEqualTo: widget.categoryTitle)
+          .where('isActive', isEqualTo: true)
+          .limit(kPoolLimit)
+          .get();
+      _queryCount2 = snap2.docs.length;
+      debugPrint('Query2 (category+isActive, no orderBy): ${_queryCount2} docs');
+      
+      if (_queryCount2 > 0) {
+        _queryStrategy = 'Q2: category+isActive (no orderBy)';
+        _candidatePool = _parseQuestionDocs(snap2.docs);
+        // Sort locally by createdAt
+        _candidatePool.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
+        debugPrint('SUCCESS via Query2');
+        return;
+      }
+    } catch (e) {
+      debugPrint('Query2 error: $e');
+      _queryError += 'Q2: $e\n';
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Query 3: isActive == true only (fallback - fetch all, filter client-side)
+    // ─────────────────────────────────────────────────────────────────────────
+    try {
+      final snap3 = await FirebaseFirestore.instance
+          .collection('quizzes')
+          .where('isActive', isEqualTo: true)
+          .limit(kPoolLimit)
+          .get();
+      _queryCount3 = snap3.docs.length;
+      
+      // Collect first 5 unique categories for debugging
+      final catSet = <String>{};
+      for (final d in snap3.docs) {
+        final cat = (d.data()['category'] ?? '').toString();
+        catSet.add(cat);
+        if (catSet.length >= 5) break;
+      }
+      _query3Categories = catSet.toList();
+      
+      debugPrint('Query3 (isActive only): ${_queryCount3} docs');
+      debugPrint('Query3 categories found: $_query3Categories');
+      
+      if (_queryCount3 > 0) {
+        // Client-side filter by normalized category
+        final filtered = snap3.docs.where((d) {
+          final docCat = (d.data()['category'] ?? '').toString();
+          return _arabicMatch(docCat, widget.categoryTitle);
+        }).toList();
+        
+        debugPrint('Query3 filtered by normalized category: ${filtered.length} docs');
+        
+        if (filtered.isNotEmpty) {
+          _queryStrategy = 'Q3: isActive + client-filter';
+          _candidatePool = _parseQuestionDocs(filtered);
+          _candidatePool.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
+          debugPrint('SUCCESS via Query3 client-filter');
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('Query3 error: $e');
+      _queryError += 'Q3: $e\n';
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Query 4: Last resort - fetch ANY docs (no filters)
+    // ─────────────────────────────────────────────────────────────────────────
+    try {
+      final snap4 = await FirebaseFirestore.instance
+          .collection('quizzes')
+          .limit(20)
+          .get();
+      debugPrint('Query4 (no filters): ${snap4.docs.length} docs');
+      
+      if (snap4.docs.isNotEmpty) {
+        final cats = snap4.docs.map((d) => (d.data()['category'] ?? 'null').toString()).toSet();
+        debugPrint('Query4 categories: $cats');
+        
+        // Client-side filter by normalized category + isActive
+        final filtered = snap4.docs.where((d) {
+          final data = d.data();
+          final docCat = (data['category'] ?? '').toString();
+          final isActive = data['isActive'];
+          // Treat missing isActive as true for dev
+          final active = isActive == true || isActive == null;
+          return active && _arabicMatch(docCat, widget.categoryTitle);
+        }).toList();
+        
+        if (filtered.isNotEmpty) {
+          _queryStrategy = 'Q4: no-filter + client-filter';
+          _candidatePool = _parseQuestionDocs(filtered);
+          _candidatePool.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
+          debugPrint('SUCCESS via Query4 client-filter');
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint('Query4 error: $e');
+      _queryError += 'Q4: $e\n';
+    }
+
+    debugPrint('ALL QUERIES FAILED - No matching questions found');
+    _queryStrategy = 'NONE';
+    _candidatePool = [];
+  }
+
+  /// Parse Firestore docs into _QuizQuestion objects
+  List<_QuizQuestion> _parseQuestionDocs(List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
+    return docs.map((d) {
+      final data = d.data();
+      final options = ((data['options'] as List?) ?? []).cast<String>();
+      
+      // Backward compat: correctAnswer → correctOptionIndex → 0
+      int rawCorrect;
+      if (data['correctAnswer'] != null) {
+        rawCorrect = (data['correctAnswer'] as int?) ?? 0;
+      } else if (data['correctOptionIndex'] != null) {
+        rawCorrect = (data['correctOptionIndex'] as int?) ?? 0;
+      } else {
+        rawCorrect = 0;
+      }
+      final correctAnswer = options.isNotEmpty
+          ? rawCorrect.clamp(0, options.length - 1)
+          : 0;
+      
+      // Difficulty with fallback
+      final difficulty = ((data['difficulty'] as int?) ?? 3).clamp(1, 5);
+      
+      return _QuizQuestion(
+        docId: d.id,
+        question: (data['question'] ?? '').toString(),
+        options: options,
+        correctAnswer: correctAnswer,
+        createdAtMs: (data['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0,
+        difficulty: difficulty,
+      );
+    }).toList();
   }
 
   /// Select questions for a new round using the sampling strategy
@@ -584,7 +745,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    if (_candidatePool.isEmpty) return _buildEmptyState();
+    // Always show intro first (even if pool is empty - intro will show diagnostic)
     if (!_gameStarted) return _buildIntro();
 
     if (_currentQuestionIndex >= _runQuestions.length) {
@@ -794,6 +955,26 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                           locked ? Colors.green : primaryColor))
                             ])),
                     const SizedBox(height: 16),
+                    // Show empty message if no questions available
+                    if (_candidatePool.isEmpty) ...[
+                      _glassCard(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.orange, size: 28),
+                            const SizedBox(height: 8),
+                            Text("لا توجد أسئلة نشطة في هذا الدوري حالياً",
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.cairo(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.orange[800])),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    // Start button (disabled if no questions)
                     Center(
                         child: ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 280),
@@ -802,18 +983,25 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                 width: double.infinity,
                                 child: ElevatedButton(
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: accentColor,
+                                      backgroundColor: _candidatePool.isEmpty 
+                                          ? Colors.grey 
+                                          : accentColor,
                                       shape: RoundedRectangleBorder(
                                           borderRadius:
                                               BorderRadius.circular(25)),
                                       elevation: 0,
                                     ),
-                                    onPressed: () {
-                                      SoundManager.playTap();
-                                      _openDailyChallengeSheet();
-                                    },
+                                    onPressed: _candidatePool.isEmpty 
+                                        ? null 
+                                        : () {
+                                            SoundManager.playTap();
+                                            _openDailyChallengeSheet();
+                                          },
                                     child: FittedBox(
-                                        child: Text(_enterButtonText,
+                                        child: Text(
+                                            _candidatePool.isEmpty 
+                                                ? "لا توجد أسئلة" 
+                                                : _enterButtonText,
                                             style: GoogleFonts.cairo(
                                                 color: Colors.white,
                                                 fontWeight:
@@ -825,6 +1013,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                             style: GoogleFonts.cairo(
                                 fontWeight: FontWeight.w800,
                                 color: Colors.blueGrey))),
+                    // Debug diagnostic panel (debug builds only)
+                    if (const bool.fromEnvironment('dart.vm.product') == false) ...[
+                      const SizedBox(height: 16),
+                      _buildDiagnosticPanel(),
+                    ],
                   ],
                 ),
               ),
@@ -1155,40 +1348,94 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             ),
           ),
           centerTitle: true),
-      body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.quiz_outlined, size: 64, color: primaryColor.withValues(alpha: 0.5)),
-                const SizedBox(height: 16),
-                Text("لا توجد أسئلة نشطة في هذا الدوري الآن.",
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.cairo(
-                        fontWeight: FontWeight.w900, fontSize: 16, color: primaryColor)),
-                const SizedBox(height: 24),
-                // Debug info (visible in debug builds)
-                if (const bool.fromEnvironment('dart.vm.product') == false)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('DEBUG:', style: GoogleFonts.robotoMono(fontWeight: FontWeight.bold, fontSize: 11)),
-                        Text('collection: quizzes', style: GoogleFonts.robotoMono(fontSize: 10)),
-                        Text('categoryTitle: "${widget.categoryTitle}"', style: GoogleFonts.robotoMono(fontSize: 10)),
-                        Text('pool count: ${_candidatePool.length}', style: GoogleFonts.robotoMono(fontSize: 10)),
-                      ],
-                    ),
-                  ),
-              ],
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 40),
+            Icon(Icons.quiz_outlined, size: 64, color: primaryColor.withValues(alpha: 0.5)),
+            const SizedBox(height: 16),
+            Text("انتهت الجولة",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.cairo(
+                    fontWeight: FontWeight.w900, fontSize: 18, color: primaryColor)),
+            const SizedBox(height: 8),
+            Text("يمكنك بدء جولة جديدة من الشاشة الرئيسية",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.cairo(
+                    fontWeight: FontWeight.w600, fontSize: 14, color: Colors.grey[600])),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(backgroundColor: primaryColor),
+              child: Text("رجوع", style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.w800)),
             ),
-          )));
+            // Debug diagnostic panel (debug builds only)
+            if (const bool.fromEnvironment('dart.vm.product') == false) ...[
+              const SizedBox(height: 24),
+              _buildDiagnosticPanel(),
+            ],
+          ],
+        ),
+      ));
+
+  /// Diagnostic panel for debugging query issues (shown in debug builds)
+  Widget _buildDiagnosticPanel() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey[400]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('🔍 DEBUG DIAGNOSTIC', 
+              style: GoogleFonts.robotoMono(fontWeight: FontWeight.bold, fontSize: 11)),
+          const Divider(height: 8),
+          _diagRow('Collection', 'quizzes'),
+          _diagRow('Raw category', '"${widget.categoryTitle}"'),
+          _diagRow('Normalized', '"$_normalizedCategory"'),
+          _diagRow('Strategy', _queryStrategy.isEmpty ? 'N/A' : _queryStrategy),
+          const Divider(height: 8),
+          Text('Query Results:', style: GoogleFonts.robotoMono(fontWeight: FontWeight.bold, fontSize: 10)),
+          _diagRow('Q1 (cat+active+order)', _queryCount1 < 0 ? 'error' : '$_queryCount1 docs'),
+          _diagRow('Q2 (cat+active)', _queryCount2 < 0 ? 'error' : '$_queryCount2 docs'),
+          _diagRow('Q3 (active only)', _queryCount3 < 0 ? 'error' : '$_queryCount3 docs'),
+          if (_query3Categories.isNotEmpty)
+            _diagRow('Q3 categories', _query3Categories.take(3).join(', ')),
+          _diagRow('Pool loaded', '${_candidatePool.length} questions'),
+          if (_queryError.isNotEmpty) ...[
+            const Divider(height: 8),
+            Text('Errors:', style: GoogleFonts.robotoMono(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.red)),
+            Text(_queryError.trim(), style: GoogleFonts.robotoMono(fontSize: 9, color: Colors.red)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _diagRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text('$label:', style: GoogleFonts.robotoMono(fontSize: 9, color: Colors.grey[700])),
+          ),
+          Expanded(
+            child: Text(value, style: GoogleFonts.robotoMono(fontSize: 9, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _glassCard(
           {required Widget child,
           EdgeInsets padding = const EdgeInsets.all(18)}) =>
