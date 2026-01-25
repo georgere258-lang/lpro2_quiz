@@ -1,10 +1,11 @@
 // PATH: lib/presentation/screens/quiz_screen.dart
-// STATUS: FULL COMPLETED FILE – ✅ Hardened Quiz Engine v1
-//         ✅ No repetition in same run (usedThisRun)
-//         ✅ Variety across runs (recentlySeen pool persisted)
+// STATUS: FULL COMPLETED FILE – ✅ Hardened Quiz Engine v2
+//         ✅ No repetition in same run (usedThisRun by docId)
+//         ✅ Variety across runs (recentlySeen per-league, FIFO bounded)
 //         ✅ Difficulty progression (stage/streak system)
 //         ✅ Safe transactional points update
-//         ✅ Answer selection fix
+//         ✅ Per-question duplicate submission guard
+//         ✅ Active-only query filter
 
 import 'dart:async';
 import 'dart:convert';
@@ -32,10 +33,18 @@ class QuizScreen extends StatefulWidget {
 }
 
 class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Constants (no other magic numbers)
+  // ═══════════════════════════════════════════════════════════════════════════
+  
   static const int _roundsPerDay = 4;
   static const int _questionsPerRound = 5;
-  static const int _recentlySeenPoolSize = 80;
-  static const int _candidatePoolLimit = 120;
+  
+  /// Max recently seen docIds to persist (FIFO bounded)
+  static const int kRecentlySeenMax = 80;
+  
+  /// Max candidate pool fetch limit for large question banks
+  static const int kPoolLimit = 400;
 
   final Color primaryColor = AppColors.primaryDeepTeal;
   final Color accentColor = AppColors.secondaryOrange;
@@ -45,7 +54,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   int get _secondsPerQuestion => _isStars ? 25 : 15;
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Question Pool & Sampling State
+  // Question Pool & Sampling State (docId-based only)
   // ═══════════════════════════════════════════════════════════════════════════
   
   /// Full candidate pool fetched from Firestore
@@ -57,8 +66,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   /// Doc IDs used in THIS run (prevents repetition during one game session)
   final Set<String> _usedThisRun = {};
   
-  /// Recently seen doc IDs across runs (persisted for variety)
-  Set<String> _recentlySeen = {};
+  /// Recently seen doc IDs across runs (persisted per-league for variety)
+  /// Stored as List to maintain insertion order for FIFO trimming
+  List<String> _recentlySeenList = [];
   
   // ═══════════════════════════════════════════════════════════════════════════
   // Difficulty Progression State
@@ -88,8 +98,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   bool _isFreePlaySession = false;
   late AnimationController _glowController;
 
-  /// Guard against duplicate result submissions (within 10 seconds)
-  DateTime? _lastResultSubmitTime;
+  /// Per-question duplicate submission guard (docIds already submitted this run)
+  final Set<String> _submittedQuestionIds = {};
 
   @override
   void initState() {
@@ -108,10 +118,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // PART A: Question Sampling (No Repetition + Variety)
+  // PART A: Question Sampling (No Repetition + Per-League Cache)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  String get _recentlySeenPrefsKey => 'quiz_recently_seen_${widget.categoryTitle}';
+  /// Per-league SharedPreferences key (includes category)
+  String get _recentlySeenPrefsKey => 'quiz_recent_seen_${widget.categoryTitle}';
 
   Future<void> _initQuizEngine() async {
     await _loadRecentlySeen();
@@ -126,32 +137,41 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       final jsonStr = prefs.getString(_recentlySeenPrefsKey);
       if (jsonStr != null) {
         final List<dynamic> list = json.decode(jsonStr);
-        _recentlySeen = list.map((e) => e.toString()).toSet();
+        _recentlySeenList = list.map((e) => e.toString()).toList();
+        // Enforce max bound on load (FIFO: keep newest)
+        if (_recentlySeenList.length > kRecentlySeenMax) {
+          _recentlySeenList = _recentlySeenList
+              .skip(_recentlySeenList.length - kRecentlySeenMax)
+              .toList();
+        }
       }
     } catch (_) {
-      _recentlySeen = {};
+      _recentlySeenList = [];
     }
   }
 
   Future<void> _saveRecentlySeen() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      // Keep only the most recent entries
-      final list = _recentlySeen.toList();
-      if (list.length > _recentlySeenPoolSize) {
-        _recentlySeen = list.skip(list.length - _recentlySeenPoolSize).toSet();
+      // FIFO trimming: keep only the most recent kRecentlySeenMax entries
+      if (_recentlySeenList.length > kRecentlySeenMax) {
+        _recentlySeenList = _recentlySeenList
+            .skip(_recentlySeenList.length - kRecentlySeenMax)
+            .toList();
       }
-      await prefs.setString(_recentlySeenPrefsKey, json.encode(_recentlySeen.toList()));
+      await prefs.setString(_recentlySeenPrefsKey, json.encode(_recentlySeenList));
     } catch (_) {}
   }
 
   Future<void> _loadCandidatePool() async {
     try {
+      // Query with isActive filter at Firestore level
       final snapshot = await FirebaseFirestore.instance
           .collection('quizzes')
           .where('category', isEqualTo: widget.categoryTitle)
+          .where('isActive', isEqualTo: true)
           .orderBy('createdAt', descending: true)
-          .limit(_candidatePoolLimit)
+          .limit(kPoolLimit)
           .get();
 
       _candidatePool = snapshot.docs.map((d) {
@@ -162,12 +182,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           options: ((data['options'] as List?) ?? []).cast<String>(),
           correctAnswer: (data['correctAnswer'] as int?) ?? 0,
           createdAtMs: (data['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0,
-          isActive: data['isActive'] != false,
         );
       }).toList();
-
-      // Filter out inactive questions
-      _candidatePool = _candidatePool.where((q) => q.isActive).toList();
     } catch (_) {
       _candidatePool = [];
     }
@@ -177,6 +193,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   void _selectQuestionsForRound() {
     _runQuestions.clear();
     
+    final recentlySeenSet = _recentlySeenList.toSet();
+    
     // Get available candidates (not used this run)
     List<_QuizQuestion> available = _candidatePool
         .where((q) => !_usedThisRun.contains(q.docId))
@@ -184,7 +202,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
     // Filter out recently seen (best effort variety)
     List<_QuizQuestion> fresh = available
-        .where((q) => !_recentlySeen.contains(q.docId))
+        .where((q) => !recentlySeenSet.contains(q.docId))
         .toList();
 
     // If not enough fresh questions, relax filter
@@ -203,10 +221,13 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     for (final q in selected) {
       _runQuestions.add(q);
       _usedThisRun.add(q.docId);
-      _recentlySeen.add(q.docId);
+      // Add to recently seen (append for FIFO order)
+      if (!_recentlySeenList.contains(q.docId)) {
+        _recentlySeenList.add(q.docId);
+      }
     }
 
-    // Persist recently seen
+    // Persist recently seen (with FIFO trimming)
     _saveRecentlySeen();
   }
 
@@ -422,7 +443,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // PART C: Safe Transactional Results
+  // PART C: Safe Transactional Results (Per-Question Anti-Dup)
   // ═══════════════════════════════════════════════════════════════════════════
 
   Future<void> _finishRound() async {
@@ -434,19 +455,27 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     _showResultSheet();
   }
 
-  /// Submit result with duplicate guard and transaction
+  /// Submit result with per-question duplicate guard and transaction
   Future<void> _submitResultSafely() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // Duplicate submission guard (within 10 seconds)
-    final now = DateTime.now();
-    if (_lastResultSubmitTime != null &&
-        now.difference(_lastResultSubmitTime!).inSeconds < 10) {
-      debugPrint("Duplicate submission blocked");
+    // Collect docIds from this round that haven't been submitted yet
+    final docIdsToSubmit = <String>[];
+    for (final q in _runQuestions) {
+      if (!_submittedQuestionIds.contains(q.docId)) {
+        docIdsToSubmit.add(q.docId);
+      }
+    }
+
+    // If all questions were already submitted (duplicate round), skip
+    if (docIdsToSubmit.isEmpty) {
+      debugPrint("All questions already submitted, skipping");
       return;
     }
-    _lastResultSubmitTime = now;
+
+    // Mark these questions as submitted (before async to prevent race)
+    _submittedQuestionIds.addAll(docIdsToSubmit);
 
     try {
       final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
@@ -932,6 +961,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                     _isFreePlaySession = false;
                                     // Clear usedThisRun when exiting to intro
                                     _usedThisRun.clear();
+                                    _submittedQuestionIds.clear();
                                   });
                                 },
                                 style: ElevatedButton.styleFrom(
@@ -949,6 +979,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
               TextButton(
                   onPressed: () {
                     _usedThisRun.clear();
+                    _submittedQuestionIds.clear();
                     Navigator.popUntil(context, (r) => r.isFirst);
                   },
                   child: Text("العودة للرئيسية",
@@ -1095,7 +1126,6 @@ class _QuizQuestion {
   final List<String> options;
   final int correctAnswer;
   final int createdAtMs;
-  final bool isActive;
 
   _QuizQuestion({
     required this.docId,
@@ -1103,6 +1133,5 @@ class _QuizQuestion {
     required this.options,
     required this.correctAnswer,
     required this.createdAtMs,
-    required this.isActive,
   });
 }
