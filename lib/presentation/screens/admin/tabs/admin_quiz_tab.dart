@@ -11,16 +11,7 @@ import '../widgets/admin_shared_widgets.dart';
 import '../quizzes/question_details_screen.dart';
 
 class AdminQuizTab extends StatefulWidget {
-  final void Function(bool) setSaving;
-  final void Function(String) snack;
-  final Future<bool> Function(String, String) confirm;
-
-  const AdminQuizTab({
-    super.key,
-    required this.setSaving,
-    required this.snack,
-    required this.confirm,
-  });
+  const AdminQuizTab({super.key});
 
   @override
   State<AdminQuizTab> createState() => _AdminQuizTabState();
@@ -70,6 +61,43 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
 
   // Bulk import controller
   final _bulkJsonC = TextEditingController();
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Internal Helpers (self-contained)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  void _setSaving(bool v) {
+    // No-op: saving indicator handled locally or not needed
+  }
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
+    );
+  }
+
+  Future<bool> _confirm(String title, String msg) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title, style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+        content: Text(msg, style: GoogleFonts.cairo()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('إلغاء', style: GoogleFonts.cairo()),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text('تأكيد', style: GoogleFonts.cairo(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
 
   @override
   void dispose() {
@@ -134,7 +162,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
         _isSearching = false;
       });
     } catch (e) {
-      widget.snack('خطأ في البحث: $e');
+      _snack('خطأ في البحث: $e');
       setState(() => _isSearching = false);
     }
   }
@@ -167,23 +195,23 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
 
     // Validation
     if (question.isEmpty || question.length < 10) {
-      widget.snack('السؤال يجب أن يكون 10 أحرف على الأقل');
+      _snack('السؤال يجب أن يكون 10 أحرف على الأقل');
       return;
     }
 
     for (int i = 0; i < 4; i++) {
       if (options[i].isEmpty) {
-        widget.snack('الاختيار ${i + 1} مطلوب');
+        _snack('الاختيار ${i + 1} مطلوب');
         return;
       }
     }
 
     if (_correctIndex < 0 || _correctIndex > 3) {
-      widget.snack('اختر الإجابة الصحيحة');
+      _snack('اختر الإجابة الصحيحة');
       return;
     }
 
-    widget.setSaving(true);
+    _setSaving(true);
 
     try {
       // quizzes_v2 clean schema: only required fields
@@ -199,13 +227,13 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
 
       await FirebaseFirestore.instance.collection(_collection).add(data);
 
-      widget.snack('تم إضافة السؤال ✅');
+      _snack('تم إضافة السؤال ✅');
       _clearAddForm();
       await _runSearch();
     } catch (e) {
-      widget.snack('خطأ: $e');
+      _snack('خطأ: $e');
     } finally {
-      widget.setSaving(false);
+      _setSaving(false);
     }
   }
 
@@ -216,7 +244,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
   Future<void> _runBulkImport() async {
     final jsonText = _bulkJsonC.text.trim();
     if (jsonText.isEmpty) {
-      widget.snack('الحقل فارغ');
+      _snack('الحقل فارغ');
       return;
     }
 
@@ -224,16 +252,16 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
     try {
       items = json.decode(jsonText) as List<dynamic>;
     } catch (e) {
-      widget.snack('JSON غير صالح: $e');
+      _snack('JSON غير صالح: $e');
       return;
     }
 
     if (items.isEmpty) {
-      widget.snack('القائمة فارغة');
+      _snack('القائمة فارغة');
       return;
     }
 
-    widget.setSaving(true);
+    _setSaving(true);
 
     int importedCount = 0;
     final failures = <String>[];
@@ -339,16 +367,16 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
               '\n${failures.take(5).join('\n')}\n...و ${failures.length - 5} أخرى';
         }
       }
-      widget.snack(report);
+      _snack(report);
 
       if (importedCount > 0) {
         _bulkJsonC.clear();
         await _runSearch();
       }
     } catch (e) {
-      widget.snack('خطأ في الاستيراد: $e');
+      _snack('خطأ في الاستيراد: $e');
     } finally {
-      widget.setSaving(false);
+      _setSaving(false);
     }
   }
 
@@ -648,9 +676,9 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
           MaterialPageRoute(
             builder: (_) => QuestionDetailsScreen(
               docId: q.id,
-              setSaving: widget.setSaving,
-              snack: widget.snack,
-              confirm: widget.confirm,
+              setSaving: _setSaving,
+              snack: _snack,
+              confirm: _confirm,
             ),
           ),
         );

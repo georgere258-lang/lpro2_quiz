@@ -110,11 +110,7 @@ class _AdminPanelState extends State<AdminPanel>
                 setSaving: _setSaving,
                 snack: _snack,
               ),
-              AdminQuizTab(
-                setSaving: _setSaving,
-                snack: _snack,
-                confirm: _confirm,
-              ),
+              const AdminQuizTab(),
               AdminNewsTab(
                 tickerRepo: _tickerRepo,
                 setSaving: _setSaving,
