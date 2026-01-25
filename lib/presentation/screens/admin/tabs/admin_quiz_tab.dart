@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/admin/tabs/admin_quiz_tab.dart
-// Quiz CMS v3: quizzes_v2 clean schema + Arabic categories only
+// Quiz CMS: quizzes collection + Arabic categories only
 
 import 'dart:convert';
 
@@ -19,10 +19,10 @@ class AdminQuizTab extends StatefulWidget {
 
 class _AdminQuizTabState extends State<AdminQuizTab> {
   // ═══════════════════════════════════════════════════════════════════════════
-  // Collection & Category Values (quizzes_v2 clean schema)
+  // Collection & Category Values
   // ═══════════════════════════════════════════════════════════════════════════
 
-  static const String _collection = 'quizzes_v2';
+  static const String _collection = 'quizzes';
 
   static const List<String> _categoryValues = [
     'دوري النجوم',
