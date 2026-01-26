@@ -122,11 +122,28 @@ service cloud.firestore {
         && (!('starsPoints' in changed) || request.resource.data.starsPoints >= resource.data.starsPoints)
         && (!('proPoints' in changed) || request.resource.data.proPoints >= resource.data.proPoints);
 
-      // ممنوع يغير الاسم أو الأفاتار مع النقاط
+      // ممنوع يغير الاسم أو الأفاتار مع النقاط (يمنع avatarIndex بدل avatarId)
       let noProfileChange =
         !('name' in changed) && !('avatarIndex' in changed);
 
       return hasQuizMarker && onlyPoints && safePoints && noProfileChange;
+    }
+
+    // ─────────────────────────────────────────
+    // user_stats/{uid}
+    // ─────────────────────────────────────────
+
+    function simpleUserStatsValidation() {
+      let d = request.resource.data;
+      return (d is map)
+          && d.keys().hasOnly(['stars','pros','freeplay','updatedAt'])
+          && ('updatedAt' in d) && (d.updatedAt is timestamp);
+    }
+
+    match /user_stats/{uid} {
+      allow read: if isModerator() || isOwner(uid);
+      allow create, update: if isOwner(uid) && simpleUserStatsValidation();
+      allow delete: if false;
     }
 
     // ─────────────────────────────────────────
