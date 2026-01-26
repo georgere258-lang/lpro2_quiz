@@ -124,7 +124,7 @@ service cloud.firestore {
 
       // ممنوع يغير الاسم أو الأفاتار مع النقاط
       let noProfileChange =
-        !('name' in changed) && !('avatarId' in changed);
+        !('name' in changed) && !('avatarIndex' in changed);
 
       return hasQuizMarker && onlyPoints && safePoints && noProfileChange;
     }
