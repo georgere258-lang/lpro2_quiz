@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/constants/app_colors.dart';
@@ -43,6 +45,25 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+
+    // Debug: Log Firebase project identity
+    if (kDebugMode) {
+      _logFirebaseIdentity();
+    }
+  }
+
+  void _logFirebaseIdentity() {
+    try {
+      final app = Firebase.app();
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      debugPrint('═══════════════════════════════════════════════');
+      debugPrint('LEADERBOARD_DEBUG projectId=${app.options.projectId}');
+      debugPrint('LEADERBOARD_DEBUG appId=${app.options.appId}');
+      debugPrint('LEADERBOARD_DEBUG currentUser.uid=$uid');
+      debugPrint('═══════════════════════════════════════════════');
+    } catch (e) {
+      debugPrint('LEADERBOARD_DEBUG Firebase.app() error: $e');
+    }
   }
 
   @override
@@ -94,10 +115,53 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     return StreamBuilder<List<LeaderboardEntry>>(
       stream: _repo.streamTop10(league),
       builder: (context, snapshot) {
+        // Error state with debug logging
         if (snapshot.hasError) {
+          final error = snapshot.error;
+          if (kDebugMode) {
+            debugPrint('LEADERBOARD_STREAM_ERROR league=$league');
+            if (error is FirebaseException) {
+              debugPrint('  code=${error.code}');
+              debugPrint('  message=${error.message}');
+              debugPrint('  plugin=${error.plugin}');
+            }
+            debugPrint('  error=$error');
+          }
           return Center(
-              child: Text("حدث خطأ في تحميل البيانات",
-                  style: GoogleFonts.cairo()));
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+                  const SizedBox(height: 12),
+                  Text("حدث خطأ في تحميل البيانات",
+                      style: GoogleFonts.cairo(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red[700])),
+                  if (kDebugMode) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.red[50],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        error is FirebaseException
+                            ? 'FirebaseError: ${error.code} - ${error.message}'
+                            : 'Error: $error',
+                        style: GoogleFonts.robotoMono(
+                            fontSize: 10, color: Colors.red[900]),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -153,13 +217,28 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         return Column(
           children: [
             _buildPodiumHeader(topThree),
-            // Show motivational "My Status" card
+            // Show motivational "My Status" card ONLY if logged in
             if (currentUid != null)
               _buildMyStatusCard(
                 currentUserEntry,
                 league,
                 currentUid,
                 rank10Points,
+              ),
+            // If not logged in, show hint
+            if (currentUid == null)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  "سجل دخولك لمعرفة ترتيبك",
+                  style: GoogleFonts.cairo(fontSize: 13, color: Colors.grey[600]),
+                  textAlign: TextAlign.center,
+                ),
               ),
             Expanded(
               child: ListView.builder(
@@ -177,6 +256,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   }
 
   /// Motivational "My Status" card with gap computation
+  /// Hardened: fails gracefully if /users/{uid} read fails
   Widget _buildMyStatusCard(
     LeaderboardEntry? entry,
     String league,
@@ -207,6 +287,44 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                   color: AppColors.secondaryOrange,
                 ),
               ),
+            ),
+          );
+        }
+
+        // Error state: show graceful message but don't crash
+        if (userSnap.hasError) {
+          final error = userSnap.error;
+          if (kDebugMode) {
+            debugPrint('LEADERBOARD_USER_FETCH_ERROR uid=$uid');
+            if (error is FirebaseException) {
+              debugPrint('  code=${error.code}');
+              debugPrint('  message=${error.message}');
+              debugPrint('  plugin=${error.plugin}');
+            }
+            debugPrint('  error=$error');
+          }
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.orange[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.warning_amber, color: Colors.orange[700], size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  "تعذر تحميل بياناتك",
+                  style: GoogleFonts.cairo(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: Colors.orange[800],
+                  ),
+                ),
+              ],
             ),
           );
         }
