@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/admin/quizzes/question_details_screen.dart
-// Question details screen v3: quizzes_v2 clean schema + Arabic categories only
+// Question details screen: quizzes collection + Arabic categories only
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -30,10 +30,10 @@ class QuestionDetailsScreen extends StatefulWidget {
 
 class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
   // ═══════════════════════════════════════════════════════════════════════════
-  // Collection & Category Values (quizzes_v2 clean schema)
+  // Collection & Category Values
   // ═══════════════════════════════════════════════════════════════════════════
 
-  static const String _collection = 'quizzes_v2';
+  static const String _collection = 'quizzes';
 
   static const List<String> _categoryValues = [
     'دوري النجوم',
@@ -77,7 +77,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Load Question (quizzes_v2 clean schema)
+  // Load Question
   // ═══════════════════════════════════════════════════════════════════════════
 
   Future<void> _loadQuestion() async {
@@ -122,7 +122,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Actions (quizzes_v2 clean schema)
+  // Actions
   // ═══════════════════════════════════════════════════════════════════════════
 
   Future<void> _saveChanges() async {
@@ -150,7 +150,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
     widget.setSaving(true);
 
     try {
-      // quizzes_v2 clean schema: only required fields
+      // quizzes collection: only required fields
       await FirebaseFirestore.instance
           .collection(_collection)
           .doc(widget.docId)
