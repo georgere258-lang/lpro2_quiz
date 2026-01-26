@@ -78,24 +78,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   userModel.proPoints,
                 ),
                 const SizedBox(height: 35),
-                if (widget.onSupportPressed != null)
-                  _buildProfileBtn(
-                    "الدعم الفني",
-                    Icons.support_agent_outlined,
-                    () {
-                      SoundManager.playTap();
-                      widget.onSupportPressed?.call();
-                    },
-                  ),
-                _buildProfileBtn(
-                  "دعوة Pro جديد",
-                  Icons.person_add_rounded,
-                  () {
-                    SoundManager.playTap();
-                    _invitePro();
-                  },
-                ),
-                if (userModel.role == 'admin')
+                if (userModel.role == 'admin' ||
+                    userModel.role == 'moderator' ||
+                    userModel.role == 'manager')
                   _buildProfileBtn(
                     "لوحة التحكم (Admin)",
                     Icons.admin_panel_settings_rounded,
@@ -109,6 +94,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     iconColor: safetyOrange,
                   ),
                 _buildProfileBtn(
+                  "تغيير الاسم",
+                  Icons.edit_rounded,
+                  () {
+                    SoundManager.playTap();
+                    _showRenameBottomSheet();
+                  },
+                ),
+                _buildProfileBtn(
+                  "دعوة Pro جديد",
+                  Icons.person_add_rounded,
+                  () {
+                    SoundManager.playTap();
+                    _invitePro();
+                  },
+                ),
+                _buildProfileBtn(
                   "حول L Pro",
                   Icons.info_outline_rounded,
                   () {
@@ -117,14 +118,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         MaterialPageRoute(builder: (_) => const AboutScreen()));
                   },
                 ),
-                _buildProfileBtn(
-                  "تغيير الاسم",
-                  Icons.edit_rounded,
-                  () {
-                    SoundManager.playTap();
-                    _showRenameBottomSheet();
-                  },
-                ),
+                if (widget.onSupportPressed != null)
+                  _buildProfileBtn(
+                    "الدعم الفني",
+                    Icons.support_agent_outlined,
+                    () {
+                      SoundManager.playTap();
+                      widget.onSupportPressed?.call();
+                    },
+                  ),
                 _buildProfileBtn(
                   "تسجيل الخروج",
                   Icons.logout_rounded,
@@ -140,31 +142,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileHeader(String name, int points, int avatarIndex, int starsPoints, int proPoints) {
+  Widget _buildProfileHeader(String name, int points, int avatarIndex,
+      int starsPoints, int proPoints) {
     return Column(
       children: [
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            // ✅ توحيد مصدر الضوء مع الهوم سكرين عبر المحرك المركزي
-            boxShadow: AppColors.eliteShadowL2,
-          ),
-          child: CircleAvatar(
-            radius: 55,
-            backgroundColor: deepTeal,
-            child: Icon(
-              avatars[avatarIndex < avatars.length ? avatarIndex : 0],
-              size: 55,
-              color: Colors.white,
+        GestureDetector(
+          onTap: () {
+            SoundManager.playTap();
+            _showAvatarPicker();
+          },
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              // ✅ توحيد مصدر الضوء مع الهوم سكرين عبر المحرك المركزي
+              boxShadow: AppColors.eliteShadowL2,
+            ),
+            child: CircleAvatar(
+              radius: 55,
+              backgroundColor: deepTeal,
+              child: Icon(
+                avatars[avatarIndex < avatars.length ? avatarIndex : 0],
+                size: 55,
+                color: Colors.white,
+              ),
             ),
           ),
         ),
         const SizedBox(height: 20),
-        Text(
-          name,
-          style: GoogleFonts.cairo(
-              fontSize: 24, fontWeight: FontWeight.w900, color: deepTeal),
+        InkWell(
+          onTap: () {
+            SoundManager.playTap();
+            _showRenameBottomSheet();
+          },
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: Text(
+              name,
+              style: GoogleFonts.cairo(
+                  fontSize: 24, fontWeight: FontWeight.w900, color: deepTeal),
+            ),
+          ),
         ),
         const SizedBox(height: 6),
         Container(
@@ -187,7 +206,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildPointsCards(int starsPoints, int proPoints) {
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.only(top: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -201,7 +220,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildPointCard(String label, int points, IconData icon) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -210,23 +229,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: deepTeal),
-          const SizedBox(width: 6),
-          Text(
-            "$label: ",
-            style: GoogleFonts.cairo(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Colors.grey[700],
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: deepTeal.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
             ),
+            child: Icon(icon, size: 20, color: deepTeal),
           ),
-          Text(
-            "$points",
-            style: GoogleFonts.cairo(
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
-              color: deepTeal,
-            ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.cairo(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                "$points",
+                style: GoogleFonts.cairo(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: deepTeal,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -281,7 +314,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _invitePro() async {
-    const message = "✨ انضم إلى L Pro — طريقك لتطوير نفسك في العقار.\nحمّل التطبيق وابدأ رحلتك الآن 💪";
+    const message =
+        "✨ انضم إلى L Pro — طريقك لتطوير نفسك في العقار.\nحمّل التطبيق وابدأ رحلتك الآن 💪";
     try {
       await Share.share(message);
     } catch (e) {
@@ -312,7 +346,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     }
 
-    final TextEditingController nameController = TextEditingController(text: currentName);
+    final TextEditingController nameController =
+        TextEditingController(text: currentName);
 
     if (!mounted) return;
 
@@ -352,7 +387,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
               style: GoogleFonts.cairo(fontSize: 16),
               autofocus: true,
@@ -388,12 +424,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _handleRename(String newName) async {
     final trimmedName = newName.trim();
-    
+
     if (trimmedName.length < 3) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("الاسم يجب أن يكون 3 أحرف على الأقل", style: GoogleFonts.cairo()),
+            content: Text("الاسم يجب أن يكون 3 أحرف على الأقل",
+                style: GoogleFonts.cairo()),
             backgroundColor: Colors.orange,
           ),
         );
@@ -408,7 +445,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .collection('users')
           .doc(user!.uid)
           .update({'name': trimmedName});
-      
+
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -424,7 +461,141 @@ class _ProfileScreenState extends State<ProfileScreen> {
         String errorMsg = "حدث خطأ";
         if (e.code == 'permission-denied') {
           errorMsg = "لا توجد صلاحية";
-        } else if (e.code == 'unavailable' || e.message?.contains('network') == true) {
+        } else if (e.code == 'unavailable' ||
+            e.message?.contains('network') == true) {
+          errorMsg = "تحقق من الاتصال";
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg, style: GoogleFonts.cairo()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("حدث خطأ", style: GoogleFonts.cairo()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showAvatarPicker() async {
+    if (user == null || !mounted) return;
+
+    int currentIndex = 0;
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .get();
+      if (snapshot.exists && snapshot.data() != null) {
+        final data = snapshot.data() as Map<String, dynamic>;
+        final avatarIdStr = data['avatarId'] as String?;
+        final avatarIndexFromFirestore = data['avatarIndex'] as int?;
+
+        if (avatarIdStr != null) {
+          currentIndex = int.tryParse(avatarIdStr) ?? 0;
+        } else if (avatarIndexFromFirestore != null) {
+          currentIndex = avatarIndexFromFirestore;
+        }
+      }
+    } catch (e) {
+      // Fallback to 0
+    }
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "اختر الأفاتار",
+              style: GoogleFonts.cairo(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: deepTeal,
+              ),
+            ),
+            const SizedBox(height: 20),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1.0,
+              ),
+              itemCount: avatars.length,
+              itemBuilder: (context, index) {
+                final isSelected = index == currentIndex;
+                return GestureDetector(
+                  onTap: () => _handleAvatarSelection(index),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isSelected ? deepTeal : Colors.grey[200],
+                      border: Border.all(
+                        color: isSelected ? deepTeal : Colors.grey[300]!,
+                        width: isSelected ? 3 : 1,
+                      ),
+                      boxShadow: isSelected ? AppColors.eliteShadowL1 : null,
+                    ),
+                    child: Icon(
+                      avatars[index],
+                      size: 40,
+                      color: isSelected ? Colors.white : deepTeal,
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleAvatarSelection(int selectedIndex) async {
+    if (user == null) return;
+
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user!.uid)
+        ..update({'avatarIndex': selectedIndex});
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text("تم تحديث الأفاتار بنجاح ✅", style: GoogleFonts.cairo()),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } on FirebaseException catch (e) {
+      if (mounted) {
+        String errorMsg = "حدث خطأ";
+        if (e.code == 'permission-denied') {
+          errorMsg = "لا توجد صلاحية";
+        } else if (e.code == 'unavailable' ||
+            e.message?.contains('network') == true) {
           errorMsg = "تحقق من الاتصال";
         }
         ScaffoldMessenger.of(context).showSnackBar(
