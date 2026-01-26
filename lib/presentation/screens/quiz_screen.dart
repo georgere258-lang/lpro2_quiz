@@ -232,7 +232,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           .limit(kPoolLimit)
           .get();
       _queryCount1 = snap1.docs.length;
-      debugPrint('Query1 (category+isActive+orderBy): ${_queryCount1} docs');
+      debugPrint('Query1 (category+isActive+orderBy): $_queryCount1 docs');
       
       if (_queryCount1 > 0) {
         _queryStrategy = 'Q1: category+isActive+orderBy';
@@ -256,7 +256,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           .limit(kPoolLimit)
           .get();
       _queryCount2 = snap2.docs.length;
-      debugPrint('Query2 (category+isActive, no orderBy): ${_queryCount2} docs');
+      debugPrint('Query2 (category+isActive, no orderBy): $_queryCount2 docs');
       
       if (_queryCount2 > 0) {
         _queryStrategy = 'Q2: category+isActive (no orderBy)';
@@ -291,7 +291,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       }
       _query3Categories = catSet.toList();
       
-      debugPrint('Query3 (isActive only): ${_queryCount3} docs');
+      debugPrint('Query3 (isActive only): $_queryCount3 docs');
       debugPrint('Query3 categories found: $_query3Categories');
       
       if (_queryCount3 > 0) {

@@ -538,7 +538,7 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
                       ),
                       const SizedBox(height: 14),
                       DropdownButtonFormField<String>(
-                        value: selectedSection,
+                        initialValue: selectedSection,
                         items: _kycSections
                             .map((s) => DropdownMenuItem(
                                   value: s,

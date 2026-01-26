@@ -26,8 +26,8 @@ class AdminNewsTab extends StatefulWidget {
 
 class _AdminNewsTabState extends State<AdminNewsTab> {
   final TextEditingController _tickerText = TextEditingController();
-  int _tickerPriority = 0;
-  bool _tickerNotify = false;
+  final int _tickerPriority = 0;
+  final bool _tickerNotify = false;
 
   @override
   void dispose() {

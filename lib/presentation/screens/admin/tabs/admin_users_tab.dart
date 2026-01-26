@@ -3,7 +3,6 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -460,7 +459,7 @@ class _UserDetailsSheetState extends State<_UserDetailsSheet> {
           builder: (ctx, setLocal) => AlertDialog(
             title: Text('تغيير الدور', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
             content: DropdownButtonFormField<String>(
-              value: newRole,
+              initialValue: newRole,
               items: UserRole.values.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
               onChanged: (v) => setLocal(() => newRole = v ?? newRole),
               decoration: adminDropDecor(),

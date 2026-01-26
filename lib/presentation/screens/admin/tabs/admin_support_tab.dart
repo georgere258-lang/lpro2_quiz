@@ -89,7 +89,7 @@ class AdminSupportTab extends StatelessWidget {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
           title: Text('تغيير الحالة', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-          content: DropdownButtonFormField<String>(value: newStatus, items: TicketStatus.values.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (v) => setLocal(() => newStatus = v ?? newStatus), decoration: adminDropDecor()),
+          content: DropdownButtonFormField<String>(initialValue: newStatus, items: TicketStatus.values.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (v) => setLocal(() => newStatus = v ?? newStatus), decoration: adminDropDecor()),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: Text('إلغاء', style: GoogleFonts.cairo())),
             TextButton(

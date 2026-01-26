@@ -57,7 +57,9 @@ class _AdminPanelState extends State<AdminPanel>
   void _snack(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg, textAlign: TextAlign.right, style: GoogleFonts.cairo())),
+      SnackBar(
+          content: Text(msg,
+              textAlign: TextAlign.right, style: GoogleFonts.cairo())),
     );
   }
 
@@ -85,7 +87,11 @@ class _AdminPanelState extends State<AdminPanel>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: FittedBox(fit: BoxFit.scaleDown, child: Text("Admin Panel", maxLines: 1, style: GoogleFonts.cairo(fontWeight: FontWeight.w900))),
+        title: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text("Admin Panel",
+                maxLines: 1,
+                style: GoogleFonts.cairo(fontWeight: FontWeight.w900))),
         backgroundColor: AppColors.primaryDeepTeal,
         actions: [
           IconButton(
@@ -102,8 +108,10 @@ class _AdminPanelState extends State<AdminPanel>
             isScrollable: true,
             labelPadding: const EdgeInsets.symmetric(horizontal: 12),
             indicatorSize: TabBarIndicatorSize.tab,
-            labelStyle: GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 12),
-            unselectedLabelStyle: GoogleFonts.cairo(fontWeight: FontWeight.w800, fontSize: 11),
+            labelStyle:
+                GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 12),
+            unselectedLabelStyle:
+                GoogleFonts.cairo(fontWeight: FontWeight.w800, fontSize: 11),
             tabs: const [
               AdminTabLabel("Content"),
               AdminTabLabel("Pro"),
@@ -156,7 +164,11 @@ class _AdminPanelState extends State<AdminPanel>
               ),
             ],
           ),
-          if (_saving) Positioned.fill(child: Container(color: Colors.black12, child: const Center(child: CircularProgressIndicator()))),
+          if (_saving)
+            Positioned.fill(
+                child: Container(
+                    color: Colors.black12,
+                    child: const Center(child: CircularProgressIndicator()))),
         ],
       ),
     );

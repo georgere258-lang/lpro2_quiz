@@ -738,7 +738,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
 
                         // section dropdown with Arabic labels
                         DropdownButtonFormField<String>(
-                          value: sectionOptions.contains(sectionKeyLocal)
+                          initialValue: sectionOptions.contains(sectionKeyLocal)
                               ? sectionKeyLocal
                               : null,
                           items: sectionOptions
@@ -803,9 +803,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                                   await _proInsightRepo.update(_docId, {
                                     'isFeatured': isFeaturedLocal,
                                     'featuredOrder': featuredOrderLocal,
-                                    'featuredUntil': untilLocal == null
-                                        ? FieldValue.delete()
-                                        : untilLocal,
+                                    'featuredUntil': untilLocal ?? FieldValue.delete(),
                                     'sectionKey': sectionKeyLocal.trim(),
                                     'orderInSection': orderInSectionLocal,
                                     'updatedAt': FieldValue.serverTimestamp(),
@@ -931,7 +929,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                       ),
                       const SizedBox(height: 14),
                       DropdownButtonFormField<String>(
-                        value: selectedSection,
+                        initialValue: selectedSection,
                         items: _proInsightSections
                             .map((s) => DropdownMenuItem(
                                   value: s,

@@ -489,7 +489,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
 
             // Content Type Dropdown
             DropdownButtonFormField<String>(
-              value: _selectedType,
+              initialValue: _selectedType,
               decoration: adminDropDecor().copyWith(labelText: 'نوع المحتوى'),
               items: _contentTypes.entries
                   .map((e) => DropdownMenuItem(
@@ -514,7 +514,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
 
             // Section Dropdown
             DropdownButtonFormField<String>(
-              value: (_sectionsByType[_selectedType] ?? [])
+              initialValue: (_sectionsByType[_selectedType] ?? [])
                       .contains(_selectedSection)
                   ? _selectedSection
                   : null,
@@ -810,7 +810,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: AppColors.secondaryOrange,
+            activeThumbColor: AppColors.secondaryOrange,
           ),
         ],
       ),

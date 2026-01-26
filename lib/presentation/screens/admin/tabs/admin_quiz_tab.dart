@@ -508,7 +508,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
                     children: [
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: _addCategory,
+                          initialValue: _addCategory,
                           decoration:
                               adminDropDecor().copyWith(labelText: 'الدوري'),
                           items: _categoryValues
@@ -530,7 +530,7 @@ class _AdminQuizTabState extends State<AdminQuizTab> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: DropdownButtonFormField<int>(
-                          value: _addDifficulty,
+                          initialValue: _addDifficulty,
                           decoration:
                               adminDropDecor().copyWith(labelText: 'الصعوبة (1-5)'),
                           items: _difficultyValues

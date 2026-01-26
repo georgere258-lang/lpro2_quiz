@@ -233,7 +233,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
             title: Text('نقل السؤال',
                 style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
             content: DropdownButtonFormField<String>(
-              value: newCategory,
+              initialValue: newCategory,
               decoration: adminDropDecor().copyWith(labelText: 'الدوري'),
               items: _categoryValues
                   .map((c) => DropdownMenuItem(
@@ -412,7 +412,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
                         children: [
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _category,
+                              initialValue: _category,
                               decoration:
                                   adminDropDecor().copyWith(labelText: 'الدوري'),
                               items: _categoryValues
@@ -434,7 +434,7 @@ class _QuestionDetailsScreenState extends State<QuestionDetailsScreen> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: DropdownButtonFormField<int>(
-                              value: _difficulty,
+                              initialValue: _difficulty,
                               decoration:
                                   adminDropDecor().copyWith(labelText: 'الصعوبة (1-5)'),
                               items: _difficultyValues
