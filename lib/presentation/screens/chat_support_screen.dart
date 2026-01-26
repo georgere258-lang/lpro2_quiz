@@ -1,14 +1,12 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter/services.dart' show rootBundle;
-import 'package:googleapis_auth/auth_io.dart' as auth;
 
-// استيراد الثوابت المركزية
 import '../../core/constants/app_colors.dart';
+import '../../features/support/repositories/support_repository.dart';
+import '../../features/support/models/support_ticket.dart';
+import '../../features/support/models/support_message.dart';
 
 class ChatSupportScreen extends StatefulWidget {
   const ChatSupportScreen({super.key});
@@ -20,7 +18,11 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
   final TextEditingController _msgController = TextEditingController();
   final User? user = FirebaseAuth.instance.currentUser;
   final Color deepTeal = AppColors.primaryDeepTeal;
+  final SupportRepository _supportRepo = SupportRepository();
+  
   bool _isSending = false;
+  String? _currentTicketId;
+  bool _isLoadingTicket = false;
 
   @override
   void dispose() {
@@ -28,45 +30,49 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
     super.dispose();
   }
 
-  // --- دالة إرسال الإشعار للمديرة عبر FCM V1 ---
-  Future<void> _sendNotificationToAdmin(
-      String userName, String messageText) async {
-    auth.AutoRefreshingAuthClient? client;
+  /// Load or create an open ticket for the current user
+  Future<String?> _loadOrCreateTicket() async {
+    if (user == null) return null;
+
+    if (_currentTicketId != null) return _currentTicketId;
+
+    setState(() => _isLoadingTicket = true);
+
     try {
-      final jsonString =
-          await rootBundle.loadString('assets/service_account.json');
-      final Map<String, dynamic> jsonMap = jsonDecode(jsonString);
-      final String projectName = jsonMap['project_id'];
-      final accountCredentials =
-          auth.ServiceAccountCredentials.fromJson(jsonMap);
-      final scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
-
-      client = await auth.clientViaServiceAccount(accountCredentials, scopes);
-      final String url =
-          'https://fcm.googleapis.com/v1/projects/$projectName/messages:send';
-
-      await client.post(
-        Uri.parse(url),
-        body: jsonEncode({
-          'message': {
-            'topic': 'admin_notifications',
-            'notification': {
-              'title': 'رسالة دعم جديدة 💬',
-              'body': 'من $userName: $messageText'
-            },
-            'android': {
-              'notification': {
-                'channel_id': 'lpro_notifications',
-                'priority': 'high',
-              },
-            },
-          }
-        }),
+      // Check for existing open/in-progress ticket
+      final tickets = await _supportRepo.watchUserTickets(user!.uid).first;
+      
+      final openTicket = tickets.firstWhere(
+        (t) => t.status == TicketStatus.open || t.status == TicketStatus.inProgress,
+        orElse: () => tickets.isNotEmpty ? tickets.first : SupportTicket(
+          id: '',
+          userId: user!.uid,
+          userName: user!.displayName ?? "عضو L Pro",
+          subject: "رسالة دعم",
+        ),
       );
+
+      if (openTicket.id.isNotEmpty) {
+        _currentTicketId = openTicket.id;
+        setState(() => _isLoadingTicket = false);
+        return _currentTicketId;
+      }
+
+      // Create new ticket if none exists
+      final userName = user!.displayName ?? "عضو L Pro";
+      final ticketId = await _supportRepo.createTicket(
+        user!.uid,
+        userName,
+        "رسالة دعم",
+      );
+
+      _currentTicketId = ticketId;
+      setState(() => _isLoadingTicket = false);
+      return ticketId;
     } catch (e) {
-      debugPrint("FCM Error to Admin: $e");
-    } finally {
-      client?.close();
+      debugPrint("Error loading/creating ticket: $e");
+      setState(() => _isLoadingTicket = false);
+      return null;
     }
   }
 
@@ -81,33 +87,48 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
     _msgController.clear();
 
     try {
-      // 1. إضافة الرسالة للمجموعة الفرعية الخاصة بالمستخدم
-      await FirebaseFirestore.instance
-          .collection('support_chats')
-          .doc(user!.uid)
-          .collection('messages')
-          .add({
-        'senderId': user!.uid,
-        'text': txt,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
+      // Ensure we have a ticket
+      final ticketId = await _loadOrCreateTicket();
+      if (ticketId == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("حدث خطأ في إنشاء التذكرة", style: GoogleFonts.cairo()),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
 
-      // 2. تحديث المستند الرئيسي لتسهيل الفرز في لوحة الإدارة
-      await FirebaseFirestore.instance
-          .collection('support_chats')
-          .doc(user!.uid)
-          .set({
-        'lastMessage': txt,
-        'lastUpdate': FieldValue.serverTimestamp(),
-        'userName': uName,
-        'userId': user!.uid,
-        'unreadByAdmin': true,
-      }, SetOptions(merge: true));
+      // Send message to ticket
+      await _supportRepo.sendMessage(
+        ticketId: ticketId,
+        senderId: user!.uid,
+        senderName: uName,
+        text: txt,
+        isAdmin: false,
+      );
 
-      // 3. إشعار المديرة فورياً
-      _sendNotificationToAdmin(uName, txt);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("تم إرسال رسالتك ✅", style: GoogleFonts.cairo()),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
       debugPrint("Error sending message: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("حدث خطأ في إرسال الرسالة: $e", style: GoogleFonts.cairo()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
@@ -115,11 +136,16 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Load ticket on init
+    if (_currentTicketId == null && !_isLoadingTicket) {
+      _loadOrCreateTicket();
+    }
+
     return Scaffold(
       backgroundColor: AppColors.scaffoldBackground,
       appBar: AppBar(
         title: Text(
-          "الدعم الفني المباشر",
+          "الدعم الفني",
           style: GoogleFonts.cairo(
               fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16),
         ),
@@ -131,40 +157,85 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
       body: Column(
         children: [
           Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('support_chats')
-                  .doc(user?.uid)
-                  .collection('messages')
-                  .orderBy('timestamp', descending: true)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                var docs = snapshot.data?.docs ?? [];
+            child: _currentTicketId != null
+                ? StreamBuilder<List<SupportMessage>>(
+                    stream: _supportRepo.watchMessages(_currentTicketId!),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
 
-                return ListView.builder(
-                  reverse: true, // لتبدأ الرسائل من الأسفل
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 15, vertical: 20),
-                  itemCount: docs.length + 1,
-                  itemBuilder: (context, i) {
-                    // عرض رسالة ترحيبية في نهاية القائمة (التي تظهر في الأعلى فعلياً)
-                    if (i == docs.length) {
-                      return _buildChatBubble(
-                          "أهلاً بك في L Pro.. كيف يمكننا مساعدتك اليوم؟ إذا كان لديك اقتراح أو سؤال لا تتردد في مراسلتنا 💡",
-                          false,
-                          null);
-                    }
-                    var d = docs[i].data() as Map<String, dynamic>;
-                    bool isMe = d['senderId'] == user?.uid;
-                    return _buildChatBubble(
-                        d['text'] ?? "", isMe, d['timestamp'] as Timestamp?);
-                  },
-                );
-              },
-            ),
+                      final messages = snapshot.data ?? [];
+
+                      if (messages.isEmpty) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.support_agent, size: 64, color: Colors.grey[400]),
+                                const SizedBox(height: 16),
+                                Text(
+                                  "أهلاً بك في L Pro",
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.grey[700],
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  "كيف يمكننا مساعدتك اليوم؟\nإذا كان لديك اقتراح أو سؤال لا تتردد في مراسلتنا 💡",
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 14,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      return ListView.builder(
+                        reverse: false,
+                        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 20),
+                        itemCount: messages.length,
+                        itemBuilder: (context, i) {
+                          final msg = messages[i];
+                          final isMe = msg.senderId == user?.uid;
+                          return _buildChatBubble(
+                            msg.text,
+                            isMe,
+                            msg.sentAt,
+                          );
+                        },
+                      );
+                    },
+                  )
+                : _isLoadingTicket
+                    ? const Center(child: CircularProgressIndicator())
+                    : Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.support_agent, size: 64, color: Colors.grey[400]),
+                              const SizedBox(height: 16),
+                              Text(
+                                "جاري تحميل التذكرة...",
+                                style: GoogleFonts.cairo(
+                                  fontSize: 16,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
           ),
           _buildInputArea(),
         ],
@@ -172,8 +243,8 @@ class _ChatSupportScreenState extends State<ChatSupportScreen> {
     );
   }
 
-  Widget _buildChatBubble(String text, bool isMe, Timestamp? ts) {
-    String time = ts != null ? DateFormat('hh:mm a').format(ts.toDate()) : "";
+  Widget _buildChatBubble(String text, bool isMe, DateTime? sentAt) {
+    String time = sentAt != null ? DateFormat('hh:mm a').format(sentAt) : "";
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Column(
