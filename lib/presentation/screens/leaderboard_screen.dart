@@ -6,8 +6,10 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/sound_manager.dart';
 import '../../features/leaderboards/models/leaderboard_entry.dart';
 import '../../features/leaderboards/repositories/leaderboards_repository.dart';
+import 'stats_screen.dart';
 
 class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
@@ -342,79 +344,97 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         // Compute gap to enter top 10
         final int gap = isInTop10 ? 0 : (rank10Points - myPoints + 1).clamp(0, 999999);
 
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: AppColors.secondaryOrange.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-                color: AppColors.secondaryOrange.withValues(alpha: 0.3)),
-          ),
-          child: Column(
-            children: [
-              // Rank row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    isInTop10 ? Icons.emoji_events : Icons.trending_up,
-                    color: AppColors.secondaryOrange,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    rankText,
-                    style: GoogleFonts.cairo(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: AppColors.primaryDeepTeal,
+        return InkWell(
+          onTap: () {
+            SoundManager.playTap();
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const StatsScreen()),
+            );
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.secondaryOrange.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                  color: AppColors.secondaryOrange.withValues(alpha: 0.3)),
+            ),
+            child: Column(
+              children: [
+                // Rank row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isInTop10 ? Icons.emoji_events : Icons.trending_up,
+                      color: AppColors.secondaryOrange,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      rankText,
+                      style: GoogleFonts.cairo(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: AppColors.primaryDeepTeal,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // Points info row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _statChip("نقاطك", myPoints),
+                    _statChip("أقل ترتيب", rank10Points),
+                  ],
+                ),
+                // Gap motivation (only if not in top 10)
+                if (!isInTop10 && gap > 0) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryDeepTeal.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      "ناقصك $gap نقطة لتدخل أفضل 10 💪",
+                      style: GoogleFonts.cairo(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        color: AppColors.primaryDeepTeal,
+                      ),
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 8),
-              // Points info row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _statChip("نقاطك", myPoints),
-                  _statChip("أقل ترتيب", rank10Points),
-                ],
-              ),
-              // Gap motivation (only if not in top 10)
-              if (!isInTop10 && gap > 0) ...[
-                const SizedBox(height: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryDeepTeal.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    "ناقصك $gap نقطة لتدخل أفضل 10 💪",
+                // Already in top 10 celebration
+                if (isInTop10) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    "أنت من الأفضل! استمر 🔥",
                     style: GoogleFonts.cairo(
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
-                      color: AppColors.primaryDeepTeal,
+                      color: Colors.green[700],
                     ),
                   ),
-                ),
-              ],
-              // Already in top 10 celebration
-              if (isInTop10) ...[
-                const SizedBox(height: 8),
+                ],
+                const SizedBox(height: 6),
                 Text(
-                  "أنت من الأفضل! استمر 🔥",
+                  "اضغط لعرض تفاصيل تقدمك",
                   style: GoogleFonts.cairo(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                    color: Colors.green[700],
+                    fontSize: 11,
+                    color: Colors.grey[600],
                   ),
                 ),
               ],
-            ],
+            ),
           ),
         );
       },
