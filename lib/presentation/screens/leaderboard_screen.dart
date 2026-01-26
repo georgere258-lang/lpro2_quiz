@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../core/constants/app_colors.dart';
-import 'package:lpro2_quiz/core/data/models/user_model.dart';
+import '../../features/leaderboards/models/leaderboard_entry.dart';
+import '../../features/leaderboards/repositories/leaderboards_repository.dart';
 
 class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
@@ -16,8 +17,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  // سنعتمد على حقل 'points' كحقل ترتيب موحد لضمان ظهور الـ 50 مستخدم في كل التبويبات
-  final List<String> _rankingFields = ['points', 'starsPoints', 'proPoints'];
+  final LeaderboardsRepository _repo = LeaderboardsRepository();
+
+  // League keys matching Firestore: general | stars | pros
+  final List<String> _leagues = ['general', 'stars', 'pros'];
 
   final List<IconData> avatars = [
     Icons.workspace_premium,
@@ -69,22 +72,19 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         textDirection: TextDirection.rtl,
         child: TabBarView(
           controller: _tabController,
-          children: _rankingFields
-              .map((field) => _buildLeaderboardList(field))
+          children: _leagues
+              .map((league) => _buildLeaderboardList(league))
               .toList(),
         ),
       ),
     );
   }
 
-  Widget _buildLeaderboardList(String currentField) {
-    return StreamBuilder<QuerySnapshot>(
-      // السحر هنا: الترتيب دايماً حسب points عشان القائمة تظهر كاملة بالـ 50 شخص
-      stream: FirebaseFirestore.instance
-          .collection('users')
-          .orderBy('points', descending: true)
-          .limit(50)
-          .snapshots(),
+  Widget _buildLeaderboardList(String league) {
+    final currentUid = FirebaseAuth.instance.currentUser?.uid;
+
+    return StreamBuilder<List<LeaderboardEntry>>(
+      stream: _repo.streamTop10(league),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
           return Center(
@@ -98,39 +98,40 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                   CircularProgressIndicator(color: AppColors.secondaryOrange));
         }
 
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+        final entries = snapshot.data ?? [];
+
+        if (entries.isEmpty) {
           return Center(
               child:
                   Text("لا يوجد متسابقون حالياً", style: GoogleFonts.cairo()));
         }
 
-        final allUsers = snapshot.data!.docs.map((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          return UserModel.fromMap(data, doc.id);
-        }).toList();
-
-        // إعادة ترتيب القائمة داخل الموبايل (Logic) بناءً على التبويب المفتوح
-        // عشان اللي عنده نقاط أكتر في دوري النجوم يطلع فوق حتى لو نقاطه الكلية أقل
-        allUsers.sort((a, b) {
-          int valA = _getPointsValue(a, currentField);
-          int valB = _getPointsValue(b, currentField);
-          return valB.compareTo(valA);
-        });
-
-        final topThree = allUsers.take(3).toList();
+        final topThree = entries.take(3).toList();
         final others =
-            allUsers.length > 3 ? allUsers.skip(3).toList() : <UserModel>[];
+            entries.length > 3 ? entries.skip(3).toList() : <LeaderboardEntry>[];
+
+        // Check if current user is in top 10
+        LeaderboardEntry? currentUserEntry;
+        if (currentUid != null) {
+          final idx = entries.indexWhere((e) => e.uid == currentUid);
+          if (idx >= 0) {
+            currentUserEntry = entries[idx];
+          }
+        }
 
         return Column(
           children: [
-            _buildPodiumHeader(topThree, currentField),
+            _buildPodiumHeader(topThree),
+            // Show current user rank
+            if (currentUid != null)
+              _buildCurrentUserRank(currentUserEntry, league, currentUid),
             Expanded(
               child: ListView.builder(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
                 itemCount: others.length,
                 itemBuilder: (context, index) =>
-                    _buildUserTile(index + 4, others[index], currentField),
+                    _buildUserTile(others[index]),
               ),
             ),
           ],
@@ -139,7 +140,45 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     );
   }
 
-  Widget _buildPodiumHeader(List<UserModel> topThree, String field) {
+  Widget _buildCurrentUserRank(LeaderboardEntry? entry, String league, String uid) {
+    return FutureBuilder<LeaderboardEntry?>(
+      // If not in top 10 from stream, try fetching directly
+      future: entry == null ? _repo.getUserEntry(league, uid) : Future.value(entry),
+      builder: (context, snap) {
+        final userEntry = snap.data ?? entry;
+        final rankText = userEntry != null
+            ? "ترتيبك: #${userEntry.rank}"
+            : "ترتيبك: خارج أفضل 10";
+
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.secondaryOrange.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.secondaryOrange.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.emoji_events, color: AppColors.secondaryOrange, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                rankText,
+                style: GoogleFonts.cairo(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: AppColors.primaryDeepTeal,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPodiumHeader(List<LeaderboardEntry> topThree) {
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 20, 10, 30),
       decoration: const BoxDecoration(
@@ -149,15 +188,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (topThree.length >= 2) _buildPodiumItem(topThree[1], 2, 75, field),
-          if (topThree.isNotEmpty) _buildPodiumItem(topThree[0], 1, 100, field),
-          if (topThree.length >= 3) _buildPodiumItem(topThree[2], 3, 70, field),
+          if (topThree.length >= 2) _buildPodiumItem(topThree[1], 2, 75),
+          if (topThree.isNotEmpty) _buildPodiumItem(topThree[0], 1, 100),
+          if (topThree.length >= 3) _buildPodiumItem(topThree[2], 3, 70),
         ],
       ),
     );
   }
 
-  Widget _buildPodiumItem(UserModel user, int rank, double size, String field) {
+  Widget _buildPodiumItem(LeaderboardEntry entry, int rank, double size) {
     Color medalColor = rank == 1
         ? const Color(0xFFFFD700)
         : (rank == 2 ? const Color(0xFFE0E0E0) : const Color(0xFFCD7F32));
@@ -177,10 +216,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                   radius: size / 2,
                   backgroundColor: Colors.white.withValues(alpha: 0.1),
                   child: Icon(
-                      avatars[user.avatarIndex < avatars.length
-                          ? user.avatarIndex
+                      avatars[entry.avatarIndex < avatars.length
+                          ? entry.avatarIndex
                           : 0],
-                      color: (user.avatarIndex == 0 || rank == 1)
+                      color: (entry.avatarIndex == 0 || rank == 1)
                           ? AppColors.secondaryOrange
                           : Colors.white,
                       size: size * 0.55)),
@@ -198,20 +237,20 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           ],
         ),
         const SizedBox(height: 10),
-        Text(user.displayName.split(' ')[0],
+        Text(entry.name.split(' ')[0],
             maxLines: 1,
             style: GoogleFonts.cairo(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
                 fontSize: 13)),
-        Text("${_getPointsValue(user, field)} ن",
+        Text("${entry.points} ن",
             style: GoogleFonts.poppins(
                 color: medalColor, fontWeight: FontWeight.w900, fontSize: 15)),
       ],
     );
   }
 
-  Widget _buildUserTile(int rank, UserModel user, String field) {
+  Widget _buildUserTile(LeaderboardEntry entry) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
@@ -230,7 +269,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         children: [
           SizedBox(
               width: 35,
-              child: Text("#$rank",
+              child: Text("#${entry.rank}",
                   style: GoogleFonts.poppins(
                       fontWeight: FontWeight.w900,
                       color: Colors.grey[400],
@@ -240,14 +279,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
               backgroundColor: AppColors.primaryDeepTeal.withValues(alpha: 0.05),
               child: Icon(
                   avatars[
-                      user.avatarIndex < avatars.length ? user.avatarIndex : 0],
-                  color: user.avatarIndex == 0
+                      entry.avatarIndex < avatars.length ? entry.avatarIndex : 0],
+                  color: entry.avatarIndex == 0
                       ? AppColors.secondaryOrange
                       : AppColors.primaryDeepTeal,
                   size: 22)),
           const SizedBox(width: 15),
           Expanded(
-              child: Text(user.displayName,
+              child: Text(entry.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.cairo(
@@ -259,7 +298,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
               decoration: BoxDecoration(
                   color: AppColors.primaryDeepTeal.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(12)),
-              child: Text("${_getPointsValue(user, field)} ن",
+              child: Text("${entry.points} ن",
                   style: GoogleFonts.poppins(
                       fontWeight: FontWeight.w900,
                       color: AppColors.primaryDeepTeal,
@@ -267,11 +306,5 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         ],
       ),
     );
-  }
-
-  int _getPointsValue(UserModel user, String field) {
-    if (field == 'starsPoints') return user.starsPoints;
-    if (field == 'proPoints') return user.proPoints;
-    return user.points;
   }
 }
