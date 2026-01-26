@@ -90,10 +90,11 @@ service cloud.firestore {
     }
 
     function onlyAllowedUserFields() {
-      let allowed = ['name', 'avatarId'];
-      let changed = request.resource.data.diff(resource.data).affectedKeys();
-      return changed.hasOnly(allowed);
-    }
+  // ✅ نخليها متوافقة مع النظام الحالي
+  let allowedFields = ['name', 'avatarIndex'];
+  let changedFields = request.resource.data.diff(resource.data).affectedKeys();
+  return changedFields.hasOnly(allowedFields);
+}
 
     // ✅ الدالة اللي كانت ناقصة (سبب الخطأ)
     function canUpdatePointsSafely() {
