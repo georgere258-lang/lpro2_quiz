@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../features/leaderboards/models/leaderboard_entry.dart';
@@ -21,6 +22,13 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   // League keys matching Firestore: general | stars | pros
   final List<String> _leagues = ['general', 'stars', 'pros'];
+
+  // Points field for each league (to read from user doc)
+  final Map<String, String> _leaguePointsField = {
+    'general': 'points',
+    'stars': 'starsPoints',
+    'pros': 'proPoints',
+  };
 
   final List<IconData> avatars = [
     Icons.workspace_premium,
@@ -100,15 +108,38 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
         final entries = snapshot.data ?? [];
 
+        // Empty state with admin hint
         if (entries.isEmpty) {
           return Center(
-              child:
-                  Text("لا يوجد متسابقون حالياً", style: GoogleFonts.cairo()));
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.leaderboard_outlined,
+                      size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text("لم يتم تحديث الترتيب بعد",
+                      style: GoogleFonts.cairo(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[600])),
+                  const SizedBox(height: 8),
+                  Text("يتم تحديث الترتيب من لوحة التحكم",
+                      style: GoogleFonts.cairo(
+                          fontSize: 13, color: Colors.grey[500])),
+                ],
+              ),
+            ),
+          );
         }
 
         final topThree = entries.take(3).toList();
         final others =
             entries.length > 3 ? entries.skip(3).toList() : <LeaderboardEntry>[];
+
+        // Get rank 10 points (or last entry if less than 10)
+        final rank10Points = entries.isNotEmpty ? entries.last.points : 0;
 
         // Check if current user is in top 10
         LeaderboardEntry? currentUserEntry;
@@ -122,9 +153,14 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         return Column(
           children: [
             _buildPodiumHeader(topThree),
-            // Show current user rank
+            // Show motivational "My Status" card
             if (currentUid != null)
-              _buildCurrentUserRank(currentUserEntry, league, currentUid),
+              _buildMyStatusCard(
+                currentUserEntry,
+                league,
+                currentUid,
+                rank10Points,
+              ),
             Expanded(
               child: ListView.builder(
                 padding:
@@ -140,41 +176,152 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     );
   }
 
-  Widget _buildCurrentUserRank(LeaderboardEntry? entry, String league, String uid) {
-    return FutureBuilder<LeaderboardEntry?>(
-      // If not in top 10 from stream, try fetching directly
-      future: entry == null ? _repo.getUserEntry(league, uid) : Future.value(entry),
-      builder: (context, snap) {
-        final userEntry = snap.data ?? entry;
-        final rankText = userEntry != null
-            ? "ترتيبك: #${userEntry.rank}"
+  /// Motivational "My Status" card with gap computation
+  Widget _buildMyStatusCard(
+    LeaderboardEntry? entry,
+    String league,
+    String uid,
+    int rank10Points,
+  ) {
+    final pointsField = _leaguePointsField[league] ?? 'points';
+
+    return FutureBuilder<DocumentSnapshot>(
+      // Read current user's points from /users/{uid} (self-read allowed)
+      future: FirebaseFirestore.instance.collection('users').doc(uid).get(),
+      builder: (context, userSnap) {
+        // Loading state
+        if (userSnap.connectionState == ConnectionState.waiting) {
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.secondaryOrange.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.secondaryOrange,
+                ),
+              ),
+            ),
+          );
+        }
+
+        // Get user's points for this league
+        final userData = userSnap.data?.data() as Map<String, dynamic>? ?? {};
+        final myPoints = (userData[pointsField] as int?) ?? 0;
+
+        // Determine rank status
+        final bool isInTop10 = entry != null;
+        final String rankText = isInTop10
+            ? "ترتيبك: #${entry.rank}"
             : "ترتيبك: خارج أفضل 10";
+
+        // Compute gap to enter top 10
+        final int gap = isInTop10 ? 0 : (rank10Points - myPoints + 1).clamp(0, 999999);
 
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             color: AppColors.secondaryOrange.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.secondaryOrange.withValues(alpha: 0.3)),
+            border: Border.all(
+                color: AppColors.secondaryOrange.withValues(alpha: 0.3)),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Column(
             children: [
-              Icon(Icons.emoji_events, color: AppColors.secondaryOrange, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                rankText,
-                style: GoogleFonts.cairo(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: AppColors.primaryDeepTeal,
-                ),
+              // Rank row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    isInTop10 ? Icons.emoji_events : Icons.trending_up,
+                    color: AppColors.secondaryOrange,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    rankText,
+                    style: GoogleFonts.cairo(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: AppColors.primaryDeepTeal,
+                    ),
+                  ),
+                ],
               ),
+              const SizedBox(height: 8),
+              // Points info row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _statChip("نقاطك", myPoints),
+                  _statChip("أقل ترتيب", rank10Points),
+                ],
+              ),
+              // Gap motivation (only if not in top 10)
+              if (!isInTop10 && gap > 0) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryDeepTeal.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    "ناقصك $gap نقطة لتدخل أفضل 10 💪",
+                    style: GoogleFonts.cairo(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                      color: AppColors.primaryDeepTeal,
+                    ),
+                  ),
+                ),
+              ],
+              // Already in top 10 celebration
+              if (isInTop10) ...[
+                const SizedBox(height: 8),
+                Text(
+                  "أنت من الأفضل! استمر 🔥",
+                  style: GoogleFonts.cairo(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    color: Colors.green[700],
+                  ),
+                ),
+              ],
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _statChip(String label, int value) {
+    return Column(
+      children: [
+        Text(
+          "$value",
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w900,
+            fontSize: 16,
+            color: AppColors.primaryDeepTeal,
+          ),
+        ),
+        Text(
+          label,
+          style: GoogleFonts.cairo(
+            fontSize: 11,
+            color: Colors.grey[600],
+          ),
+        ),
+      ],
     );
   }
 
