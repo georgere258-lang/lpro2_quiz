@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/sound_manager.dart';
@@ -73,6 +74,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   userModel.displayName,
                   userModel.points,
                   userModel.avatarIndex,
+                  userModel.starsPoints,
+                  userModel.proPoints,
                 ),
                 const SizedBox(height: 35),
                 if (widget.onSupportPressed != null)
@@ -84,6 +87,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       widget.onSupportPressed?.call();
                     },
                   ),
+                _buildProfileBtn(
+                  "دعوة Pro جديد",
+                  Icons.person_add_rounded,
+                  () {
+                    SoundManager.playTap();
+                    _invitePro();
+                  },
+                ),
                 if (userModel.role == 'admin')
                   _buildProfileBtn(
                     "لوحة التحكم (Admin)",
@@ -107,6 +118,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   },
                 ),
                 _buildProfileBtn(
+                  "تغيير الاسم",
+                  Icons.edit_rounded,
+                  () {
+                    SoundManager.playTap();
+                    _showRenameBottomSheet();
+                  },
+                ),
+                _buildProfileBtn(
                   "تسجيل الخروج",
                   Icons.logout_rounded,
                   _handleLogout,
@@ -121,7 +140,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileHeader(String name, int points, int avatarIndex) {
+  Widget _buildProfileHeader(String name, int points, int avatarIndex, int starsPoints, int proPoints) {
     return Column(
       children: [
         Container(
@@ -161,7 +180,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 fontSize: 13, fontWeight: FontWeight.w800, color: deepTeal),
           ),
         ),
+        _buildPointsCards(starsPoints, proPoints),
       ],
+    );
+  }
+
+  Widget _buildPointsCards(int starsPoints, int proPoints) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _buildPointCard("نجوم", starsPoints, Icons.stars_rounded),
+          const SizedBox(width: 12),
+          _buildPointCard("محترفين", proPoints, Icons.workspace_premium),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPointCard(String label, int points, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppColors.eliteShadowL1,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: deepTeal),
+          const SizedBox(width: 6),
+          Text(
+            "$label: ",
+            style: GoogleFonts.cairo(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Colors.grey[700],
+            ),
+          ),
+          Text(
+            "$points",
+            style: GoogleFonts.cairo(
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+              color: deepTeal,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -209,6 +277,172 @@ class _ProfileScreenState extends State<ProfileScreen> {
         MaterialPageRoute(builder: (_) => const LoginScreen()),
         (_) => false,
       );
+    }
+  }
+
+  Future<void> _invitePro() async {
+    const message = "✨ انضم إلى L Pro — طريقك لتطوير نفسك في العقار.\nحمّل التطبيق وابدأ رحلتك الآن 💪";
+    try {
+      await Share.share(message);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("حدث خطأ في المشاركة", style: GoogleFonts.cairo()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showRenameBottomSheet() async {
+    String currentName = '';
+    if (user?.uid != null) {
+      try {
+        final snapshot = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user!.uid)
+            .get();
+        if (snapshot.exists && snapshot.data() != null) {
+          currentName = (snapshot.data() as Map<String, dynamic>)['name'] ?? '';
+        }
+      } catch (e) {
+        // Fallback to empty
+      }
+    }
+
+    final TextEditingController nameController = TextEditingController(text: currentName);
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          top: 20,
+          left: 20,
+          right: 20,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "تغيير الاسم",
+              style: GoogleFonts.cairo(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: deepTeal,
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: nameController,
+              textDirection: TextDirection.rtl,
+              decoration: InputDecoration(
+                hintText: "أدخل اسمك",
+                hintStyle: GoogleFonts.cairo(),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              style: GoogleFonts.cairo(fontSize: 16),
+              autofocus: true,
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => _handleRename(nameController.text),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: deepTeal,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  "حفظ",
+                  style: GoogleFonts.cairo(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleRename(String newName) async {
+    final trimmedName = newName.trim();
+    
+    if (trimmedName.length < 3) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("الاسم يجب أن يكون 3 أحرف على الأقل", style: GoogleFonts.cairo()),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (user == null) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .update({'name': trimmedName});
+      
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("تم تحديث الاسم بنجاح ✅", style: GoogleFonts.cairo()),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } on FirebaseException catch (e) {
+      if (mounted) {
+        String errorMsg = "حدث خطأ";
+        if (e.code == 'permission-denied') {
+          errorMsg = "لا توجد صلاحية";
+        } else if (e.code == 'unavailable' || e.message?.contains('network') == true) {
+          errorMsg = "تحقق من الاتصال";
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg, style: GoogleFonts.cairo()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("حدث خطأ", style: GoogleFonts.cairo()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 }
