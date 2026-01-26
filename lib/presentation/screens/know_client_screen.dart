@@ -485,7 +485,7 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
               // 5️⃣ جديد Pro (last 5)
               if (recent.isNotEmpty) ...[
                 _topicsCard(
-                  title: 'جديد Pro',
+                  title: 'جديد L Pro',
                   icon: Icons.new_releases_rounded,
                   items: recent.take(5).toList(),
                 ),
@@ -495,7 +495,7 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
               // 6️⃣ ترشيحات Pro (last 5)
               if (featured.isNotEmpty) ...[
                 _topicsCard(
-                  title: 'ترشيحات Pro',
+                  title: 'ترشيحات L Pro',
                   icon: Icons.star_rounded,
                   items: featured.take(5).toList(),
                 ),
