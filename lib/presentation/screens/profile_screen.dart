@@ -14,6 +14,7 @@ import 'package:lpro2_quiz/core/data/models/user_model.dart';
 import 'about_screen.dart';
 import 'login_screen.dart';
 import 'admin/admin_panel.dart';
+import 'stats_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onSupportPressed;
@@ -242,42 +243,56 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildPointCard(String label, int points, IconData icon) {
     final isStars = label == "نجوم";
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-          ...AppColors.eliteShadowL1,
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 22, color: isStars ? Colors.amber : deepTeal),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: GoogleFonts.cairo(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[500],
+    return InkWell(
+      onTap: () {
+        SoundManager.playTap();
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => StatsScreen(
+              initialTab: isStars ? 'stars' : 'pros',
             ),
           ),
-          Text(
-            "$points",
-            style: GoogleFonts.poppins(
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color: deepTeal,
-              height: 1.2,
+        );
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
             ),
-          ),
-        ],
+            ...AppColors.eliteShadowL1,
+          ],
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 22, color: isStars ? Colors.amber : deepTeal),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: GoogleFonts.cairo(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[500],
+              ),
+            ),
+            Text(
+              "$points",
+              style: GoogleFonts.poppins(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: deepTeal,
+                height: 1.2,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

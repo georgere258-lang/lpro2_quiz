@@ -16,6 +16,7 @@ import 'fact_screen.dart';
 import 'know_client_screen.dart';
 import 'market_radar_screen.dart';
 import 'money_economy_screen.dart';
+import 'stats_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -269,7 +270,17 @@ class _WelcomeCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              _PointsBadge(points: points),
+              InkWell(
+                onTap: () {
+                  SoundManager.playTap();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const StatsScreen()),
+                  );
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: _PointsBadge(points: points),
+              ),
             ],
           ),
         );
