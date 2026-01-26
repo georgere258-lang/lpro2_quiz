@@ -145,12 +145,12 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
       textDirection: TextDirection.rtl,
       child: ListView(
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         children: [
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           // ✅ Premium Header Card
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(24),
@@ -159,7 +159,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
             child: Column(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(18),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
@@ -171,28 +171,28 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                       ),
                     ],
                   ),
-                  child: Icon(icon, size: 44, color: color),
+                  child: Icon(icon, size: 34, color: color),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 12),
                 Text(
                   league,
                   style: GoogleFonts.cairo(
-                    fontSize: 24,
+                    fontSize: 20,
                     fontWeight: FontWeight.w900,
                     color: deepTeal,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
                 Text(
                   motivationalText,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.cairo(
-                    fontSize: 15,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: Colors.grey[600],
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
                 // ✅ Progress/Accuracy Bar
                 Container(
                   padding: const EdgeInsets.all(16),
@@ -237,15 +237,15 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
               ],
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 16),
           // ✅ Stats Grid with Animated Numbers
           GridView.count(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 2,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            childAspectRatio: 1.1,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.25,
             children: [
               if (!isFreePlay)
                 _buildAnimatedStatCard(
@@ -293,7 +293,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
@@ -302,8 +302,8 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 28, color: color),
-          const SizedBox(height: 10),
+          Icon(icon, size: 24, color: color),
+          const SizedBox(height: 6),
           // ✅ Animated Number
           TweenAnimationBuilder<int>(
             tween: IntTween(begin: 0, end: value),
@@ -312,19 +312,19 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
               return Text(
                 "$animatedValue",
                 style: GoogleFonts.poppins(
-                  fontSize: 24,
+                  fontSize: 20,
                   fontWeight: FontWeight.w900,
                   color: deepTeal,
                 ),
               );
             },
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             label,
             textAlign: TextAlign.center,
             style: GoogleFonts.cairo(
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w700,
               color: Colors.grey[700],
             ),
