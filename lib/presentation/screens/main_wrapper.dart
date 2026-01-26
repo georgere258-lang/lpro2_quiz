@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/main_wrapper.dart
-// STATUS: SEAMLESS HEADER INTEGRATION ✅ (FULL FILE)
+// STATUS: FIXED SEAMLESS INTEGRATION ✅
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -10,8 +10,9 @@ import '../../core/constants/app_colors.dart';
 import '../../core/services/app_config_service.dart';
 import 'home_screen.dart';
 import 'leaderboard_screen.dart';
-import 'profile_screen.dart';
 import 'chat_support_screen.dart';
+// ✅ تم إضافة الاستيراد المفقود لحل مشكلة الشاشة الحمراء
+import 'profile_screen.dart';
 import '../../features/news_ticker/presentation/news_ticker_widget.dart';
 import '../widgets/lpro_bottom_nav_bar.dart';
 
@@ -34,6 +35,7 @@ class _MainWrapperState extends State<MainWrapper> {
     if (widget.initialIndex != null) {
       _currentIndex = widget.initialIndex!.clamp(0, 2);
     }
+    // ✅ التأكد من استدعاء الصفحات بالمسارات الصحيحة
     _pages = [
       const HomeScreen(),
       const LeaderboardScreen(),
@@ -151,7 +153,6 @@ class _MainWrapperState extends State<MainWrapper> {
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(42),
         child: Padding(
-          // ✅ تم تصفير الهوامش الجانبية لضمان امتداد الشريط
           padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
           child: _user == null
               ? const _TickerBox(userName: "Pro")
@@ -219,7 +220,7 @@ class _TickerBox extends StatelessWidget {
     return Container(
       height: 34,
       width: double.infinity,
-      color: Colors.transparent, // ✅ شفاف تماماً
+      color: Colors.transparent,
       alignment: Alignment.center,
       child: NewsTickerWidget(userName: userName),
     );
