@@ -1,6 +1,7 @@
 // PATH: lib/presentation/screens/profile_screen.dart
 // STATUS: ULTRA PREMIUM ELITE (Sleek Micro-Cards & Focal Glow)
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -383,7 +384,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (snapshot.exists && snapshot.data() != null) {
           currentName = (snapshot.data() as Map<String, dynamic>)['name'] ?? '';
         }
-      } catch (e) {}
+      } catch (e) {
+        debugPrint('ProfileScreen: Error loading name: $e');
+      }
     }
 
     final TextEditingController nameController =
@@ -517,7 +520,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (snapshot.exists && snapshot.data() != null) {
         currentIndex = snapshot.data()!['avatarIndex'] ?? 0;
       }
-    } catch (e) {}
+    } catch (e) {
+      debugPrint('ProfileScreen: Error loading avatarIndex: $e');
+    }
 
     if (!mounted) return;
     showModalBottomSheet(
