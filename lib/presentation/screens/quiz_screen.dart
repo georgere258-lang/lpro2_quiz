@@ -977,8 +977,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                           ? Icons.auto_awesome_rounded
                           : Icons.workspace_premium,
                       title: _isStars 
-                          ? "✨ دوري النجوم – بداية الطريق الصح"
-                          : "🔥 دوري المحترفين – مستوى Pro",
+                          ? "✨ دوري النجوم"
+                          : "🔥 دوري المحترفين",
                       description: _isStars 
                           ? "" 
                           : "الاحتراف مش إنك تعرف معلومة واحدة،\nالاحتراف إن كل خيوط المعلومة تبقى في إيدك\n– سوق، عميل، توقيت، قرار.",
