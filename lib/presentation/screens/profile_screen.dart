@@ -495,7 +495,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .get();
       if (snapshot.exists && snapshot.data() != null) {
         final data = snapshot.data() as Map<String, dynamic>;
-        final avatarIdStr = data['avatarId'] as String?;
+        final avatarIdStr = data['avatarIndex'] as String?;
         final avatarIndexFromFirestore = data['avatarIndex'] as int?;
 
         if (avatarIdStr != null) {
