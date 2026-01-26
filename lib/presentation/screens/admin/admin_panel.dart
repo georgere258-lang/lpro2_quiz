@@ -10,6 +10,7 @@ import '../../../features/news_ticker/repositories/news_ticker_repository.dart';
 import '../../../features/pro_card/repositories/pro_card_repository.dart';
 import '../../../features/support/repositories/support_repository.dart';
 import '../../../features/users/repositories/users_admin_repository.dart';
+import '../../../features/leaderboards/repositories/leaderboards_repository.dart';
 import 'tabs/admin_content_tab.dart';
 import 'tabs/admin_kyc_tab.dart';
 import 'tabs/admin_news_tab.dart';
@@ -37,6 +38,7 @@ class _AdminPanelState extends State<AdminPanel>
   final UsersAdminRepository _usersRepo = UsersAdminRepository();
   final NewsTickerRepository _tickerRepo = NewsTickerRepository();
   final AppConfigService _configService = AppConfigService();
+  final LeaderboardsRepository _leaderboardsRepo = LeaderboardsRepository();
 
   bool _saving = false;
 
@@ -67,12 +69,31 @@ class _AdminPanelState extends State<AdminPanel>
     return await adminConfirmDialog(context, title, content);
   }
 
+  Future<void> _refreshLeaderboards() async {
+    _setSaving(true);
+    try {
+      await _leaderboardsRepo.refreshTop10AsAdmin();
+      _snack('تم تحديث الترتيب ✅');
+    } catch (e) {
+      _snack('خطأ: $e');
+    } finally {
+      _setSaving(false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: FittedBox(fit: BoxFit.scaleDown, child: Text("Admin Panel", maxLines: 1, style: GoogleFonts.cairo(fontWeight: FontWeight.w900))),
         backgroundColor: AppColors.primaryDeepTeal,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.leaderboard, color: Colors.white),
+            tooltip: 'تحديث الترتيب',
+            onPressed: _refreshLeaderboards,
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48),
           child: TabBar(
