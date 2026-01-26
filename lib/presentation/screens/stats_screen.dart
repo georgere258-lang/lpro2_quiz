@@ -1,10 +1,12 @@
 // PATH: lib/presentation/screens/stats_screen.dart
-// STATUS: PREMIUM STATS SCREEN (Mock Data)
-// TODO: ربطها لاحقًا بالـ Firestore / quiz results
+// STATUS: PREMIUM STATS SCREEN (Real Data from user_stats)
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/firestore_paths.dart';
 import '../widgets/lpro_bottom_nav_bar.dart';
 import 'main_wrapper.dart';
 
@@ -25,6 +27,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
+    ensureStatsDocExists();
     int initialIndex = 0;
     if (widget.initialTab == 'pros') {
       initialIndex = 1;
@@ -32,6 +35,51 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
       initialIndex = 2;
     }
     _tabController = TabController(length: 3, vsync: this, initialIndex: initialIndex);
+  }
+
+  Future<void> ensureStatsDocExists() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      final ref = FirebaseFirestore.instance.collection('user_stats').doc(user.uid);
+      final snapshot = await ref.get();
+      if (!snapshot.exists) {
+        await ref.set(
+          {
+            'updatedAt': FieldValue.serverTimestamp(),
+            'stars': {
+              'roundsPlayed': 0,
+              'totalQuestions': 0,
+              'correctAnswers': 0,
+              'wrongAnswers': 0,
+              'currentStreak': 0,
+              'bestStreak': 0,
+              'totalPoints': 0,
+            },
+            'pros': {
+              'roundsPlayed': 0,
+              'totalQuestions': 0,
+              'correctAnswers': 0,
+              'wrongAnswers': 0,
+              'currentStreak': 0,
+              'bestStreak': 0,
+              'totalPoints': 0,
+            },
+            'freeplay': {
+              'roundsPlayed': 0,
+              'totalQuestions': 0,
+              'correctAnswers': 0,
+              'wrongAnswers': 0,
+              'currentStreak': 0,
+              'bestStreak': 0,
+            },
+          },
+          SetOptions(merge: true),
+        );
+      }
+    } catch (e) {
+      debugPrint('StatsScreen ensureStatsDocExists: $e');
+    }
   }
 
   @override
@@ -79,38 +127,21 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
             league: "نجوم",
             icon: Icons.stars_rounded,
             color: Colors.amber,
-            mockData: {
-              'totalPoints': 1250,
-              'roundsPlayed': 45,
-              'correctAnswers': 320,
-              'totalQuestions': 450,
-              'bestStreak': 12,
-            },
+            leagueKey: 'stars',
             motivationalText: "استمر في التميز والوصول للأعلى! 🌟",
           ),
           _buildStatsTab(
             league: "محترفين",
             icon: Icons.workspace_premium,
             color: deepTeal,
-            mockData: {
-              'totalPoints': 890,
-              'roundsPlayed': 32,
-              'correctAnswers': 245,
-              'totalQuestions': 320,
-              'bestStreak': 8,
-            },
+            leagueKey: 'pros',
             motivationalText: "أنت المحترف الحقيقي! 💪",
           ),
           _buildStatsTab(
             league: "Free Play",
             icon: Icons.sports_esports,
             color: const Color(0xFF9B59B6),
-            mockData: {
-              'roundsPlayed': 120,
-              'totalQuestions': 480,
-              'correctAnswers': 380,
-              'bestStreak': 15,
-            },
+            leagueKey: 'freeplay',
             motivationalText: "التدريب المستمر هو طريق النجاح! 🎯",
             isFreePlay: true,
           ),
@@ -132,20 +163,38 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
     required String league,
     required IconData icon,
     required Color color,
-    required Map<String, int> mockData,
+    required String leagueKey,
     required String motivationalText,
     bool isFreePlay = false,
   }) {
-    final totalQuestions = mockData['totalQuestions'] ?? 0;
-    final correctAnswers = mockData['correctAnswers'] ?? 0;
-    final accuracy = totalQuestions > 0 ? (correctAnswers / totalQuestions * 100).round() : 0;
-
+    final user = FirebaseAuth.instance.currentUser;
+    
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: ListView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        children: [
+      child: StreamBuilder<DocumentSnapshot>(
+        stream: user != null
+            ? FirebaseFirestore.instance
+                .collection(FirestorePaths.userStats)
+                .doc(user.uid)
+                .snapshots()
+            : null,
+        builder: (context, snapshot) {
+          // Extract league data or use defaults
+          Map<String, dynamic> leagueData = {};
+          if (snapshot.hasData && snapshot.data!.exists) {
+            final data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
+            leagueData = (data[leagueKey] as Map<String, dynamic>?) ?? {};
+          }
+
+          final totalQuestions = (leagueData['totalQuestions'] as int?) ?? 0;
+          final correctAnswers = (leagueData['correctAnswers'] as int?) ?? 0;
+          final denom = totalQuestions > 0 ? totalQuestions : 1;
+          final accuracy = (correctAnswers / denom * 100).round();
+
+          return ListView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            children: [
           const SizedBox(height: 12),
           // ✅ Premium Header Card
           Container(
@@ -249,38 +298,40 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
               if (!isFreePlay)
                 _buildAnimatedStatCard(
                   label: "إجمالي النقاط",
-                  value: mockData['totalPoints'] ?? 0,
+                  value: (leagueData['totalPoints'] as int?) ?? 0,
                   icon: Icons.emoji_events,
                   color: color,
                 )
               else
                 _buildAnimatedStatCard(
                   label: "إجمالي الأسئلة",
-                  value: mockData['totalQuestions'] ?? 0,
+                  value: totalQuestions,
                   icon: Icons.help_outline,
                   color: color,
                 ),
               _buildAnimatedStatCard(
                 label: "الجولات",
-                value: mockData['roundsPlayed'] ?? 0,
+                value: (leagueData['roundsPlayed'] as int?) ?? 0,
                 icon: Icons.repeat,
                 color: color,
               ),
               _buildAnimatedStatCard(
                 label: "إجابات صحيحة",
-                value: mockData['correctAnswers'] ?? 0,
+                value: correctAnswers,
                 icon: Icons.check_circle,
                 color: color,
               ),
               _buildAnimatedStatCard(
                 label: "أفضل سلسلة",
-                value: mockData['bestStreak'] ?? 0,
+                value: (leagueData['bestStreak'] as int?) ?? 0,
                 icon: Icons.local_fire_department,
                 color: color,
               ),
             ],
           ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
