@@ -47,6 +47,31 @@ class UsersAdminRepository {
             .toList());
   }
 
+  /// Searches users by phone number (phoneE164 or phone field).
+  Future<List<UserProfile>> searchByPhone(String phone) async {
+    if (phone.trim().isEmpty) return [];
+
+    final searchTerm = phone.trim();
+
+    // Try exact match on phoneE164 first
+    var snap = await _collection
+        .where('phoneE164', isEqualTo: searchTerm)
+        .limit(20)
+        .get();
+
+    // Fallback: exact match on phone field
+    if (snap.docs.isEmpty) {
+      snap = await _collection
+          .where('phone', isEqualTo: searchTerm)
+          .limit(20)
+          .get();
+    }
+
+    return snap.docs
+        .map((d) => UserProfile.fromFirestore(d.data(), d.id))
+        .toList();
+  }
+
   /// Blocks a user with reason and admin tracking.
   Future<void> blockUser(String uid, String reason, String adminUid) async {
     if (uid.trim().isEmpty) {

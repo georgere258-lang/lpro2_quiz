@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/firestore_paths.dart';
 import '../../../../features/users/models/user_profile.dart';
 import '../../../../features/users/repositories/users_admin_repository.dart';
 import '../widgets/admin_shared_widgets.dart';
@@ -59,10 +60,16 @@ class _AdminUsersTabState extends State<AdminUsersTab> {
           _isSearching = false;
         });
       }
+    } on FirebaseException catch (e) {
+      debugPrint('USERS_SEARCH_FAIL code=${e.code} msg=${e.message} plugin=${e.plugin}');
+      if (mounted) {
+        setState(() => _isSearching = false);
+        widget.snack('FirebaseError: ${e.code} - ${e.message}');
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _isSearching = false);
-        widget.snack('خطأ في البحث');
+        widget.snack('UnexpectedError: $e');
       }
     }
   }
@@ -222,7 +229,7 @@ class _UserDetailsSheetState extends State<_UserDetailsSheet> {
   Future<void> _fetchUserData() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final ref = FirebaseFirestore.instance.collection('users').doc(widget.uid);
+      final ref = FirebaseFirestore.instance.collection(FirestorePaths.users).doc(widget.uid);
       final snap = await ref.get();
       if (!snap.exists) {
         if (mounted) {
@@ -371,34 +378,38 @@ class _UserDetailsSheetState extends State<_UserDetailsSheet> {
 
   Future<void> _openBlockDialog() async {
     final reasonC = TextEditingController();
-    await showDialog(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          title: Text('حظر المستخدم', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(_safeStr(_data?['name'], _safeStr(_data?['phoneE164'])), style: GoogleFonts.cairo()),
-              const SizedBox(height: 8),
-              adminTextField(reasonC, 'سبب الحظر'),
+    try {
+      await showDialog(
+        context: context,
+        builder: (ctx) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: Text('حظر المستخدم', style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_safeStr(_data?['name'], _safeStr(_data?['phoneE164'])), style: GoogleFonts.cairo()),
+                const SizedBox(height: 8),
+                adminTextField(reasonC, 'سبب الحظر'),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: Text('إلغاء', style: GoogleFonts.cairo())),
+              TextButton(
+                onPressed: () async {
+                  if (reasonC.text.trim().isEmpty) { widget.snack('اكتب السبب'); return; }
+                  Navigator.pop(ctx);
+                  await _blockUser(reasonC.text.trim());
+                },
+                child: Text('حظر', style: GoogleFonts.cairo(color: Colors.red)),
+              ),
             ],
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: Text('إلغاء', style: GoogleFonts.cairo())),
-            TextButton(
-              onPressed: () async {
-                if (reasonC.text.trim().isEmpty) { widget.snack('اكتب السبب'); return; }
-                Navigator.pop(ctx);
-                await _blockUser(reasonC.text.trim());
-              },
-              child: Text('حظر', style: GoogleFonts.cairo(color: Colors.red)),
-            ),
-          ],
         ),
-      ),
-    );
+      );
+    } finally {
+      reasonC.dispose();
+    }
   }
 
   Future<void> _blockUser(String reason) async {

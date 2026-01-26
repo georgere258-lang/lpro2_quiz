@@ -18,6 +18,8 @@ class UserProfile {
   final String uid;
   final String email;
   final String? name;
+  final String? phone;
+  final String? phoneE164;
   final String? avatarId;
   final String role;
   final bool isBlocked;
@@ -32,6 +34,8 @@ class UserProfile {
     required this.uid,
     required this.email,
     this.name,
+    this.phone,
+    this.phoneE164,
     this.avatarId,
     this.role = UserRole.user,
     this.isBlocked = false,
@@ -53,6 +57,8 @@ class UserProfile {
     return {
       'email': email,
       if (name != null) 'name': name,
+      if (phone != null) 'phone': phone,
+      if (phoneE164 != null) 'phoneE164': phoneE164,
       if (avatarId != null) 'avatarId': avatarId,
       'role': role,
       'isBlocked': isBlocked,
@@ -67,6 +73,8 @@ class UserProfile {
       uid: uid,
       email: (data['email'] as String?) ?? '',
       name: data['name'] as String?,
+      phone: data['phone'] as String?,
+      phoneE164: data['phoneE164'] as String?,
       avatarId: data['avatarId'] as String?,
       role: (data['role'] as String?) ?? UserRole.user,
       isBlocked: data['isBlocked'] == true,
