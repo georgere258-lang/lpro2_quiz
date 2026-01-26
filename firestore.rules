@@ -41,7 +41,9 @@ service cloud.firestore {
     // ═══════════════════════════════════════════════════════════════════════
 
     match /news_ticker_items/{docId} {
-      allow read: if isModerator() || resource.data.isActive == true;
+      allow read: if isModerator()
+                  || resource.data.isActive == true
+                  || !(resource.data.keys().hasAny(['isActive']));
       allow write: if isModerator();
     }
 
@@ -50,7 +52,9 @@ service cloud.firestore {
     // ═══════════════════════════════════════════════════════════════════════
 
     match /pro_insight/{docId} {
-      allow read: if isModerator() || resource.data.isActive == true;
+      allow read: if isModerator()
+                  || resource.data.isActive == true
+                  || !(resource.data.keys().hasAny(['isActive']));
       allow write: if isModerator();
     }
 
@@ -59,7 +63,9 @@ service cloud.firestore {
     // ═══════════════════════════════════════════════════════════════════════
 
     match /know_your_client/{docId} {
-      allow read: if isModerator() || resource.data.isActive == true;
+      allow read: if isModerator()
+                  || resource.data.isActive == true
+                  || !(resource.data.keys().hasAny(['isActive']));
       allow write: if isModerator();
     }
 
