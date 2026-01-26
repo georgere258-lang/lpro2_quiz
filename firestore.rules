@@ -3,9 +3,9 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ═══════════════════════════════════════════════════════════════════════
+    // ─────────────────────────────────────────
     // Helper Functions
-    // ═══════════════════════════════════════════════════════════════════════
+    // ─────────────────────────────────────────
 
     function isAuthenticated() {
       return request.auth != null;
@@ -27,160 +27,150 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == uid;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // app_config: read for all, write for admin only
-    // ═══════════════════════════════════════════════════════════════════════
+    // ─────────────────────────────────────────
+    // app_config
+    // ─────────────────────────────────────────
 
     match /app_config/{docId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // news_ticker_items: public read if isActive, moderator full access
-    // ═══════════════════════════════════════════════════════════════════════
+    // ─────────────────────────────────────────
+    // Public Content
+    // ─────────────────────────────────────────
+
+    function isActiveOrMissing() {
+      return resource.data.isActive == true
+          || !(resource.data.keys().hasAny(['isActive']));
+    }
 
     match /news_ticker_items/{docId} {
-      allow read: if isModerator()
-                  || resource.data.isActive == true
-                  || !(resource.data.keys().hasAny(['isActive']));
+      allow read: if isModerator() || isActiveOrMissing();
       allow write: if isModerator();
     }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // pro_insight: public read if isActive, moderator full access
-    // ═══════════════════════════════════════════════════════════════════════
 
     match /pro_insight/{docId} {
-      allow read: if isModerator()
-                  || resource.data.isActive == true
-                  || !(resource.data.keys().hasAny(['isActive']));
+      allow read: if isModerator() || isActiveOrMissing();
       allow write: if isModerator();
     }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // know_your_client: public read if isActive, moderator full access
-    // ═══════════════════════════════════════════════════════════════════════
 
     match /know_your_client/{docId} {
-      allow read: if isModerator()
-                  || resource.data.isActive == true
-                  || !(resource.data.keys().hasAny(['isActive']));
+      allow read: if isModerator() || isActiveOrMissing();
       allow write: if isModerator();
     }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // quizzes: public read if isActive, moderator full access
-    // ═══════════════════════════════════════════════════════════════════════
 
     match /quizzes/{docId} {
-      allow read: if isModerator() || resource.data.isActive == true;
+      allow read: if isModerator() || isActiveOrMissing();
       allow write: if isModerator();
     }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // home_pro_card: public read, moderator write
-    // ═══════════════════════════════════════════════════════════════════════
 
     match /home_pro_card/{docId} {
       allow read: if true;
       allow write: if isModerator();
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // users/{uid}: owner reads/updates self (limited fields), admin full
-    // ═══════════════════════════════════════════════════════════════════════
+    // ─────────────────────────────────────────
+    // users/{uid}
+    // ─────────────────────────────────────────
 
     match /users/{uid} {
-      // Read: owner can read self, admin can read anyone
+
       allow read: if isOwner(uid) || isAdmin();
 
-      // Create: only owner at signup, must set role='user' and isBlocked=false
       allow create: if isOwner(uid)
                     && request.resource.data.role == 'user'
                     && request.resource.data.isBlocked == false;
 
-      // Update: owner can update only allowed fields, admin can update anything
       allow update: if isAdmin()
-                    || (isOwner(uid) && onlyAllowedUserFields());
+                    || (isOwner(uid) && onlyAllowedUserFields())
+                    || (isOwner(uid) && canUpdatePointsSafely());
 
-      // Delete: admin only
       allow delete: if isAdmin();
     }
 
-    // Helper: user can only update name and avatarId (strictly)
     function onlyAllowedUserFields() {
-      let allowedFields = ['name', 'avatarId'];
-      let changedFields = request.resource.data.diff(resource.data).affectedKeys();
-      return changedFields.hasOnly(allowedFields);
+      let allowed = ['name', 'avatarId'];
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      return changed.hasOnly(allowed);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // support_tickets/{ticketId}: owner or moderator
-    // ═══════════════════════════════════════════════════════════════════════
+    // ✅ الدالة اللي كانت ناقصة (سبب الخطأ)
+    function canUpdatePointsSafely() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+
+      let allowed = [
+        'points',
+        'starsPoints',
+        'proPoints',
+        'lastQuizDate',
+        'updatedAt',
+        'dailyStarsRounds',
+        'dailyProsRounds'
+      ];
+
+      // لازم يكون تحديث كويز
+      let hasQuizMarker = request.resource.data.lastQuizDate != null;
+
+      // ما يغيرش غير حقول النقاط
+      let onlyPoints = changed.hasOnly(allowed);
+
+      // زيادة فقط (مش تقليل)
+      let safePoints =
+        (!('points' in changed) || request.resource.data.points >= resource.data.points)
+        && (!('starsPoints' in changed) || request.resource.data.starsPoints >= resource.data.starsPoints)
+        && (!('proPoints' in changed) || request.resource.data.proPoints >= resource.data.proPoints);
+
+      // ممنوع يغير الاسم أو الأفاتار مع النقاط
+      let noProfileChange =
+        !('name' in changed) && !('avatarId' in changed);
+
+      return hasQuizMarker && onlyPoints && safePoints && noProfileChange;
+    }
+
+    // ─────────────────────────────────────────
+    // support_tickets
+    // ─────────────────────────────────────────
 
     match /support_tickets/{ticketId} {
-      // Read: ticket owner or moderator
+
       allow read: if isModerator()
                   || (isAuthenticated() && resource.data.userId == request.auth.uid);
 
-      // Create: authenticated user, must be their own ticket
       allow create: if isAuthenticated()
                     && request.resource.data.userId == request.auth.uid;
 
-      // Update: moderator only (assign/status changes)
-      allow update: if isModerator();
-
-      // Delete: moderator only
-      allow delete: if isModerator();
-
-      // ─────────────────────────────────────────────────────────────────────
-      // messages subcollection
-      // ─────────────────────────────────────────────────────────────────────
+      allow update, delete: if isModerator();
 
       match /messages/{messageId} {
-        // Read: ticket owner or moderator
         allow read: if isModerator()
                     || (isAuthenticated() && isTicketOwner(ticketId));
 
-        // Create: ticket owner or moderator
         allow create: if isModerator()
                       || (isAuthenticated() && isTicketOwner(ticketId));
 
-        // Update/Delete: moderator only
         allow update, delete: if isModerator();
       }
     }
 
-    // Helper: check if current user owns the parent ticket
     function isTicketOwner(ticketId) {
-      return get(/databases/$(database)/documents/support_tickets/$(ticketId)).data.userId == request.auth.uid;
+      return get(/databases/$(database)/documents/support_tickets/$(ticketId)).data.userId
+             == request.auth.uid;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // support_chats (legacy): moderator only
-    // ═══════════════════════════════════════════════════════════════════════
-
+    // legacy
     match /support_chats/{docId} {
       allow read, write: if isModerator();
     }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // leaderboards: public read, moderator write
-    // ═══════════════════════════════════════════════════════════════════════
 
     match /leaderboards/{league}/entries/{uid} {
       allow read: if true;
       allow write: if isModerator();
     }
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // Default Deny: everything else is blocked
-    // ═══════════════════════════════════════════════════════════════════════
-
+    // Default deny
     match /{document=**} {
       allow read, write: if false;
     }
-
   }
 }
