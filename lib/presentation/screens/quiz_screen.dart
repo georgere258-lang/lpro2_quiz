@@ -1065,6 +1065,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                     Builder(builder: (context) {
                       final canStart = !_isLoading &&
                           _candidatePool.length >= _questionsPerRound;
+                      final buttonLabel = _isLoading
+                          ? "جاري التحميل..."
+                          : (!canStart
+                              ? "لا توجد أسئلة كافية"
+                              : _enterButtonText);
                       return Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -1088,7 +1093,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                   }
                                 : null,
                             child: Text(
-                              canStart ? _enterButtonText : "لا توجد أسئلة كافية",
+                              buttonLabel,
                               style: GoogleFonts.cairo(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w900,
