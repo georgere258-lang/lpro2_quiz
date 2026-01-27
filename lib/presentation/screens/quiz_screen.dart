@@ -14,6 +14,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'dart:ui';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -116,6 +117,16 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   /// Per-question duplicate submission guard (docIds already submitted this run)
   final Set<String> _submittedQuestionIds = {};
 
+  /// No duplicate question IDs within same round
+  final Set<String> _seenQuestionIdsThisRound = {};
+
+  /// Shuffled options + correct index for current question (display + verification)
+  List<String> _displayOptions = [];
+  int _displayCorrectIndex = 0;
+
+  /// PHASE 0 instrumentation: timing from mount to Intro visible
+  final Stopwatch _introTiming = Stopwatch();
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Diagnostic State (for debugging category/query issues)
   // ═══════════════════════════════════════════════════════════════════════════
@@ -150,6 +161,12 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _introTiming.start();
+    debugPrint('INTRO_TIMING: initState start 0ms');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      debugPrint('INTRO_TIMING: after first frame ${_introTiming.elapsedMilliseconds}ms');
+    });
     _glowController =
         AnimationController(vsync: this, duration: const Duration(seconds: 9))
           ..repeat(reverse: true);
@@ -173,8 +190,13 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   Future<void> _initQuizEngine() async {
     await _loadRecentlySeen();
     await _loadCandidatePool();
+    debugPrint('INTRO_TIMING: after candidate pool ${_introTiming.elapsedMilliseconds}ms');
     await _loadUserDailyProgress();
-    if (mounted) setState(() => _isLoading = false);
+    debugPrint('INTRO_TIMING: user progress loaded ${_introTiming.elapsedMilliseconds}ms');
+    if (mounted) {
+      debugPrint('INTRO_TIMING: loading done, setState ${_introTiming.elapsedMilliseconds}ms');
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _loadRecentlySeen() async {
@@ -210,10 +232,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _loadCandidatePool() async {
+    debugPrint('INTRO_TIMING: _loadCandidatePool start ${_introTiming.elapsedMilliseconds}ms');
     _normalizedCategory = _normalizeArabic(widget.categoryTitle);
     _queryError = '';
     _queryStrategy = '';
-    
+
     debugPrint('═══════════════════════════════════════════════════════════════');
     debugPrint('QUIZ LOAD DIAGNOSTIC');
     debugPrint('═══════════════════════════════════════════════════════════════');
@@ -224,6 +247,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     // Query 1: category == raw + isActive == true + orderBy createdAt
     // ─────────────────────────────────────────────────────────────────────────
     try {
+      debugPrint('INTRO_TIMING: first Firestore request start ${_introTiming.elapsedMilliseconds}ms');
       final snap1 = await FirebaseFirestore.instance
           .collection('quizzes')
           .where('category', isEqualTo: widget.categoryTitle)
@@ -231,6 +255,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           .orderBy('createdAt', descending: true)
           .limit(kPoolLimit)
           .get();
+      debugPrint('INTRO_TIMING: first Firestore snapshot received ${_introTiming.elapsedMilliseconds}ms (Q1 docs: ${snap1.docs.length})');
       _queryCount1 = snap1.docs.length;
       debugPrint('Query1 (category+isActive+orderBy): $_queryCount1 docs');
       
@@ -238,6 +263,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         _queryStrategy = 'Q1: category+isActive+orderBy';
         _candidatePool = _parseQuestionDocs(snap1.docs);
         debugPrint('SUCCESS via Query1');
+        debugPrint('INTRO_TIMING: _loadCandidatePool end ${_introTiming.elapsedMilliseconds}ms');
         return;
       }
     } catch (e) {
@@ -261,9 +287,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       if (_queryCount2 > 0) {
         _queryStrategy = 'Q2: category+isActive (no orderBy)';
         _candidatePool = _parseQuestionDocs(snap2.docs);
-        // Sort locally by createdAt
         _candidatePool.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
         debugPrint('SUCCESS via Query2');
+        debugPrint('INTRO_TIMING: _loadCandidatePool end ${_introTiming.elapsedMilliseconds}ms');
         return;
       }
     } catch (e) {
@@ -308,6 +334,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           _candidatePool = _parseQuestionDocs(filtered);
           _candidatePool.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
           debugPrint('SUCCESS via Query3 client-filter');
+          debugPrint('INTRO_TIMING: _loadCandidatePool end ${_introTiming.elapsedMilliseconds}ms');
           return;
         }
       }
@@ -345,6 +372,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           _candidatePool = _parseQuestionDocs(filtered);
           _candidatePool.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
           debugPrint('SUCCESS via Query4 client-filter');
+          debugPrint('INTRO_TIMING: _loadCandidatePool end ${_introTiming.elapsedMilliseconds}ms');
           return;
         }
       }
@@ -357,6 +385,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     debugPrint('Strategy: $_queryStrategy | Errors: $_queryError');
     _queryStrategy = 'NONE';
     _candidatePool = [];
+    debugPrint('INTRO_TIMING: _loadCandidatePool end ${_introTiming.elapsedMilliseconds}ms');
   }
 
   /// Parse Firestore docs into _QuizQuestion objects
@@ -395,12 +424,15 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   /// Select questions for a new round using the sampling strategy
   void _selectQuestionsForRound() {
     _runQuestions.clear();
-    
+    _seenQuestionIdsThisRound.clear();
+
     final recentlySeenSet = _recentlySeenList.toSet();
-    
-    // Get available candidates (not used this run)
+
+    // Get available candidates (not used this run, not seen this round)
     List<_QuizQuestion> available = _candidatePool
-        .where((q) => !_usedThisRun.contains(q.docId))
+        .where((q) =>
+            !_usedThisRun.contains(q.docId) &&
+            !_seenQuestionIdsThisRound.contains(q.docId))
         .toList();
 
     // Filter out recently seen (best effort variety)
@@ -408,29 +440,26 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         .where((q) => !recentlySeenSet.contains(q.docId))
         .toList();
 
-    // If not enough fresh questions, relax filter
     if (fresh.length < _questionsPerRound) {
-      fresh = available; // Allow recently seen but still block usedThisRun
+      fresh = available;
     }
-
-    // If still not enough (edge case), use all available
     if (fresh.isEmpty) {
-      fresh = _candidatePool.toList();
+      fresh = _candidatePool
+          .where((q) => !_seenQuestionIdsThisRound.contains(q.docId))
+          .toList();
     }
 
-    // Apply difficulty progression bias
     final selected = _selectWithDifficultyBias(fresh, _questionsPerRound);
 
     for (final q in selected) {
       _runQuestions.add(q);
       _usedThisRun.add(q.docId);
-      // Add to recently seen (append for FIFO order)
+      _seenQuestionIdsThisRound.add(q.docId);
       if (!_recentlySeenList.contains(q.docId)) {
         _recentlySeenList.add(q.docId);
       }
     }
 
-    // Persist recently seen (with FIFO trimming)
     _saveRecentlySeen();
   }
 
@@ -536,14 +565,37 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     }
   }
 
+  /// Shuffle options for current question and set _displayOptions + _displayCorrectIndex
+  void _shuffleAndSetDisplayForQuestion(_QuizQuestion q) {
+    final opts = q.options;
+    if (opts.isEmpty) {
+      _displayOptions = [];
+      _displayCorrectIndex = 0;
+      return;
+    }
+    final idx = q.correctAnswer.clamp(0, opts.length - 1);
+    final pairs = List<MapEntry<String, bool>>.generate(
+      opts.length,
+      (i) => MapEntry<String, bool>(opts[i], i == idx),
+    );
+    pairs.shuffle(Random());
+    _displayOptions = pairs.map((e) => e.key).toList();
+    final found = pairs.indexWhere((e) => e.value);
+    _displayCorrectIndex = found >= 0 ? found : 0;
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // User Progress & Daily Tracking
   // ═══════════════════════════════════════════════════════════════════════════
 
   Future<void> _loadUserDailyProgress() async {
+    debugPrint('INTRO_TIMING: _loadUserDailyProgress start ${_introTiming.elapsedMilliseconds}ms');
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
+      if (user == null) {
+        debugPrint('INTRO_TIMING: _loadUserDailyProgress end (no user) ${_introTiming.elapsedMilliseconds}ms');
+        return;
+      }
 
       final doc = await FirebaseFirestore.instance
           .collection('users')
@@ -598,6 +650,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     } catch (e) {
       debugPrint("Error loading progress: $e");
     }
+    debugPrint('INTRO_TIMING: _loadUserDailyProgress end ${_introTiming.elapsedMilliseconds}ms');
   }
 
   void _startTimer() {
@@ -614,18 +667,14 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   void _startRound({required bool freePlay}) {
-    // Hard guard: cannot start unless enough questions available
     if (_candidatePool.length < _questionsPerRound) return;
-    
-    // Reset stage and streak for new round
+
     _stage = 0;
     _streak = 0;
-    
-    // Select questions for this round
     _selectQuestionsForRound();
-    
     if (_runQuestions.isEmpty) return;
-    
+
+    _shuffleAndSetDisplayForQuestion(_runQuestions[0]);
     setState(() {
       _isFreePlaySession = freePlay;
       _gameStarted = true;
@@ -642,14 +691,13 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   void _handleAnswer(String answer) {
     if (_showFeedback) return;
     _timer?.cancel();
-    
+
     if (_currentQuestionIndex >= _runQuestions.length) return;
-    
-    final q = _runQuestions[_currentQuestionIndex];
-    final correct = q.options.isNotEmpty && q.correctAnswer < q.options.length
-        ? q.options[q.correctAnswer]
+
+    final correct = _displayOptions.isNotEmpty &&
+            _displayCorrectIndex < _displayOptions.length
+        ? _displayOptions[_displayCorrectIndex]
         : '';
-    
     final isCorrect = answer == correct && answer.isNotEmpty;
     
     // Update difficulty progression
@@ -678,11 +726,15 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   void _nextQuestion() {
+    final nextIndex = _currentQuestionIndex + 1;
+    if (nextIndex < _runQuestions.length) {
+      _shuffleAndSetDisplayForQuestion(_runQuestions[nextIndex]);
+    }
     setState(() {
       _showFeedback = false;
       _selectedOption = null;
       _questionIndexInRound++;
-      _currentQuestionIndex++;
+      _currentQuestionIndex = nextIndex;
     });
     _startTimer();
   }
@@ -793,20 +845,23 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    // PHASE B: Show Intro immediately; load data in background. Start button disabled until ready.
+    if (!_gameStarted) {
+      final buildSw = Stopwatch()..start();
+      final intro = _buildIntro();
+      buildSw.stop();
+      debugPrint('INTRO_TIMING: build Intro ${buildSw.elapsedMilliseconds}ms');
+      return intro;
     }
-    // Always show intro first (even if pool is empty - intro will show diagnostic)
-    if (!_gameStarted) return _buildIntro();
 
     if (_currentQuestionIndex >= _runQuestions.length) {
       return _buildEmptyState();
     }
 
     final q = _runQuestions[_currentQuestionIndex];
-    final options = q.options;
-    final correct = options.isNotEmpty && q.correctAnswer < options.length
-        ? options[q.correctAnswer]
+    final options = _displayOptions;
+    final correct = options.isNotEmpty && _displayCorrectIndex < options.length
+        ? options[_displayCorrectIndex]
         : '';
 
     return Scaffold(
@@ -924,6 +979,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildIntro() {
+    debugPrint('INTRO_TIMING: _buildIntro (contains Image.asset top_brand)');
     return Scaffold(
       backgroundColor: const Color(0xFFFDFBF7),
       appBar: AppBar(
@@ -1005,9 +1061,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                           _isCurrentLeagueLocked ? Colors.green : primaryColor))
                             ])),
                     const SizedBox(height: 16),
-                    // CTA button (compact pill, disabled if not enough questions)
+                    // CTA button (disabled until loaded + enough questions)
                     Builder(builder: (context) {
-                      final canStart = _candidatePool.length >= _questionsPerRound;
+                      final canStart = !_isLoading &&
+                          _candidatePool.length >= _questionsPerRound;
                       return Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
