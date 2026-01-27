@@ -766,9 +766,22 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     try {
+      // Update users collection
       await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
         'dailyFreePlayRounds': FieldValue.increment(1),
         'lastQuizDate': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // Update user_stats collection (Free Play)
+      final wrongAnswers = (_questionsPerRound - _correctAnswersCount).clamp(0, _questionsPerRound);
+      await FirebaseFirestore.instance.collection('user_stats').doc(user.uid).set({
+        'updatedAt': FieldValue.serverTimestamp(),
+        'freeplay': {
+          'roundsPlayed': FieldValue.increment(1),
+          'totalQuestions': FieldValue.increment(_questionsPerRound),
+          'correctAnswers': FieldValue.increment(_correctAnswersCount),
+          'wrongAnswers': FieldValue.increment(wrongAnswers),
+        },
       }, SetOptions(merge: true));
     } catch (e) {
       debugPrint("Error incrementing free play: $e");
@@ -799,6 +812,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
     try {
       final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+      final statsRef = FirebaseFirestore.instance.collection('user_stats').doc(user.uid);
+      final leagueKey = _isStars ? 'stars' : 'pros';
+      final wrongAnswers = (_questionsPerRound - _correctAnswersCount).clamp(0, _questionsPerRound);
 
       // Use transaction for atomic update
       await FirebaseFirestore.instance.runTransaction((transaction) async {
@@ -824,16 +840,44 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         }
 
         transaction.set(userRef, updates, SetOptions(merge: true));
+
+        // Update user_stats collection (Stars/Pros)
+        transaction.set(statsRef, {
+          'updatedAt': FieldValue.serverTimestamp(),
+          leagueKey: {
+            'roundsPlayed': FieldValue.increment(1),
+            'totalQuestions': FieldValue.increment(_questionsPerRound),
+            'correctAnswers': FieldValue.increment(_correctAnswersCount),
+            'wrongAnswers': FieldValue.increment(wrongAnswers),
+            'totalPoints': FieldValue.increment(_roundScore),
+          },
+        }, SetOptions(merge: true));
       });
     } catch (e) {
       debugPrint("Error submitting result: $e");
       // Fallback to non-transactional update
       try {
+        final leagueKey = _isStars ? 'stars' : 'pros';
+        final wrongAnswers = (_questionsPerRound - _correctAnswersCount).clamp(0, _questionsPerRound);
+
+        // Update users collection
         await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
           'points': FieldValue.increment(_roundScore),
           _isStars ? 'starsPoints' : 'proPoints': FieldValue.increment(_roundScore),
           _isStars ? 'dailyStarsRounds' : 'dailyProsRounds': FieldValue.increment(1),
           'lastQuizDate': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        // Update user_stats collection (fallback)
+        await FirebaseFirestore.instance.collection('user_stats').doc(user.uid).set({
+          'updatedAt': FieldValue.serverTimestamp(),
+          leagueKey: {
+            'roundsPlayed': FieldValue.increment(1),
+            'totalQuestions': FieldValue.increment(_questionsPerRound),
+            'correctAnswers': FieldValue.increment(_correctAnswersCount),
+            'wrongAnswers': FieldValue.increment(wrongAnswers),
+            'totalPoints': FieldValue.increment(_roundScore),
+          },
         }, SetOptions(merge: true));
       } catch (_) {}
     }
