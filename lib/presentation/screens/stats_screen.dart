@@ -6,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/firestore_paths.dart';
 import '../widgets/lpro_bottom_nav_bar.dart';
 import 'main_wrapper.dart';
 
@@ -174,7 +173,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
       child: StreamBuilder<DocumentSnapshot>(
         stream: user != null
             ? FirebaseFirestore.instance
-                .collection(FirestorePaths.userStats)
+                .collection('user_stats')
                 .doc(user.uid)
                 .snapshots()
             : null,
