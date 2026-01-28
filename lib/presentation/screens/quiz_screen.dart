@@ -5,7 +5,6 @@
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 import 'dart:ui';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -301,14 +300,15 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             'dailyProsRounds': 0,
             'dailyFreePlayRounds': 0,
           });
-          if (mounted)
+          if (mounted) {
             setState(() {
               _starsRoundsToday = 0;
               _prosRoundsToday = 0;
               _freePlayRoundsToday = 0;
             });
+          }
         } else {
-          if (mounted)
+          if (mounted) {
             setState(() {
               _starsRoundsToday = (data['dailyStarsRounds'] as int? ?? 0)
                   .clamp(0, _roundsPerDay);
@@ -316,6 +316,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                   .clamp(0, _roundsPerDay);
               _freePlayRoundsToday = (data['dailyFreePlayRounds'] as int? ?? 0);
             });
+          }
         }
       }
     } catch (_) {}
@@ -442,8 +443,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     if (!_gameStarted) return _buildIntro();
-    if (_currentQuestionIndex >= _runQuestions.length)
+    if (_currentQuestionIndex >= _runQuestions.length) {
       return _buildEmptyState();
+    }
 
     final q = _runQuestions[_currentQuestionIndex];
     final options = _displayOptions;
