@@ -1,6 +1,6 @@
 // PATH: lib/presentation/screens/know_client_section_topics_screen.dart
 // PURPOSE: Show topics belonging to a specific section of "اعرف عميلك"
-// NAVIGATION: KnowClientSectionsScreen → KnowClientSectionTopicsScreen → KnowClientArticlesScreen
+// ✅ UPDATED: Section-based filtering using stable sectionKey with Tag Fallback
 
 import 'dart:async';
 
@@ -31,7 +31,6 @@ class _KnowClientSectionTopicsScreenState
     extends State<KnowClientSectionTopicsScreen> {
   static const String _collectionName = 'know_your_client';
 
-  // ✅ Admin determined by users/{uid}.role == 'admin'
   bool _isAdmin = false;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _roleSubscription;
 
@@ -117,14 +116,20 @@ class _KnowClientSectionTopicsScreenState
             final docs = snap.data!.docs;
             final nowMs = DateTime.now().millisecondsSinceEpoch;
 
-            // Filter topics by section (using tags) + visibility rules
-            final topics = docs
-                .map((d) => _TopicItem.fromDoc(d.id, d.data()))
-                .where((e) {
-              if (e.title.trim().isEmpty) return false;
-              if (!e.tags.contains(widget.sectionName)) return false;
+            // ✅ Logic Fix: Determine the target sectionKey for filtering
+            final targetKey =
+                _KycTopicItem.inferSectionKeyFromTag(widget.sectionName);
 
-              // Scheduled visibility rule
+            final topics =
+                docs.map((d) => _TopicItem.fromDoc(d.id, d.data())).where((e) {
+              if (e.title.trim().isEmpty) return false;
+
+              // ✅ Filter: Checks sectionKey (new) OR fallback to tags (old)
+              bool isInSection = (e.sectionKey == targetKey) ||
+                  (e.tags.contains(widget.sectionName));
+
+              if (!isInSection) return false;
+
               final isScheduledFuture =
                   (e.publishAtMs > 0 && e.publishAtMs > nowMs);
 
@@ -133,7 +138,6 @@ class _KnowClientSectionTopicsScreenState
               return true;
             }).toList();
 
-            // Sort by createdAt descending (newest first)
             topics.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
 
             if (topics.isEmpty) {
@@ -265,7 +269,8 @@ class _TopicCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.secondaryOrange.withValues(alpha: 0.12),
+                        color:
+                            AppColors.secondaryOrange.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color:
@@ -298,6 +303,7 @@ class _TopicItem {
   final int createdAtMs;
   final int publishAtMs;
   final List<String> tags;
+  final String sectionKey; // ✅ Added
 
   _TopicItem({
     required this.id,
@@ -305,6 +311,7 @@ class _TopicItem {
     required this.createdAtMs,
     required this.publishAtMs,
     required this.tags,
+    required this.sectionKey, // ✅ Added
   });
 
   factory _TopicItem.fromDoc(String id, Map<String, dynamic> data) {
@@ -325,12 +332,43 @@ class _TopicItem {
     final pub = data['publishAt'];
     if (pub is Timestamp) publishAtMs = pub.millisecondsSinceEpoch;
 
+    // ✅ Extraction with Fallback
+    String sectionKey = (data['sectionKey'] ?? '').toString().trim();
+    if (sectionKey.isEmpty && tags.isNotEmpty) {
+      sectionKey = _KycTopicItem.inferSectionKeyFromTag(tags.first);
+    }
+
     return _TopicItem(
       id: id,
       title: (data['title'] ?? '').toString(),
       createdAtMs: createdAtMs,
       publishAtMs: publishAtMs,
       tags: tags,
+      sectionKey: sectionKey,
     );
+  }
+}
+
+// ✅ Internal mapping helper (matches know_client_screen logic)
+class _KycTopicItem {
+  static String inferSectionKeyFromTag(String tag) {
+    switch (tag) {
+      case "أساسيات العميل":
+        return "client_basics";
+      case "أنماط الشخصيات":
+        return "personality_types";
+      case "الدوافع والاحتياجات":
+        return "motives_needs";
+      case "الاعتراضات والردود":
+        return "objections_responses";
+      case "التفاوض":
+        return "negotiation";
+      case "إغلاق الصفقة":
+        return "closing";
+      case "متابعة وما بعد البيع":
+        return "after_sale";
+      default:
+        return "";
+    }
   }
 }

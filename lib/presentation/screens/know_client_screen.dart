@@ -1,6 +1,6 @@
 // PATH: lib/presentation/screens/know_client_screen.dart
-// STATUS: Landing Page Gateway + Favorites BottomSheet (aligned with Fact architecture)
-// ORDER: Intro → Sections → Last Seen → Favorites → Recent → Featured
+// STATUS: Landing Page Gateway + Favorites BottomSheet
+// ✅ UPDATED: Unified sectionKey logic with Tag Fallback
 
 import 'dart:async';
 
@@ -28,14 +28,12 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
   static const String _prefsFavKey = 'kyc_fav_titles';
   static const String _prefsLastSeenKey = 'kyc_last_seen_title';
 
-  // ✅ Recent window
   static const int _recentDaysWindow = 7;
 
   String _lastSeenTitle = '';
   String _lastSeenDocId = '';
   Set<String> _favoriteTitles = {};
 
-  // ✅ Admin determined by users/{uid}.role == 'admin'
   bool _isAdmin = false;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _roleSubscription;
 
@@ -142,9 +140,7 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
     );
   }
 
-  // ✅ Favorites BottomSheet
   Future<void> _openFavoritesSheet() async {
-    // Fetch all items to get docIds for favorite titles
     final allItems = await _fetchOnceItems();
 
     if (!mounted) return;
@@ -170,7 +166,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Handle
                       Center(
                         child: Container(
                           width: 42,
@@ -182,8 +177,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
-
-                      // Title
                       Row(
                         children: [
                           const Icon(Icons.bookmark_rounded,
@@ -209,8 +202,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-
-                      // Content
                       if (favList.isEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 32),
@@ -226,16 +217,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                                   fontWeight: FontWeight.w700,
                                   fontSize: 13,
                                   color: Colors.grey[600],
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                "أضف مواضيع للمفضلة من داخل أي موضوع.",
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.cairo(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 11.5,
-                                  color: Colors.grey[500],
                                 ),
                               ),
                             ],
@@ -254,7 +235,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                                 const SizedBox(height: 10),
                             itemBuilder: (context, index) {
                               final title = favList[index];
-                              // Find docId for this title
                               final item = allItems.firstWhere(
                                 (e) => e.title.trim() == title.trim(),
                                 orElse: () => _KycTopicItem(
@@ -264,6 +244,7 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                                   publishAtMs: 0,
                                   tags: [],
                                   isActive: true,
+                                  sectionKey: '',
                                   isFeatured: false,
                                   featuredOrder: 0,
                                   featuredUntil: null,
@@ -332,8 +313,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
         );
       },
     );
-
-    // Refresh state after sheet closes
     await _loadLocalState();
   }
 
@@ -404,17 +383,13 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
 
           final isScheduledFuture =
               (e.publishAtMs > 0 && e.publishAtMs > nowMs);
-
-          // Admin can see scheduled, users cannot
           if (!_isAdmin && isScheduledFuture) return false;
 
           return true;
         }).toList();
 
-        // ✅ Base ordering for normal list
         allItems.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
 
-        // ✅ Featured (ترشيحات L Pro)
         final now = DateTime.now();
         final featured = allItems
             .where((e) => e.isFeatured == true && e.isFeaturedValid(now))
@@ -425,7 +400,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
           return b.createdAtMs.compareTo(a.createdAtMs);
         });
 
-        // ✅ Recent (جديد L Pro)
         final recentCutoff =
             now.subtract(const Duration(days: _recentDaysWindow));
         final recent = allItems
@@ -442,12 +416,8 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1️⃣ Intro Card (compact)
               _introCard(),
-
               const SizedBox(height: 14),
-
-              // 2️⃣ Sections Button (Full width + prominent)
               _fullWidthButton(
                 icon: Icons.category_outlined,
                 label: 'كل الأقسام',
@@ -461,16 +431,11 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                   );
                 },
               ),
-
               const SizedBox(height: 10),
-
-              // 3️⃣ تابع من حيث توقفت (compact - same height as buttons)
               if (_lastSeenTitle.trim().isNotEmpty) ...[
                 _lastSeenButton(),
                 const SizedBox(height: 10),
               ],
-
-              // 4️⃣ Favorites Button (Working!)
               _fullWidthButton(
                 icon: Icons.bookmark_rounded,
                 label: 'المفضلة',
@@ -479,10 +444,7 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                     : null,
                 onTap: _openFavoritesSheet,
               ),
-
               const SizedBox(height: 16),
-
-              // 5️⃣ جديد Pro (last 5)
               if (recent.isNotEmpty) ...[
                 _topicsCard(
                   title: 'جديد L Pro',
@@ -491,8 +453,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                 ),
                 const SizedBox(height: 12),
               ],
-
-              // 6️⃣ ترشيحات Pro (last 5)
               if (featured.isNotEmpty) ...[
                 _topicsCard(
                   title: 'ترشيحات L Pro',
@@ -507,7 +467,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
     );
   }
 
-  // ✅ Compact Intro Card
   Widget _introCard() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -643,7 +602,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
     );
   }
 
-  // ✅ Compact "تابع" button - same height as other buttons
   Widget _lastSeenButton() {
     return InkWell(
       borderRadius: BorderRadius.circular(14),
@@ -889,8 +847,8 @@ class _KycTopicItem {
   final int publishAtMs;
   final List<String> tags;
   final bool isActive;
+  final String sectionKey; // ✅ Standardized Partition Key
 
-  // ✅ Featured controls
   final bool isFeatured;
   final int featuredOrder;
   final DateTime? featuredUntil;
@@ -902,6 +860,7 @@ class _KycTopicItem {
     required this.publishAtMs,
     required this.tags,
     required this.isActive,
+    required this.sectionKey, // ✅ Added
     required this.isFeatured,
     required this.featuredOrder,
     required this.featuredUntil,
@@ -921,6 +880,12 @@ class _KycTopicItem {
         final s = t.toString().trim();
         if (s.isNotEmpty) tags.add(s);
       }
+    }
+
+    // ✅ Logic: Unified sectionKey with Tag Fallback (Backward Compatibility)
+    String sectionKey = (data['sectionKey'] ?? '').toString().trim();
+    if (sectionKey.isEmpty && tags.isNotEmpty) {
+      sectionKey = _inferSectionKeyFromTag(tags.first);
     }
 
     int createdAtMs = 0;
@@ -948,9 +913,32 @@ class _KycTopicItem {
       publishAtMs: publishAtMs,
       tags: tags,
       isActive: data['isActive'] == true,
+      sectionKey: sectionKey, // ✅ Final Standardized Key
       isFeatured: isFeatured,
       featuredOrder: featuredOrder,
       featuredUntil: featuredUntil,
     );
+  }
+
+  // ✅ Local Helper for Backward Compatibility
+  static String _inferSectionKeyFromTag(String tag) {
+    switch (tag) {
+      case "أساسيات العميل":
+        return "client_basics";
+      case "أنماط الشخصيات":
+        return "personality_types";
+      case "الدوافع والاحتياجات":
+        return "motives_needs";
+      case "الاعتراضات والردود":
+        return "objections_responses";
+      case "التفاوض":
+        return "negotiation";
+      case "إغلاق الصفقة":
+        return "closing";
+      case "متابعة وما بعد البيع":
+        return "after_sale";
+      default:
+        return "";
+    }
   }
 }
