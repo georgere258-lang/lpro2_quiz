@@ -5,6 +5,7 @@
 //         + ✅ Featured control: isFeatured + featuredOrder + featuredUntil
 //         + ✅ Section control: sectionKey + orderInSection (with dropdown + arrows)
 //         + ✅ FIX: bottom favorite now clickable
+//         + ✅ FINAL FIX: AppBar title forced to Sub-Section Name from Tags/Labels
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -62,7 +63,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
   DateTime? _featuredUntil; // انتهاء التثبيت (اختياري)
   String _sectionKey = ''; // داخل "المعلومة بتفرق"
   int _orderInSection = 0; // ترتيب داخل القسم
-  List<String> _tags = []; // ✅ Tags (used for Move Section)
+  List<String> _tags = []; // ✅ Tags (used for Move Section and Header Title)
 
   // ✅ Known section keys with Arabic labels (legacy sectionKey)
   static const Map<String, String> _sectionLabels = {
@@ -85,6 +86,23 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
     'التعاقدات والإجراءات',
     'دراسة المشاريع',
   ];
+
+  // ✅ Computed Header Title (The Architectural Fix)
+  String get _appBarTitle {
+    // 1. Try mapping from sectionKey first (Modern way)
+    if (_sectionLabels.containsKey(_sectionKey)) {
+      return _sectionLabels[_sectionKey]!;
+    }
+    // 2. Fallback: Search tags for any known Arabic section name (Legacy/Old way)
+    for (final tag in _tags) {
+      final normalized = _normalizeTag(tag);
+      if (_proInsightSections.contains(normalized)) {
+        return normalized;
+      }
+    }
+    // 3. Last resort
+    return 'المعلومة بتفرق';
+  }
 
   // ✅ Tag normalization for pro_insight
   static String _normalizeTag(String tag) {
@@ -136,8 +154,10 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
       final u = FirebaseAuth.instance.currentUser;
       if (u == null) return;
 
-      final snap =
-          await FirebaseFirestore.instance.collection(FirestorePaths.users).doc(u.uid).get();
+      final snap = await FirebaseFirestore.instance
+          .collection(FirestorePaths.users)
+          .doc(u.uid)
+          .get();
       final data = snap.data() ?? {};
       final r = (data['role'] ?? 'user').toString().trim().toLowerCase();
 
@@ -270,11 +290,14 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
         ? orderRaw
         : int.tryParse((orderRaw ?? '0').toString()) ?? 0;
 
-    // ✅ Read tags (for display only, not modified by admin tools)
+    // ✅ Read tags (Essential for Header Fallback)
     List<String> tags = [];
     final tagsRaw = data['tags'];
     if (tagsRaw is List) {
-      tags = tagsRaw.map((e) => e.toString().trim()).where((t) => t.isNotEmpty).toList();
+      tags = tagsRaw
+          .map((e) => e.toString().trim())
+          .where((t) => t.isNotEmpty)
+          .toList();
     }
 
     setState(() {
@@ -803,7 +826,8 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                                   await _proInsightRepo.update(_docId, {
                                     'isFeatured': isFeaturedLocal,
                                     'featuredOrder': featuredOrderLocal,
-                                    'featuredUntil': untilLocal ?? FieldValue.delete(),
+                                    'featuredUntil':
+                                        untilLocal ?? FieldValue.delete(),
                                     'sectionKey': sectionKeyLocal.trim(),
                                     'orderInSection': orderInSectionLocal,
                                     'updatedAt': FieldValue.serverTimestamp(),
@@ -941,8 +965,8 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                                   ),
                                 ))
                             .toList(),
-                        onChanged: (v) =>
-                            setLocal(() => selectedSection = v ?? selectedSection),
+                        onChanged: (v) => setLocal(
+                            () => selectedSection = v ?? selectedSection),
                         decoration: InputDecoration(
                           labelText: "القسم الجديد",
                           labelStyle: GoogleFonts.cairo(
@@ -975,17 +999,14 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                               final nav = Navigator.of(context);
                               try {
                                 // Build nextTags:
-                                // 1) Start from existing tags, trim, remove empties
-                                // 2) Remove any existing pro_insight section tags
-                                // 3) Add selected section tag
-                                // 4) Ensure unique
                                 final existingTags = _tags
                                     .map((t) => _normalizeTag(t))
                                     .where((t) => t.isNotEmpty)
                                     .toList();
 
                                 final nonSectionTags = existingTags
-                                    .where((t) => !_proInsightSections.contains(t))
+                                    .where(
+                                        (t) => !_proInsightSections.contains(t))
                                     .toList();
 
                                 final nextTags = <String>{
@@ -1354,13 +1375,14 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
         backgroundColor: AppColors.primaryDeepTeal,
         foregroundColor: Colors.white,
         centerTitle: true,
+        // ✅ DYNAMIC SUB-SECTION TITLE FIX
         title: SizedBox(
           height: 28,
           child: FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.center,
             child: Text(
-              _rawTitle,
+              _appBarTitle, // Using computed dynamic property
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.cairo(fontWeight: FontWeight.w900),
@@ -1408,68 +1430,57 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                       children: [
                         _infoBox(_hook.isEmpty ? "—" : _hook),
                         const SizedBox(height: 14),
-                        _sectionBox(title: 'تصحيح المفهوم', body: _reset),
-                        const SizedBox(height: 14),
-                        _sectionBox(title: 'المعلومة اللي بتفرق', body: _core),
-                        const SizedBox(height: 14),
-                        _sectionBox(title: 'مثال واقعي', body: _example),
-                        const SizedBox(height: 16),
-                        _lockBox(_lock),
-                        const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            _pillAction(
-                              icon: Icons.share_outlined,
-                              label: "مشاركة",
-                              color: AppColors.secondaryOrange,
-                              onTap: _shareTopic,
-                            ),
-                            const SizedBox(width: 10),
 
-                            // ✅ FIX: make bottom favorite clickable
-                            Expanded(
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(14),
-                                onTap: _toggleFavorite,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(14),
-                                    border: Border.all(
-                                      color: AppColors.primaryDeepTeal
-                                          .withValues(alpha: 0.10),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        _isFavorite
-                                            ? Icons.bookmark_rounded
-                                            : Icons.bookmark_border_rounded,
-                                        size: 18,
-                                        color: AppColors.primaryDeepTeal,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        _isFavorite
-                                            ? "في المفضلة"
-                                            : "أضف للمفضلة",
-                                        style: GoogleFonts.cairo(
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 12.5,
-                                          color: AppColors.primaryDeepTeal,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                        if (_reset.isNotEmpty) ...[
+                          _sectionBox(title: 'تصحيح المفهوم', body: _reset),
+                          const SizedBox(height: 14),
+                        ],
+
+                        if (_core.isNotEmpty) ...[
+                          _sectionBox(
+                              title: 'المعلومة اللي بتفرق', body: _core),
+                          const SizedBox(height: 14),
+                        ],
+
+                        if (_example.isNotEmpty) ...[
+                          _sectionBox(title: 'مثال واقعي', body: _example),
+                          const SizedBox(height: 16),
+                        ],
+
+                        if (_lock.isNotEmpty) ...[
+                          _lockBox(_lock),
+                          const SizedBox(height: 14),
+                        ],
+
+                        // ✅ TRIPLE ACTION ICONS ROW (Matched with Image requirements)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // 1. Share Icon
+                            _actionIconCircle(
+                              icon: Icons.ios_share_rounded,
+                              onTap: _shareTopic,
+                              color: AppColors.secondaryOrange,
+                            ),
+                            const SizedBox(width: 25),
+                            // 2. Favorite Icon (Synced with Header)
+                            _actionIconCircle(
+                              icon: _isFavorite
+                                  ? Icons.bookmark_rounded
+                                  : Icons.bookmark_outline_rounded,
+                              onTap: _toggleFavorite,
+                              color: AppColors.primaryDeepTeal,
+                            ),
+                            const SizedBox(width: 25),
+                            // 3. Grid/Sections Icon
+                            _actionIconCircle(
+                              icon: Icons.grid_view_rounded,
+                              onTap: () => Navigator.pop(context),
+                              color: AppColors.primaryDeepTeal,
                             ),
                           ],
                         ),
+
                         const SizedBox(height: 16),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1482,12 +1493,6 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                                   ? () => _goToTitleRaw(
                                       _nav[_currentIndex - 1].titleRaw)
                                   : null,
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.grid_view_rounded),
-                              color: AppColors.primaryDeepTeal,
-                              iconSize: 26,
-                              onPressed: () => Navigator.pop(context),
                             ),
                             _navCircle(
                               enabled: _hasNext,
@@ -1507,35 +1512,23 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
     );
   }
 
-  Widget _pillAction({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
+  // ✅ UI HELPER: Component for Action Icons (Circular/Transparent style)
+  Widget _actionIconCircle(
+      {required IconData icon,
+      required VoidCallback onTap,
+      required Color color}) {
     return InkWell(
-      borderRadius: BorderRadius.circular(14),
       onTap: onTap,
+      borderRadius: BorderRadius.circular(30),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        width: 54,
+        height: 54,
         decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(14),
+          color: color.withOpacity(0.08),
+          shape: BoxShape.circle,
+          border: Border.all(color: color.withOpacity(0.15)),
         ),
-        child: Row(
-          children: [
-            Icon(icon, size: 18, color: Colors.white),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: GoogleFonts.cairo(
-                fontWeight: FontWeight.w900,
-                fontSize: 12.5,
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
+        child: Icon(icon, color: color, size: 26),
       ),
     );
   }
@@ -1585,11 +1578,11 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
         borderRadius: BorderRadius.circular(18),
         gradient: LinearGradient(
           colors: [
-            AppColors.primaryDeepTeal.withValues(alpha: 0.10),
-            AppColors.secondaryOrange.withValues(alpha: 0.10),
+            AppColors.primaryDeepTeal.withOpacity(0.10),
+            AppColors.secondaryOrange.withOpacity(0.10),
           ],
         ),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+        border: Border.all(color: Colors.black.withOpacity(0.04)),
       ),
       child: Text(
         text,
@@ -1610,10 +1603,10 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.08)),
+        border: Border.all(color: AppColors.primaryDeepTeal.withOpacity(0.08)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 6),
           ),
@@ -1638,7 +1631,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
             style: GoogleFonts.cairo(
               fontSize: 13.5,
               height: 1.9,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w900,
               color: const Color(0xFF2D3142),
             ),
           ),
@@ -1654,11 +1647,11 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
         borderRadius: BorderRadius.circular(18),
         gradient: LinearGradient(
           colors: [
-            AppColors.primaryDeepTeal.withValues(alpha: 0.10),
-            AppColors.secondaryOrange.withValues(alpha: 0.10),
+            AppColors.primaryDeepTeal.withOpacity(0.10),
+            AppColors.secondaryOrange.withOpacity(0.10),
           ],
         ),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.04)),
+        border: Border.all(color: Colors.black.withOpacity(0.04)),
       ),
       child: Text(
         text.isEmpty ? "—" : text,

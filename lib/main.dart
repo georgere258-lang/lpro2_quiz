@@ -20,12 +20,15 @@ import 'package:lpro2_quiz/presentation/screens/main_wrapper.dart';
 import 'package:lpro2_quiz/presentation/screens/about_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/admin/admin_panel.dart';
 import 'package:lpro2_quiz/presentation/screens/know_client_screen.dart';
-
+import 'package:lpro2_quiz/core/utils/seed_know_your_client_v2.dart';
 import 'core/curriculum/unit_repository.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  print('FIREBASE projectId = ${Firebase.app().options.projectId}');
+  print('FIREBASE appId = ${Firebase.app().options.appId}');
+  // لا نحتاج للـ seed هنا لأنه سيعمل في main
 }
 
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
@@ -38,20 +41,25 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
 void main() async {
+  // 1. التهيئة الأساسية
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ✅ التعديل الجذري: إخبار النظام بترك الزوايا السفلية للتطبيق ليلونها
+  // 2. تهيئة فايربيز (استخدام خياراتك الحالية)
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // ✅ 3. استدعاء كود الرفع (سيعمل مرة واحدة فقط بفضل القفل الداخلي)
+  await SeedKnowYourClientV2.run();
+
+  // 4. إعدادات النظام (الزوايا السفلية والبار العلوي)
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    systemNavigationBarColor: Colors.transparent, // جعل شريط النظام شفافاً
+    systemNavigationBarColor: Colors.transparent,
     systemNavigationBarDividerColor: Colors.transparent,
     systemNavigationBarIconBrightness: Brightness.light,
     statusBarColor: Colors.transparent,
   ));
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
+  // 5. تهيئة الخدمات الإضافية
   SoundManager.init();
-
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   const AndroidInitializationSettings initializationSettingsAndroid =
@@ -81,6 +89,7 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
+  // 6. تشغيل التطبيق مع الـ RepositoryProvider الخاص بك
   runApp(
     RepositoryProvider<UnitRepository>(
       create: (_) => LocalUnitRepository(),
