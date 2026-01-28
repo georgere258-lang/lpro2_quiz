@@ -1,9 +1,8 @@
 // PATH: lib/presentation/screens/know_client_articles_screen.dart
-// STATUS: Full Original File – No Shortcuts – Standard Admin Tools
-// ✅ RESTORED: Every single line of the original Admin Logic & Editor
-// ✅ FIXED: Navigation Sorting (Includes all topics by ensuring stable sort)
-// ✅ MODIFIED: AppBar Sub-Section Title + Body Triple Icons
-// ✅ MODIFIED: bottomNavigationBar removed for this screen only
+// STATUS: Full Original File – STRICT FIXES APPLIED
+// ✅ FIX 1: Header shows Sub-Section Name (_sectionDisplayName) NOT Article Title
+// ✅ FIX 2: Navigation Arrows logic fixed to load immediately within the section
+// ✅ RESTORED: All Admin Tools & Logic (Uncut/Uncleaned)
 
 import 'dart:async';
 
@@ -69,7 +68,7 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
   bool get _hasPrev => _navIndex > 0;
   bool get _hasNext => _navIndex >= 0 && _navIndex < _nav.length - 1;
 
-  // ✅ Maps internal key to professional Arabic labels for Header
+  // ✅ هذا هو الجزء المسؤول عن عرض "اسم القسم" في الهيدر
   String get _sectionDisplayName {
     switch (_sectionKey) {
       case 'client_basics':
@@ -129,7 +128,8 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
 
   int _tsToMs(dynamic v) {
     if (v is Timestamp) return v.millisecondsSinceEpoch;
-    return 0;
+    if (v is int) return v;
+    return DateTime.now().millisecondsSinceEpoch;
   }
 
   Future<void> _loadArticleAndNav() async {
@@ -197,6 +197,7 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
       await _markLastSeen(_title, _docId);
       await _loadFavoriteState();
 
+      // ✅ بناء شريط التنقل فوراً بعد تحميل البيانات لضمان ظهور الأسهم
       await _buildSectionNav();
 
       setState(() => _loading = false);
@@ -206,14 +207,17 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
   }
 
   Future<void> _buildSectionNav() async {
-    if (_sectionKey.trim().isEmpty) {
+    // إذا لم يكن هناك قسم محدد، لا يمكن بناء التنقل
+    if (_sectionKey.isEmpty) {
       _nav = [];
       _navIndex = -1;
       return;
     }
 
+    // جلب كل المواضيع المفعلة التي تنتمي لنفس القسم
     final snap = await FirebaseFirestore.instance
         .collection(_collectionName)
+        .where('sectionKey', isEqualTo: _sectionKey)
         .where('isActive', isEqualTo: true)
         .get();
 
@@ -221,9 +225,6 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
 
     for (final d in snap.docs) {
       final m = d.data();
-      final sk = (m['sectionKey'] ?? '').toString().trim();
-      if (sk != _sectionKey) continue;
-
       final t = (m['title'] ?? '').toString().trim();
       if (t.isEmpty) continue;
 
@@ -242,15 +243,19 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
       ));
     }
 
-    // ✅ FIXED LOGIC: Stable sorting ensuring all 4 topics appear regardless of age or null values
+    // الترتيب لضمان تسلسل الأسهم (السابق والتالي)
     list.sort((a, b) {
       final byOrder = a.orderInSection.compareTo(b.orderInSection);
       if (byOrder != 0) return byOrder;
       return a.createdAtMs.compareTo(b.createdAtMs);
     });
 
-    _nav = list;
-    _navIndex = _nav.indexWhere((e) => e.id == _docId);
+    if (mounted) {
+      setState(() {
+        _nav = list;
+        _navIndex = _nav.indexWhere((e) => e.id == _docId);
+      });
+    }
   }
 
   Future<void> _markLastSeen(String title, String docId) async {
@@ -904,7 +909,7 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
         backgroundColor: AppColors.primaryDeepTeal,
         foregroundColor: Colors.white,
         centerTitle: true,
-        // ✅ UI Fix: Shows Sub-Section Name in Header
+        // ✅ هذا هو التصحيح النهائي: عرض اسم القسم الفرعي في الهيدر
         title: Text(_sectionDisplayName,
             style:
                 GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 16)),
@@ -921,7 +926,6 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
           ),
         ],
       ),
-      // ✅ Removed bottomNavigationBar for Deep Reading focus
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -956,7 +960,7 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
 
                   const SizedBox(height: 30),
 
-                  // ✅ Triple Action Icon Row in body (Share, Favorite, Grid)
+                  // ✅ Triple Action Icon Row
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -984,7 +988,7 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
 
                   const SizedBox(height: 35),
 
-                  // ✅ Fixed Section-Bounded Navigation with stable sort fallback
+                  // ✅ الأسهم تعمل وتنقلك داخل نفس القسم (Section) فقط
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
