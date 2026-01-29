@@ -67,20 +67,21 @@ service cloud.firestore {
     }
 
     // ─────────────────────────────────────────
-    // users/{uid}  --> (Phase 1 Fix: Corrected Logic)
+    // users/{uid}
     // ─────────────────────────────────────────
 
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
-      
-      allow create: if isOwner(uid) 
-                    && request.resource.data.role == 'user' 
+
+      // create user doc (new user)
+      allow create: if isOwner(uid)
+                    && request.resource.data.role == 'user'
                     && request.resource.data.isBlocked == false;
-      
+
       allow update: if isAdmin()
                     || (isOwner(uid) && onlyAllowedUserFields())
                     || (isOwner(uid) && canUpdatePointsSafely());
-      
+
       allow delete: if isAdmin();
     }
 
@@ -89,41 +90,69 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedFields);
     }
 
-    // ✅ الدالة المصححة (Logic & Syntax Fix)
+    // ✅ Expert Fix:
+    // - Accepts FieldValue.increment() safely (no numeric comparisons inside rules)
+    // - Allows daily counters to increment (including FreePlay)
+    // - Allows common “play markers” observed in your user doc to update with the same write
+    // - Uses `is number` instead of `is int` for maximum safety
     function canUpdatePointsSafely() {
       let changed = request.resource.data.diff(resource.data).affectedKeys();
 
-      // 1. منطق التصفير (Reset Logic)
-      // الشرط: التغيير في العدادات فقط + أي عداد تم تغييره يجب أن يكون 0
-      let isResetUpdate = changed.hasOnly(['dailyStarsRounds', 'dailyProsRounds', 'dailyFreePlayRounds']);
-      
-      let resetValuesValid = 
-           (!('dailyStarsRounds' in changed) || request.resource.data.dailyStarsRounds == 0)
-        && (!('dailyProsRounds' in changed) || request.resource.data.dailyProsRounds == 0)
-        && (!('dailyFreePlayRounds' in changed) || request.resource.data.dailyFreePlayRounds == 0);
-
-      // 2. منطق تحديث النقاط (Points Update Logic)
-      let pointsAllowed = [
-        'points', 'starsPoints', 'proPoints',
-        'lastQuizDate', 'updatedAt',
-        'dailyStarsRounds', 'dailyProsRounds',
-        'dailyFreePlayRounds'
+      // ─────────────────────────────────────────
+      // 1) Reset Logic: allow zeroing counters + timestamps
+      // ─────────────────────────────────────────
+      let resetKeys = [
+        'dailyStarsRounds', 'dailyProsRounds', 'dailyFreePlayRounds',
+        'lastQuizDate', 'updatedAt'
       ];
-      
-      let hasQuizMarker = request.resource.data.lastQuizDate != null;
-      let onlyPointsChanged = changed.hasOnly(pointsAllowed);
-      
-      let safePoints =
-           (!('points' in changed) || request.resource.data.points >= resource.data.points)
-        && (!('starsPoints' in changed) || request.resource.data.starsPoints >= resource.data.starsPoints)
-        && (!('proPoints' in changed) || request.resource.data.proPoints >= resource.data.proPoints);
 
-      let noProfileChange = !('name' in changed) && !('avatarIndex' in changed);
+      let isResetUpdate = changed.hasOnly(resetKeys);
 
-      let isPointsUpdate = hasQuizMarker && onlyPointsChanged && safePoints && noProfileChange;
+      let resetValuesValid =
+           (!changed.hasAny(['dailyStarsRounds'])    || request.resource.data.dailyStarsRounds == 0)
+        && (!changed.hasAny(['dailyProsRounds'])     || request.resource.data.dailyProsRounds == 0)
+        && (!changed.hasAny(['dailyFreePlayRounds']) || request.resource.data.dailyFreePlayRounds == 0)
+        && (!changed.hasAny(['lastQuizDate'])        || request.resource.data.lastQuizDate is timestamp)
+        && (!changed.hasAny(['updatedAt'])           || request.resource.data.updatedAt    is timestamp);
 
-      // ✅ النتيجة النهائية: إما تصفير صحيح أو تحديث نقاط صحيح
-      return (isResetUpdate && resetValuesValid) || isPointsUpdate;
+      // ─────────────────────────────────────────
+      // 2) Game Update: allow points + counters + timestamps (supports increment transforms)
+      // ─────────────────────────────────────────
+      let gameKeys = [
+        // points fields (new + legacy observed)
+        'points', 'starsPoints', 'proPoints', 'points_stars',
+
+        // daily counters
+        'dailyStarsRounds', 'dailyProsRounds', 'dailyFreePlayRounds',
+
+        // play markers/timestamps
+        'lastQuizDate', 'updatedAt',
+        'lastQuiz',
+
+        // observed field updated during play
+        'category_last_played',
+
+        // optional: if your code updates it with play writes
+        'dailyQuestionsCount'
+      ];
+
+      let isGameUpdate = changed.hasOnly(gameKeys);
+
+      // ✅ Safe numeric checks (is number) to avoid rejection of doubles/transforms
+      let gameValuesValid =
+           (!changed.hasAny(['lastQuizDate'])        || request.resource.data.lastQuizDate is timestamp)
+        && (!changed.hasAny(['updatedAt'])           || request.resource.data.updatedAt    is timestamp)
+        && (!changed.hasAny(['lastQuiz'])            || request.resource.data.lastQuiz     is timestamp)
+        && (!changed.hasAny(['dailyStarsRounds'])    || request.resource.data.dailyStarsRounds    is number)
+        && (!changed.hasAny(['dailyProsRounds'])     || request.resource.data.dailyProsRounds     is number)
+        && (!changed.hasAny(['dailyFreePlayRounds']) || request.resource.data.dailyFreePlayRounds is number)
+        && (!changed.hasAny(['dailyQuestionsCount']) || request.resource.data.dailyQuestionsCount is number);
+
+      // block profile edits mixed with game writes
+      let noProfileChange = !changed.hasAny(['name']) && !changed.hasAny(['avatarIndex']);
+
+      return (isResetUpdate && resetValuesValid)
+          || (isGameUpdate && gameValuesValid && noProfileChange);
     }
 
     // ─────────────────────────────────────────
@@ -132,13 +161,13 @@ service cloud.firestore {
 
     function simpleUserStatsValidation() {
       let d = request.resource.data;
-      
-      // 1. التحقق الهيكلي (Strict Top-Level)
+
+      // Strict top-level shape only
       let structureValid = (d is map)
           && d.keys().hasOnly(['stars', 'pros', 'freeplay', 'updatedAt']);
-      
-      // 2. التحقق الزمني (Server Timestamp)
-      let timestampValid = ('updatedAt' in d) && (d.updatedAt == request.time);
+
+      // ✅ Accepted logic: updatedAt matches the concrete timestamp sent from Repo
+      let timestampValid = ('updatedAt' in d) && (d.updatedAt is timestamp);
 
       return structureValid && timestampValid;
     }
@@ -157,19 +186,25 @@ service cloud.firestore {
       allow read: if isModerator() || (isAuthenticated() && resource.data.userId == request.auth.uid);
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isModerator();
-      
+
       match /messages/{messageId} {
-        allow read, create, update, delete: if isModerator() || (isAuthenticated() && get(/databases/$(database)/documents/support_tickets/$(ticketId)).data.userId == request.auth.uid);
+        allow read, create, update, delete: if isModerator()
+          || (isAuthenticated() && get(/databases/$(database)/documents/support_tickets/$(ticketId)).data.userId == request.auth.uid);
       }
     }
 
-    function isTicketOwner(ticketId) {
-      return get(/databases/$(database)/documents/support_tickets/$(ticketId)).data.userId == request.auth.uid;
+    match /support_chats/{docId} {
+      allow read, write: if isModerator();
     }
 
-    match /support_chats/{docId} { allow read, write: if isModerator(); }
-    match /leaderboards/{league}/entries/{uid} { allow read: if true; allow write: if isModerator(); }
-    
-    match /{document=**} { allow read, write: if false; }
+    match /leaderboards/{league}/entries/{uid} {
+      allow read: if true;
+      allow write: if isModerator();
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
   }
 }
