@@ -1,3 +1,12 @@
+// PATH: lib/core/data/models/user_model.dart
+// STATUS: FULL FILE — ✅ Safe Legacy Read Doc + Num-safe parsing (no behavior change)
+//
+// Notes:
+// - `starsPoints` is the canonical field for Stars League points.
+// - `points_stars` is LEGACY fallback for backward compatibility ONLY.
+//   Do NOT write to `points_stars`. It can be removed after legacy data migration.
+// - All numeric reads are `num`-safe to avoid runtime type issues (int/double).
+
 class UserModel {
   final String uid;
   final String phone;
@@ -23,28 +32,52 @@ class UserModel {
 
   String get displayName => (name.trim().isEmpty) ? "Pro" : name;
 
+  // ────────────────────────────────────────────────────────────────────────────
+  // Helpers (num-safe reads)
+  // ────────────────────────────────────────────────────────────────────────────
+  static int _readInt(Map<String, dynamic> data, String key,
+      {int fallback = 0}) {
+    final v = data[key];
+    if (v is num) return v.toInt();
+    return fallback;
+  }
+
+  static String _readString(Map<String, dynamic> data, String key,
+      {String fallback = ''}) {
+    final v = data[key];
+    if (v is String) return v;
+    return fallback;
+  }
+
   // تحويل البيانات القادمة من Firebase (النسخة الذكية)
   factory UserModel.fromMap(Map<String, dynamic> data, String documentId) {
-    // 1. معالجة دوري النجوم (دعم المسميين القديم والجديد)
-    int sPoints = data['starsPoints'] ?? data['points_stars'] ?? 0;
+    // 1) Stars League:
+    // NOTE: `points_stars` is LEGACY fallback for backward compatibility only.
+    // Do NOT write to it. The canonical field is `starsPoints`.
+    final int sPoints = _readInt(
+      data,
+      'starsPoints',
+      fallback: _readInt(data, 'points_stars', fallback: 0),
+    );
 
-    // 2. معالجة دوري المحترفين
-    int pPoints = data['proPoints'] ?? 0;
+    // 2) Pros League
+    final int pPoints = _readInt(data, 'proPoints', fallback: 0);
 
-    // 3. معالجة الإجمالي (points)
-    // لو حقل points موجود خده، لو مش موجود اجمع الدوريين
-    int totalPoints = data['points'] ?? (sPoints + pPoints);
+    // 3) Total points
+    // If `points` exists use it; otherwise fallback to sum(stars+pros).
+    final int totalPoints =
+        _readInt(data, 'points', fallback: (sPoints + pPoints));
 
     return UserModel(
       uid: documentId,
-      phone: data['phone'] ?? '',
-      name: data['name'] ?? '',
-      photoUrl: data['photoUrl'] ?? '',
+      phone: _readString(data, 'phone', fallback: ''),
+      name: _readString(data, 'name', fallback: ''),
+      photoUrl: _readString(data, 'photoUrl', fallback: ''),
       starsPoints: sPoints,
       proPoints: pPoints,
       points: totalPoints,
-      avatarIndex: data['avatarIndex'] ?? 0,
-      role: data['role'] ?? 'user',
+      avatarIndex: _readInt(data, 'avatarIndex', fallback: 0),
+      role: _readString(data, 'role', fallback: 'user'),
     );
   }
 
