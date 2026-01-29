@@ -19,6 +19,8 @@ class FirestorePaths {
   static const String supportTickets = 'support_tickets';
   static const String users = 'users';
   static const String userStats = 'user_stats'; // ✅ Added (Phase 2)
+  static const String marketRadar = 'market_radar';
+  static const String moneyEconomy = 'money_economy';
 
   // ─────────────────────────────────────────────────────────────
   // Document / Sub-path constants
