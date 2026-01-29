@@ -28,17 +28,13 @@ service cloud.firestore {
     }
 
     // ─────────────────────────────────────────
-    // app_config
+    // app_config & Public Content
     // ─────────────────────────────────────────
 
     match /app_config/{docId} {
       allow read: if true;
       allow write: if isAdmin();
     }
-
-    // ─────────────────────────────────────────
-    // Public Content
-    // ─────────────────────────────────────────
 
     function isActiveOrMissing() {
       return resource.data.isActive == true
@@ -71,62 +67,63 @@ service cloud.firestore {
     }
 
     // ─────────────────────────────────────────
-    // users/{uid}
+    // users/{uid}  --> (Phase 1 Fix: Corrected Logic)
     // ─────────────────────────────────────────
 
     match /users/{uid} {
-
       allow read: if isOwner(uid) || isAdmin();
-
-      allow create: if isOwner(uid)
-                    && request.resource.data.role == 'user'
+      
+      allow create: if isOwner(uid) 
+                    && request.resource.data.role == 'user' 
                     && request.resource.data.isBlocked == false;
-
+      
       allow update: if isAdmin()
                     || (isOwner(uid) && onlyAllowedUserFields())
                     || (isOwner(uid) && canUpdatePointsSafely());
-
+      
       allow delete: if isAdmin();
     }
 
     function onlyAllowedUserFields() {
-  // ✅ نخليها متوافقة مع النظام الحالي
-  let allowedFields = ['name', 'avatarIndex'];
-  let changedFields = request.resource.data.diff(resource.data).affectedKeys();
-  return changedFields.hasOnly(allowedFields);
-}
+      let allowedFields = ['name', 'avatarIndex'];
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedFields);
+    }
 
-    // ✅ الدالة اللي كانت ناقصة (سبب الخطأ)
+    // ✅ الدالة المصححة (Logic & Syntax Fix)
     function canUpdatePointsSafely() {
       let changed = request.resource.data.diff(resource.data).affectedKeys();
 
-      let allowed = [
-        'points',
-        'starsPoints',
-        'proPoints',
-        'lastQuizDate',
-        'updatedAt',
-        'dailyStarsRounds',
-        'dailyProsRounds'
+      // 1. منطق التصفير (Reset Logic)
+      // الشرط: التغيير في العدادات فقط + أي عداد تم تغييره يجب أن يكون 0
+      let isResetUpdate = changed.hasOnly(['dailyStarsRounds', 'dailyProsRounds', 'dailyFreePlayRounds']);
+      
+      let resetValuesValid = 
+           (!('dailyStarsRounds' in changed) || request.resource.data.dailyStarsRounds == 0)
+        && (!('dailyProsRounds' in changed) || request.resource.data.dailyProsRounds == 0)
+        && (!('dailyFreePlayRounds' in changed) || request.resource.data.dailyFreePlayRounds == 0);
+
+      // 2. منطق تحديث النقاط (Points Update Logic)
+      let pointsAllowed = [
+        'points', 'starsPoints', 'proPoints',
+        'lastQuizDate', 'updatedAt',
+        'dailyStarsRounds', 'dailyProsRounds',
+        'dailyFreePlayRounds'
       ];
-
-      // لازم يكون تحديث كويز
+      
       let hasQuizMarker = request.resource.data.lastQuizDate != null;
-
-      // ما يغيرش غير حقول النقاط
-      let onlyPoints = changed.hasOnly(allowed);
-
-      // زيادة فقط (مش تقليل)
+      let onlyPointsChanged = changed.hasOnly(pointsAllowed);
+      
       let safePoints =
-        (!('points' in changed) || request.resource.data.points >= resource.data.points)
+           (!('points' in changed) || request.resource.data.points >= resource.data.points)
         && (!('starsPoints' in changed) || request.resource.data.starsPoints >= resource.data.starsPoints)
         && (!('proPoints' in changed) || request.resource.data.proPoints >= resource.data.proPoints);
 
-      // ممنوع يغير الاسم أو الأفاتار مع النقاط (يمنع avatarIndex بدل avatarId)
-      let noProfileChange =
-        !('name' in changed) && !('avatarIndex' in changed);
+      let noProfileChange = !('name' in changed) && !('avatarIndex' in changed);
 
-      return hasQuizMarker && onlyPoints && safePoints && noProfileChange;
+      let isPointsUpdate = hasQuizMarker && onlyPointsChanged && safePoints && noProfileChange;
+
+      // ✅ النتيجة النهائية: إما تصفير صحيح أو تحديث نقاط صحيح
+      return (isResetUpdate && resetValuesValid) || isPointsUpdate;
     }
 
     // ─────────────────────────────────────────
@@ -135,9 +132,15 @@ service cloud.firestore {
 
     function simpleUserStatsValidation() {
       let d = request.resource.data;
-      return (d is map)
-          && d.keys().hasOnly(['stars','pros','freeplay','updatedAt'])
-          && ('updatedAt' in d) && (d.updatedAt is timestamp);
+      
+      // 1. التحقق الهيكلي (Strict Top-Level)
+      let structureValid = (d is map)
+          && d.keys().hasOnly(['stars', 'pros', 'freeplay', 'updatedAt']);
+      
+      // 2. التحقق الزمني (Server Timestamp)
+      let timestampValid = ('updatedAt' in d) && (d.updatedAt == request.time);
+
+      return structureValid && timestampValid;
     }
 
     match /user_stats/{uid} {
@@ -147,48 +150,26 @@ service cloud.firestore {
     }
 
     // ─────────────────────────────────────────
-    // support_tickets
+    // Support & Leaderboards
     // ─────────────────────────────────────────
 
     match /support_tickets/{ticketId} {
-
-      allow read: if isModerator()
-                  || (isAuthenticated() && resource.data.userId == request.auth.uid);
-
-      allow create: if isAuthenticated()
-                    && request.resource.data.userId == request.auth.uid;
-
+      allow read: if isModerator() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isModerator();
-
+      
       match /messages/{messageId} {
-        allow read: if isModerator()
-                    || (isAuthenticated() && isTicketOwner(ticketId));
-
-        allow create: if isModerator()
-                      || (isAuthenticated() && isTicketOwner(ticketId));
-
-        allow update, delete: if isModerator();
+        allow read, create, update, delete: if isModerator() || (isAuthenticated() && get(/databases/$(database)/documents/support_tickets/$(ticketId)).data.userId == request.auth.uid);
       }
     }
 
     function isTicketOwner(ticketId) {
-      return get(/databases/$(database)/documents/support_tickets/$(ticketId)).data.userId
-             == request.auth.uid;
+      return get(/databases/$(database)/documents/support_tickets/$(ticketId)).data.userId == request.auth.uid;
     }
 
-    // legacy
-    match /support_chats/{docId} {
-      allow read, write: if isModerator();
-    }
-
-    match /leaderboards/{league}/entries/{uid} {
-      allow read: if true;
-      allow write: if isModerator();
-    }
-
-    // Default deny
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    match /support_chats/{docId} { allow read, write: if isModerator(); }
+    match /leaderboards/{league}/entries/{uid} { allow read: if true; allow write: if isModerator(); }
+    
+    match /{document=**} { allow read, write: if false; }
   }
 }

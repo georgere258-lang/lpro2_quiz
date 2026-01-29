@@ -12,8 +12,16 @@ class LProBottomNavBar extends StatelessWidget {
     required this.onTap,
   });
 
+  int _safeIndex(int i) {
+    if (i < 0) return 0;
+    if (i > 2) return 2; // maps 3 (support) -> 2 (profile tab)
+    return i;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final int safeActive = _safeIndex(activeIndex);
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.primaryDeepTeal,
@@ -29,8 +37,12 @@ class LProBottomNavBar extends StatelessWidget {
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
         child: BottomNavigationBar(
-          currentIndex: activeIndex >= 3 ? 2 : activeIndex,
-          onTap: onTap,
+          currentIndex: safeActive,
+          onTap: (i) {
+            // Guard: prevent re-triggering navigation when tapping the same tab
+            if (i == safeActive) return;
+            onTap(i);
+          },
           backgroundColor: Colors.transparent,
           elevation: 0,
           selectedItemColor: AppColors.secondaryOrange,
