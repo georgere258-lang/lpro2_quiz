@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/stats_screen.dart
-// STATUS: PREMIUM STATS SCREEN (Real Data from user_stats)
+// STATUS: PREMIUM STATS SCREEN (Real Data from user_stats) - FIXED (num-safe + aligned seed)
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -10,15 +10,17 @@ import '../widgets/lpro_bottom_nav_bar.dart';
 import 'main_wrapper.dart';
 
 class StatsScreen extends StatefulWidget {
-  final String? initialTab; // 'stars' | 'pros' | 'freeplay' | null (default: stars)
-  
+  final String?
+      initialTab; // 'stars' | 'pros' | 'freeplay' | null (default: stars)
+
   const StatsScreen({super.key, this.initialTab});
 
   @override
   State<StatsScreen> createState() => _StatsScreenState();
 }
 
-class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStateMixin {
+class _StatsScreenState extends State<StatsScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final Color deepTeal = AppColors.primaryDeepTeal;
   final Color safetyOrange = AppColors.secondaryOrange;
@@ -26,56 +28,62 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    ensureStatsDocExists();
+    _ensureStatsDocExistsAligned();
     int initialIndex = 0;
     if (widget.initialTab == 'pros') {
       initialIndex = 1;
     } else if (widget.initialTab == 'freeplay') {
       initialIndex = 2;
     }
-    _tabController = TabController(length: 3, vsync: this, initialIndex: initialIndex);
+    _tabController =
+        TabController(length: 3, vsync: this, initialIndex: initialIndex);
   }
 
-  Future<void> ensureStatsDocExists() async {
+  // num-safe int reader (Firestore often returns num)
+  int _n(Map<String, dynamic> map, String key) {
+    final v = map[key];
+    if (v is num) return v.toInt();
+    return 0;
+  }
+
+  Future<void> _ensureStatsDocExistsAligned() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
+
     try {
-      final ref = FirebaseFirestore.instance.collection('user_stats').doc(user.uid);
+      final ref =
+          FirebaseFirestore.instance.collection('user_stats').doc(user.uid);
       final snapshot = await ref.get();
-      if (!snapshot.exists) {
-        await ref.set(
-          {
-            'updatedAt': FieldValue.serverTimestamp(),
-            'stars': {
-              'roundsPlayed': 0,
-              'totalQuestions': 0,
-              'correctAnswers': 0,
-              'wrongAnswers': 0,
-              'currentStreak': 0,
-              'bestStreak': 0,
-              'totalPoints': 0,
-            },
-            'pros': {
-              'roundsPlayed': 0,
-              'totalQuestions': 0,
-              'correctAnswers': 0,
-              'wrongAnswers': 0,
-              'currentStreak': 0,
-              'bestStreak': 0,
-              'totalPoints': 0,
-            },
-            'freeplay': {
-              'roundsPlayed': 0,
-              'totalQuestions': 0,
-              'correctAnswers': 0,
-              'wrongAnswers': 0,
-              'currentStreak': 0,
-              'bestStreak': 0,
-            },
+      if (snapshot.exists) return;
+
+      // ✅ Align seed shape with QuizRepository writes (no extra keys)
+      await ref.set(
+        {
+          'updatedAt': Timestamp.fromDate(DateTime.now()),
+          'stars': {
+            'roundsPlayed': 0,
+            'totalQuestions': 0,
+            'correctAnswers': 0,
+            'wrongAnswers': 0,
+            'totalPoints': 0,
           },
-          SetOptions(merge: true),
-        );
-      }
+          'pros': {
+            'roundsPlayed': 0,
+            'totalQuestions': 0,
+            'correctAnswers': 0,
+            'wrongAnswers': 0,
+            'totalPoints': 0,
+          },
+          'freeplay': {
+            'roundsPlayed': 0,
+            'totalQuestions': 0,
+            'correctAnswers': 0,
+            'wrongAnswers': 0,
+            'totalPoints': 0, // keep consistent even if you don't display it
+          },
+        },
+        SetOptions(merge: true),
+      );
     } catch (e) {
       debugPrint('StatsScreen ensureStatsDocExists: $e');
     }
@@ -110,8 +118,10 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
           indicatorWeight: 3,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white.withValues(alpha: 0.6),
-          labelStyle: GoogleFonts.cairo(fontWeight: FontWeight.w800, fontSize: 14),
-          unselectedLabelStyle: GoogleFonts.cairo(fontWeight: FontWeight.w600, fontSize: 13),
+          labelStyle:
+              GoogleFonts.cairo(fontWeight: FontWeight.w800, fontSize: 14),
+          unselectedLabelStyle:
+              GoogleFonts.cairo(fontWeight: FontWeight.w600, fontSize: 13),
           tabs: const [
             Tab(text: "نجوم ✨"),
             Tab(text: "محترفين 🏆"),
@@ -167,7 +177,7 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
     bool isFreePlay = false,
   }) {
     final user = FirebaseAuth.instance.currentUser;
-    
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: StreamBuilder<DocumentSnapshot>(
@@ -178,15 +188,18 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
                 .snapshots()
             : null,
         builder: (context, snapshot) {
-          // Extract league data or use defaults
-          Map<String, dynamic> leagueData = {};
+          Map<String, dynamic> leagueData = <String, dynamic>{};
+
           if (snapshot.hasData && snapshot.data!.exists) {
-            final data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
-            leagueData = (data[leagueKey] as Map<String, dynamic>?) ?? {};
+            final data = snapshot.data!.data() as Map<String, dynamic>? ??
+                <String, dynamic>{};
+            leagueData = (data[leagueKey] as Map<String, dynamic>?) ??
+                <String, dynamic>{};
           }
 
-          final totalQuestions = (leagueData['totalQuestions'] as int?) ?? 0;
-          final correctAnswers = (leagueData['correctAnswers'] as int?) ?? 0;
+          final totalQuestions = _n(leagueData, 'totalQuestions');
+          final correctAnswers = _n(leagueData, 'correctAnswers');
+
           final denom = totalQuestions > 0 ? totalQuestions : 1;
           final accuracy = (correctAnswers / denom * 100).round();
 
@@ -194,140 +207,138 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.all(16),
             children: [
-          const SizedBox(height: 12),
-          // ✅ Premium Header Card
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: AppColors.eliteShadowL2,
-            ),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: color.withValues(alpha: 0.2),
-                        blurRadius: 20,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: Icon(icon, size: 34, color: color),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: AppColors.eliteShadowL2,
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  league,
-                  style: GoogleFonts.cairo(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    color: deepTeal,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  motivationalText,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.cairo(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[600],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // ✅ Progress/Accuracy Bar
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "الدقة",
-                            style: GoogleFonts.cairo(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                          Text(
-                            "$accuracy%",
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                              color: color,
-                            ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: color.withValues(alpha: 0.2),
+                            blurRadius: 20,
+                            spreadRadius: 2,
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
-                      LinearProgressIndicator(
-                        value: accuracy / 100,
-                        backgroundColor: Colors.grey[200],
-                        valueColor: AlwaysStoppedAnimation<Color>(color),
-                        minHeight: 8,
-                        borderRadius: BorderRadius.circular(4),
+                      child: Icon(icon, size: 34, color: color),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      league,
+                      style: GoogleFonts.cairo(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: deepTeal,
                       ),
-                    ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      motivationalText,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.cairo(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                "الدقة",
+                                style: GoogleFonts.cairo(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                              Text(
+                                "$accuracy%",
+                                style: GoogleFonts.poppins(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  color: color,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          LinearProgressIndicator(
+                            value: accuracy / 100,
+                            backgroundColor: Colors.grey[200],
+                            valueColor: AlwaysStoppedAnimation<Color>(color),
+                            minHeight: 8,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1.25,
+                children: [
+                  if (!isFreePlay)
+                    _buildAnimatedStatCard(
+                      label: "إجمالي النقاط",
+                      value: _n(leagueData, 'totalPoints'),
+                      icon: Icons.emoji_events,
+                      color: color,
+                    )
+                  else
+                    _buildAnimatedStatCard(
+                      label: "إجمالي الأسئلة",
+                      value: totalQuestions,
+                      icon: Icons.help_outline,
+                      color: color,
+                    ),
+                  _buildAnimatedStatCard(
+                    label: "الجولات",
+                    value: _n(leagueData, 'roundsPlayed'),
+                    icon: Icons.repeat,
+                    color: color,
                   ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          // ✅ Stats Grid with Animated Numbers
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.25,
-            children: [
-              if (!isFreePlay)
-                _buildAnimatedStatCard(
-                  label: "إجمالي النقاط",
-                  value: (leagueData['totalPoints'] as int?) ?? 0,
-                  icon: Icons.emoji_events,
-                  color: color,
-                )
-              else
-                _buildAnimatedStatCard(
-                  label: "إجمالي الأسئلة",
-                  value: totalQuestions,
-                  icon: Icons.help_outline,
-                  color: color,
-                ),
-              _buildAnimatedStatCard(
-                label: "الجولات",
-                value: (leagueData['roundsPlayed'] as int?) ?? 0,
-                icon: Icons.repeat,
-                color: color,
+                  _buildAnimatedStatCard(
+                    label: "إجابات صحيحة",
+                    value: correctAnswers,
+                    icon: Icons.check_circle,
+                    color: color,
+                  ),
+                  _buildAnimatedStatCard(
+                    label: "أفضل سلسلة",
+                    value: _n(leagueData,
+                        'bestStreak'), // will stay 0 unless you implement streaks later
+                    icon: Icons.local_fire_department,
+                    color: color,
+                  ),
+                ],
               ),
-              _buildAnimatedStatCard(
-                label: "إجابات صحيحة",
-                value: correctAnswers,
-                icon: Icons.check_circle,
-                color: color,
-              ),
-              _buildAnimatedStatCard(
-                label: "أفضل سلسلة",
-                value: (leagueData['bestStreak'] as int?) ?? 0,
-                icon: Icons.local_fire_department,
-                color: color,
-              ),
-            ],
-          ),
             ],
           );
         },
@@ -353,7 +364,6 @@ class _StatsScreenState extends State<StatsScreen> with SingleTickerProviderStat
         children: [
           Icon(icon, size: 24, color: color),
           const SizedBox(height: 6),
-          // ✅ Animated Number
           TweenAnimationBuilder<int>(
             tween: IntTween(begin: 0, end: value),
             duration: const Duration(milliseconds: 700),
