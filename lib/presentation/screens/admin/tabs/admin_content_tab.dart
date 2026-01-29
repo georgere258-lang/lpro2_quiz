@@ -1,5 +1,8 @@
 // PATH: lib/presentation/screens/admin/tabs/admin_content_tab.dart
-// STATUS: Full File - Fixed Logic (KYC uses sectionKey ONLY / Pro Insight uses Tags ONLY)
+// STATUS: Full File - FIXED (Bulk import uses selectedType ONLY, no auto-detect)
+//         ✅ KYC: sectionKey enforced, tags removed
+//         ✅ Pro Insight: tags enforced, sectionKey removed
+//         ✅ Prevents “KYC items landing in Pro Insight” forever
 
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -96,6 +99,12 @@ class _AdminContentTabState extends State<AdminContentTab> {
   void initState() {
     super.initState();
     _docIdC.addListener(_onDocIdChanged);
+
+    // Ensure consistent defaults
+    final sections = _sectionsByType[_selectedType] ?? const <String>[];
+    if (sections.isNotEmpty) {
+      _selectedSection = sections.first;
+    }
   }
 
   @override
@@ -118,27 +127,31 @@ class _AdminContentTabState extends State<AdminContentTab> {
     final id = _docIdC.text.trim();
     if (id.isEmpty) return;
 
-    // Try to find document in current collection
     try {
       final snap = await FirebaseFirestore.instance
           .collection(_collectionName(_selectedType))
           .doc(id)
           .get();
 
-      if (snap.exists && mounted) {
-        final data = snap.data()!;
-        // Logic to populate fields based on existing data
-        // (Simplified for brevity, main focus is on SAVE logic)
-        setState(() {
-          if (_selectedType == 'know_your_client') {
-            _selectedSectionKey = data['sectionKey'];
-            _selectedSection =
-                _kycKeyMapping[_selectedSectionKey] ?? _selectedSection;
-          } else {
-            // Logic for tags mapping if needed
+      if (!snap.exists || !mounted) return;
+
+      final data = snap.data()!;
+      setState(() {
+        if (_selectedType == 'know_your_client') {
+          final sk = (data['sectionKey'] ?? '').toString().trim();
+          _selectedSectionKey = sk.isNotEmpty ? sk : _kycKeyMapping.keys.first;
+          _selectedSection = _kycKeyMapping[_selectedSectionKey] ??
+              _kycKeyMapping.values.first;
+        } else {
+          // Pro Insight: try to infer section from tags if present
+          final tags =
+              (data['tags'] is List) ? (data['tags'] as List) : const [];
+          final firstTag = tags.isNotEmpty ? tags.first.toString().trim() : '';
+          if (firstTag.isNotEmpty) {
+            _selectedSection = _tagNormalization[firstTag] ?? firstTag;
           }
-        });
-      }
+        }
+      });
     } catch (_) {}
   }
 
@@ -171,6 +184,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
     _exampleC.clear();
     _lockC.clear();
     _bulkJsonC.clear();
+
     setState(() {
       _isActive = true;
       _isFeatured = false;
@@ -178,10 +192,14 @@ class _AdminContentTabState extends State<AdminContentTab> {
       _publishAt = null;
       _expireAt = null;
       _featuredUntil = null;
-      // Reset dropdowns to defaults
+
       if (_selectedType == 'know_your_client') {
         _selectedSectionKey = _kycKeyMapping.keys.first;
         _selectedSection = _kycKeyMapping.values.first;
+      } else {
+        _selectedSectionKey = null;
+        final sections = _sectionsByType[_selectedType] ?? const <String>[];
+        _selectedSection = sections.isNotEmpty ? sections.first : '';
       }
     });
   }
@@ -193,15 +211,16 @@ class _AdminContentTabState extends State<AdminContentTab> {
     final title = _titleC.text.trim();
     final hook = _hookC.text.trim();
 
-    // Validation
     if (title.isEmpty || hook.isEmpty) {
       widget.snack('العنوان و Hook مطلوبين');
       return;
     }
-    if (_selectedType == 'know_your_client' &&
-        (_selectedSectionKey == null || _selectedSectionKey!.isEmpty)) {
-      widget.snack('القسم (Section Key) مطلوب لـ "اعرف عميلك"');
-      return;
+    if (_selectedType == 'know_your_client') {
+      final sk = (_selectedSectionKey ?? '').trim();
+      if (sk.isEmpty) {
+        widget.snack('القسم (Section Key) مطلوب لـ "اعرف عميلك"');
+        return;
+      }
     }
 
     widget.setSaving(true);
@@ -209,7 +228,6 @@ class _AdminContentTabState extends State<AdminContentTab> {
       final collection = _collectionName(_selectedType);
       final docId = _docIdC.text.trim();
 
-      // 1. Prepare Base Data (Shared Fields)
       final data = <String, dynamic>{
         'title': title,
         'hook': hook,
@@ -219,7 +237,6 @@ class _AdminContentTabState extends State<AdminContentTab> {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      // 2. Add Optional Text Fields
       if (_articleC.text.isNotEmpty) data['article'] = _articleC.text.trim();
       if (_resetC.text.isNotEmpty) data['reset'] = _resetC.text.trim();
       if (_coreC.text.isNotEmpty) data['core'] = _coreC.text.trim();
@@ -228,22 +245,15 @@ class _AdminContentTabState extends State<AdminContentTab> {
       if (_publishAt != null)
         data['publishAt'] = Timestamp.fromDate(_publishAt!);
 
-      // 3. Strict Branching Logic
       if (_selectedType == 'know_your_client') {
-        // --- CASE 1: Know Your Client ---
-        // MUST use sectionKey. MUST NOT use tags.
-        data['sectionKey'] = _selectedSectionKey;
-        // Ensure strictly no tags for KYC manual upload
-        // (Firestore merge option won't delete existing tags if we don't send the key,
-        // but new docs won't have it).
+        data['sectionKey'] = (_selectedSectionKey ?? '').trim();
+        // DO NOT write tags for KYC
       } else {
-        // --- CASE 2: Pro Insight ---
-        // MUST use tags. MUST NOT use sectionKey.
         final tags = _normalizeTags([_selectedSection], _selectedType);
         data['tags'] = tags;
+        // DO NOT write sectionKey for Pro Insight
       }
 
-      // 4. Write to Firestore
       if (docId.isNotEmpty) {
         await FirebaseFirestore.instance
             .collection(collection)
@@ -264,7 +274,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ✅ STRICT BULK IMPORT LOGIC
+  // ✅ STRICT BULK IMPORT LOGIC (Selected Type ONLY)
   // ═══════════════════════════════════════════════════════════════════════════
   Future<void> _runBulkImport() async {
     final jsonText = _bulkJsonC.text.trim();
@@ -272,50 +282,95 @@ class _AdminContentTabState extends State<AdminContentTab> {
       widget.snack('الصندوق فارغ');
       return;
     }
+
+    // Selected target type is the ONLY truth.
+    final targetType = _selectedType;
+    final targetCollection = _collectionName(targetType);
+
+    // Ensure defaults for injection
+    final defaultKycSectionKey = _selectedSectionKey?.trim().isNotEmpty == true
+        ? _selectedSectionKey!.trim()
+        : _kycKeyMapping.keys.first;
+
+    final defaultProInsightTag = _selectedSection.trim().isNotEmpty
+        ? _selectedSection.trim()
+        : (_sectionsByType['pro_insight']?.first ?? 'البداية الصح');
+
     try {
-      final items = json.decode(jsonText) as List<dynamic>;
+      final raw = json.decode(jsonText);
+
+      if (raw is! List) {
+        widget.snack('لازم يكون JSON Array: [ {...}, {...} ]');
+        return;
+      }
+
       widget.setSaving(true);
       int count = 0;
 
-      // Batch processing (limit 500 per batch)
-      for (int i = 0; i < items.length; i += 500) {
+      for (int i = 0; i < raw.length; i += 450) {
+        // keep headroom under 500 writes
         final batch = FirebaseFirestore.instance.batch();
-        final chunk = items.skip(i).take(500);
+        final chunk = raw.skip(i).take(450);
 
-        for (var item in chunk) {
-          // Detect Type based on Data
-          // If it has 'sectionKey', assume KYC. Else assume Pro Insight.
-          final hasSectionKey = item['sectionKey'] != null &&
-              item['sectionKey'].toString().isNotEmpty;
+        for (final item in chunk) {
+          if (item is! Map) continue;
 
-          final type = hasSectionKey ? 'know_your_client' : 'pro_insight';
-          final col = _collectionName(type);
+          final data = Map<String, dynamic>.from(item as Map);
 
-          // Generate or Use ID
-          final docId = item['docId'] ??
-              FirebaseFirestore.instance.collection(col).doc().id;
+          // Determine/Generate docId
+          final docId = (data['docId']?.toString().trim().isNotEmpty == true)
+              ? data['docId'].toString().trim()
+              : FirebaseFirestore.instance
+                  .collection(targetCollection)
+                  .doc()
+                  .id;
 
-          final data = Map<String, dynamic>.from(item);
+          data.remove('docId');
+
+          // Normalize timestamps
           data['updatedAt'] = FieldValue.serverTimestamp();
-          if (data['createdAt'] == null) {
-            data['createdAt'] = FieldValue.serverTimestamp();
-          }
+          data['createdAt'] = data['createdAt'] ?? FieldValue.serverTimestamp();
 
-          // --- STRICT CLEANUP ---
-          if (type == 'know_your_client') {
-            // Remove 'tags' if present in JSON by mistake
+          // ✅ STRICT TYPE ENFORCEMENT
+          if (targetType == 'know_your_client') {
+            // KYC MUST have sectionKey
+            final sk = (data['sectionKey'] ?? '').toString().trim();
+            data['sectionKey'] = sk.isNotEmpty ? sk : defaultKycSectionKey;
+
+            // Remove tags if mistakenly present
             data.remove('tags');
           } else {
-            // Remove 'sectionKey' if present in JSON by mistake
+            // Pro Insight MUST have tags
+            final tagsRaw = data['tags'];
+            List<String> tags = [];
+
+            if (tagsRaw is List) {
+              tags = tagsRaw.map((e) => e.toString()).toList();
+            } else if (tagsRaw is String) {
+              tags = [tagsRaw];
+            }
+
+            tags = _normalizeTags(
+              tags.isNotEmpty ? tags : [defaultProInsightTag],
+              'pro_insight',
+            );
+
+            data['tags'] = tags;
+
+            // Remove sectionKey if mistakenly present
             data.remove('sectionKey');
           }
 
-          batch.set(FirebaseFirestore.instance.collection(col).doc(docId), data,
-              SetOptions(merge: true));
+          final ref = FirebaseFirestore.instance
+              .collection(targetCollection)
+              .doc(docId);
+          batch.set(ref, data, SetOptions(merge: true));
           count++;
         }
+
         await batch.commit();
       }
+
       widget.snack('تم استيراد $count موضوع بنجاح ✅');
       setState(() => _bulkJsonC.clear());
     } catch (e) {
@@ -336,29 +391,32 @@ class _AdminContentTabState extends State<AdminContentTab> {
           children: [
             _sectionHeader('نوع المحتوى والقسم'),
             const SizedBox(height: 10),
-
-            // 1. Content Type Dropdown
             DropdownButtonFormField<String>(
               value: _selectedType,
               decoration: adminDropDecor().copyWith(labelText: 'نوع المحتوى'),
               items: _contentTypes.entries
                   .map((e) => DropdownMenuItem(
-                      value: e.key,
-                      child: Text(e.value,
+                        value: e.key,
+                        child: Text(
+                          e.value,
                           style: GoogleFonts.cairo(
-                              fontWeight: FontWeight.w800, fontSize: 13))))
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ))
                   .toList(),
               onChanged: (v) {
                 if (v == null) return;
                 setState(() {
                   _selectedType = v;
-                  // Reset selection logic based on type
+
                   if (_selectedType == 'know_your_client') {
                     _selectedSectionKey = _kycKeyMapping.keys.first;
                     _selectedSection = _kycKeyMapping.values.first;
                   } else {
                     _selectedSectionKey = null;
-                    final sections = _sectionsByType[v] ?? [];
+                    final sections = _sectionsByType[v] ?? const <String>[];
                     _selectedSection =
                         sections.isNotEmpty ? sections.first : '';
                   }
@@ -366,55 +424,62 @@ class _AdminContentTabState extends State<AdminContentTab> {
               },
             ),
             const SizedBox(height: 10),
-
-            // 2. Section Selector (Conditional UI)
             if (_selectedType == 'know_your_client') ...[
-              // KYC uses Section Key Mapping
               DropdownButtonFormField<String>(
-                value: _selectedSectionKey ?? _kycKeyMapping.keys.first,
+                value: (_selectedSectionKey?.trim().isNotEmpty == true)
+                    ? _selectedSectionKey
+                    : _kycKeyMapping.keys.first,
                 decoration: adminDropDecor()
                     .copyWith(labelText: 'قسم اعرف عميلك (Section Key)'),
                 items: _kycKeyMapping.entries
                     .map((e) => DropdownMenuItem(
-                        value: e.key,
-                        child: Text(e.value, // Shows Arabic Name
+                          value: e.key,
+                          child: Text(
+                            e.value,
                             style: GoogleFonts.cairo(
-                                fontWeight: FontWeight.w800, fontSize: 13))))
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ))
                     .toList(),
                 onChanged: (v) {
-                  if (v != null)
-                    setState(() {
-                      _selectedSectionKey = v;
-                      _selectedSection = _kycKeyMapping[v]!;
-                    });
+                  if (v == null) return;
+                  setState(() {
+                    _selectedSectionKey = v;
+                    _selectedSection = _kycKeyMapping[v]!;
+                  });
                 },
               ),
               const SizedBox(height: 10),
             ] else ...[
-              // Pro Insight uses Tags
               DropdownButtonFormField<String>(
                 value: _selectedSection,
                 decoration: adminDropDecor().copyWith(labelText: 'القسم (Tag)'),
-                items: (_sectionsByType[_selectedType] ?? [])
+                items: (_sectionsByType[_selectedType] ?? const <String>[])
                     .map((s) => DropdownMenuItem(
-                        value: s,
-                        child: Text(s,
+                          value: s,
+                          child: Text(
+                            s,
                             style: GoogleFonts.cairo(
-                                fontWeight: FontWeight.w800, fontSize: 13))))
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ))
                     .toList(),
                 onChanged: (v) {
                   if (v != null) setState(() => _selectedSection = v);
                 },
               ),
             ],
-
             const SizedBox(height: 20),
             _sectionHeader('بيانات الموضوع'),
             const SizedBox(height: 10),
-
-            // 3. Text Fields
             adminTextField(
-                _docIdC, 'docId (للتعديل فقط - اتركه فارغاً للجديد)'),
+              _docIdC,
+              'docId (للتعديل فقط - اتركه فارغاً للجديد)',
+            ),
             const SizedBox(height: 10),
             adminTextField(_titleC, 'العنوان (Title) *'),
             const SizedBox(height: 10),
@@ -429,41 +494,38 @@ class _AdminContentTabState extends State<AdminContentTab> {
             adminTextField(_exampleC, 'مثال عملي (Example)', maxLines: 3),
             const SizedBox(height: 10),
             adminTextField(_lockC, 'الخاتمة/الإغلاق (Lock)', maxLines: 2),
-
             const SizedBox(height: 20),
             _sectionHeader('الظهور والنشر'),
             const SizedBox(height: 10),
             _toggleRow(
-                label: 'نشط (isActive)',
-                value: _isActive,
-                onChanged: (v) => setState(() => _isActive = v)),
+              label: 'نشط (isActive)',
+              value: _isActive,
+              onChanged: (v) => setState(() => _isActive = v),
+            ),
             const SizedBox(height: 10),
             _toggleRow(
-                label: 'مميز (isFeatured)',
-                value: _isFeatured,
-                onChanged: (v) => setState(() => _isFeatured = v)),
-
+              label: 'مميز (isFeatured)',
+              value: _isFeatured,
+              onChanged: (v) => setState(() => _isFeatured = v),
+            ),
             const SizedBox(height: 15),
-
-            // 4. Action Buttons (Save / Clear)
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _primaryButton(
-                    label: 'حفظ الموضوع',
-                    icon: Icons.save_rounded,
-                    onTap: _saveDocument),
+                  label: 'حفظ الموضوع',
+                  icon: Icons.save_rounded,
+                  onTap: _saveDocument,
+                ),
                 const SizedBox(width: 10),
                 _secondaryButton(
-                    label: 'تفريغ الخانات',
-                    icon: Icons.refresh,
-                    onTap: _clearForm),
+                  label: 'تفريغ الخانات',
+                  icon: Icons.refresh,
+                  onTap: _clearForm,
+                ),
               ],
             ),
-
             const SizedBox(height: 40),
-
-            // 5. Bulk Importer Section
             _dividerWithText('أدوات الرفع الجماعي'),
             const SizedBox(height: 10),
             Center(
@@ -480,13 +542,27 @@ class _AdminContentTabState extends State<AdminContentTab> {
             ),
             if (_showBulkImport) ...[
               const SizedBox(height: 15),
-              adminTextField(_bulkJsonC, 'الصق مصفوفة JSON هنا (Array)...',
-                  maxLines: 10),
+              adminTextField(
+                _bulkJsonC,
+                'الصق مصفوفة JSON هنا (Array)...',
+                maxLines: 10,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'مهم: الرفع الجماعي سيذهب لنوع المحتوى المختار بالأعلى فقط.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.cairo(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.grey[700],
+                ),
+              ),
               const SizedBox(height: 15),
               _primaryButton(
-                  label: 'بدء الاستيراد الجماعي الآن',
-                  icon: Icons.cloud_upload_rounded,
-                  onTap: _runBulkImport),
+                label: 'بدء الاستيراد الجماعي الآن',
+                icon: Icons.cloud_upload_rounded,
+                onTap: _runBulkImport,
+              ),
             ],
             const SizedBox(height: 60),
           ],
@@ -497,91 +573,130 @@ class _AdminContentTabState extends State<AdminContentTab> {
 
   // --- UI Helper Widgets ---
 
-  Widget _sectionHeader(String text) => Text(text,
-      style: GoogleFonts.cairo(
+  Widget _sectionHeader(String text) => Text(
+        text,
+        style: GoogleFonts.cairo(
           fontWeight: FontWeight.w900,
           fontSize: 14,
-          color: AppColors.primaryDeepTeal));
+          color: AppColors.primaryDeepTeal,
+        ),
+      );
 
-  Widget _dividerWithText(String text) => Row(children: [
-        const Expanded(child: Divider()),
-        Padding(
+  Widget _dividerWithText(String text) => Row(
+        children: [
+          const Expanded(child: Divider()),
+          Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Text(text,
-                style: GoogleFonts.cairo(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey))),
-        const Expanded(child: Divider())
-      ]);
+            child: Text(
+              text,
+              style: GoogleFonts.cairo(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+          const Expanded(child: Divider()),
+        ],
+      );
 
-  Widget _toggleRow(
-          {required String label,
-          required bool value,
-          required ValueChanged<bool> onChanged}) =>
+  Widget _toggleRow({
+    required String label,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) =>
       Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-              color: Colors.grey[100], borderRadius: BorderRadius.circular(12)),
-          child: Row(children: [
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
             Expanded(
-                child: Text(label,
-                    style: GoogleFonts.cairo(
-                        fontWeight: FontWeight.w800, fontSize: 13))),
-            Switch(
-                value: value,
-                onChanged: onChanged,
-                activeColor: AppColors.secondaryOrange)
-          ]));
-
-  Widget _actionChip(
-          {required IconData icon,
-          required String label,
-          required Color color,
-          required VoidCallback onTap}) =>
-      ActionChip(
-          avatar: Icon(icon, size: 16, color: color),
-          label: Text(label,
-              style: GoogleFonts.cairo(
-                  fontWeight: FontWeight.w800, fontSize: 11, color: color)),
-          backgroundColor: color.withOpacity(0.1),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          onPressed: onTap);
-
-  Widget _primaryButton(
-          {required String label,
-          required IconData icon,
-          required VoidCallback onTap}) =>
-      ElevatedButton.icon(
-          onPressed: onTap,
-          style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryDeepTeal,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14))),
-          icon: Icon(icon, size: 18, color: Colors.white),
-          label: Text(label,
-              style: GoogleFonts.cairo(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 13,
-                  color: Colors.white)));
-
-  Widget _secondaryButton(
-          {required String label,
-          required IconData icon,
-          required VoidCallback onTap}) =>
-      OutlinedButton.icon(
-          onPressed: onTap,
-          style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
-              side: BorderSide(color: Colors.grey[300]!)),
-          icon: Icon(icon, size: 18, color: Colors.grey[700]),
-          label: Text(label,
-              style: GoogleFonts.cairo(
+              child: Text(
+                label,
+                style: GoogleFonts.cairo(
                   fontWeight: FontWeight.w800,
                   fontSize: 13,
-                  color: Colors.grey[700])));
+                ),
+              ),
+            ),
+            Switch(
+              value: value,
+              onChanged: onChanged,
+              activeColor: AppColors.secondaryOrange,
+            ),
+          ],
+        ),
+      );
+
+  Widget _actionChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) =>
+      ActionChip(
+        avatar: Icon(icon, size: 16, color: color),
+        label: Text(
+          label,
+          style: GoogleFonts.cairo(
+            fontWeight: FontWeight.w800,
+            fontSize: 11,
+            color: color,
+          ),
+        ),
+        backgroundColor: color.withOpacity(0.1),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        onPressed: onTap,
+      );
+
+  Widget _primaryButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) =>
+      ElevatedButton.icon(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryDeepTeal,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+        icon: Icon(icon, size: 18, color: Colors.white),
+        label: Text(
+          label,
+          style: GoogleFonts.cairo(
+            fontWeight: FontWeight.w900,
+            fontSize: 13,
+            color: Colors.white,
+          ),
+        ),
+      );
+
+  Widget _secondaryButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) =>
+      OutlinedButton.icon(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          side: BorderSide(color: Colors.grey[300]!),
+        ),
+        icon: Icon(icon, size: 18, color: Colors.grey[700]),
+        label: Text(
+          label,
+          style: GoogleFonts.cairo(
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+            color: Colors.grey[700],
+          ),
+        ),
+      );
 }
