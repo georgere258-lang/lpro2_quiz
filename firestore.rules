@@ -12,7 +12,9 @@ service cloud.firestore {
     }
 
     function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      return isAuthenticated()
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : null;
     }
 
     function isAdmin() {
@@ -20,7 +22,7 @@ service cloud.firestore {
     }
 
     function isModerator() {
-      return isAuthenticated() && getUserRole() in ['admin', 'moderator'];
+      return isAuthenticated() && (getUserRole() in ['admin', 'moderator']);
     }
 
     function isOwner(uid) {
@@ -37,8 +39,9 @@ service cloud.firestore {
     }
 
     function isActiveOrMissing() {
-      return resource.data.isActive == true
-          || !(resource.data.keys().hasAny(['isActive']));
+      return resource == null
+        || resource.data.isActive == true
+        || !(resource.data.keys().hasAny(['isActive']));
     }
 
     match /news_ticker_items/{docId} {
@@ -67,40 +70,47 @@ service cloud.firestore {
     }
 
     // ─────────────────────────────────────────
+    // Money & Market Radar
+    // ─────────────────────────────────────────
+
+    match /money/{docId} {
+      allow read: if isModerator() || isActiveOrMissing();
+      allow write: if isModerator();
+    }
+
+    match /market_radar/{docId} {
+      allow read: if isModerator() || isActiveOrMissing();
+      allow write: if isModerator();
+    }
+
+    // ─────────────────────────────────────────
     // users/{uid}
     // ─────────────────────────────────────────
 
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
 
-      // create user doc (new user)
       allow create: if isOwner(uid)
-                    && request.resource.data.role == 'user'
-                    && request.resource.data.isBlocked == false;
+        && request.resource.data.role == 'user'
+        && request.resource.data.isBlocked == false;
 
       allow update: if isAdmin()
-                    || (isOwner(uid) && onlyAllowedUserFields())
-                    || (isOwner(uid) && canUpdatePointsSafely());
+        || (isOwner(uid) && onlyAllowedUserFields())
+        || (isOwner(uid) && canUpdatePointsSafely());
 
       allow delete: if isAdmin();
     }
 
     function onlyAllowedUserFields() {
       let allowedFields = ['name', 'avatarIndex'];
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedFields);
+      return request.resource.data.diff(resource.data)
+        .affectedKeys()
+        .hasOnly(allowedFields);
     }
 
-    // ✅ Expert Fix:
-    // - Accepts FieldValue.increment() safely (no numeric comparisons inside rules)
-    // - Allows daily counters to increment (including FreePlay)
-    // - Allows common “play markers” observed in your user doc to update with the same write
-    // - Uses `is number` instead of `is int` for maximum safety
     function canUpdatePointsSafely() {
       let changed = request.resource.data.diff(resource.data).affectedKeys();
 
-      // ─────────────────────────────────────────
-      // 1) Reset Logic: allow zeroing counters + timestamps
-      // ─────────────────────────────────────────
       let resetKeys = [
         'dailyStarsRounds', 'dailyProsRounds', 'dailyFreePlayRounds',
         'lastQuizDate', 'updatedAt'
@@ -113,43 +123,30 @@ service cloud.firestore {
         && (!changed.hasAny(['dailyProsRounds'])     || request.resource.data.dailyProsRounds == 0)
         && (!changed.hasAny(['dailyFreePlayRounds']) || request.resource.data.dailyFreePlayRounds == 0)
         && (!changed.hasAny(['lastQuizDate'])        || request.resource.data.lastQuizDate is timestamp)
-        && (!changed.hasAny(['updatedAt'])           || request.resource.data.updatedAt    is timestamp);
+        && (!changed.hasAny(['updatedAt'])           || request.resource.data.updatedAt is timestamp);
 
-      // ─────────────────────────────────────────
-      // 2) Game Update: allow points + counters + timestamps (supports increment transforms)
-      // ─────────────────────────────────────────
       let gameKeys = [
-        // points fields (new + legacy observed)
         'points', 'starsPoints', 'proPoints', 'points_stars',
-
-        // daily counters
         'dailyStarsRounds', 'dailyProsRounds', 'dailyFreePlayRounds',
-
-        // play markers/timestamps
         'lastQuizDate', 'updatedAt',
         'lastQuiz',
-
-        // observed field updated during play
         'category_last_played',
-
-        // optional: if your code updates it with play writes
         'dailyQuestionsCount'
       ];
 
       let isGameUpdate = changed.hasOnly(gameKeys);
 
-      // ✅ Safe numeric checks (is number) to avoid rejection of doubles/transforms
       let gameValuesValid =
            (!changed.hasAny(['lastQuizDate'])        || request.resource.data.lastQuizDate is timestamp)
-        && (!changed.hasAny(['updatedAt'])           || request.resource.data.updatedAt    is timestamp)
-        && (!changed.hasAny(['lastQuiz'])            || request.resource.data.lastQuiz     is timestamp)
-        && (!changed.hasAny(['dailyStarsRounds'])    || request.resource.data.dailyStarsRounds    is number)
-        && (!changed.hasAny(['dailyProsRounds'])     || request.resource.data.dailyProsRounds     is number)
+        && (!changed.hasAny(['updatedAt'])           || request.resource.data.updatedAt is timestamp)
+        && (!changed.hasAny(['lastQuiz'])            || request.resource.data.lastQuiz is timestamp)
+        && (!changed.hasAny(['dailyStarsRounds'])    || request.resource.data.dailyStarsRounds is number)
+        && (!changed.hasAny(['dailyProsRounds'])     || request.resource.data.dailyProsRounds is number)
         && (!changed.hasAny(['dailyFreePlayRounds']) || request.resource.data.dailyFreePlayRounds is number)
         && (!changed.hasAny(['dailyQuestionsCount']) || request.resource.data.dailyQuestionsCount is number);
 
-      // block profile edits mixed with game writes
-      let noProfileChange = !changed.hasAny(['name']) && !changed.hasAny(['avatarIndex']);
+      let noProfileChange =
+        !changed.hasAny(['name']) && !changed.hasAny(['avatarIndex']);
 
       return (isResetUpdate && resetValuesValid)
           || (isGameUpdate && gameValuesValid && noProfileChange);
@@ -161,15 +158,10 @@ service cloud.firestore {
 
     function simpleUserStatsValidation() {
       let d = request.resource.data;
-
-      // Strict top-level shape only
-      let structureValid = (d is map)
-          && d.keys().hasOnly(['stars', 'pros', 'freeplay', 'updatedAt']);
-
-      // ✅ Accepted logic: updatedAt matches the concrete timestamp sent from Repo
-      let timestampValid = ('updatedAt' in d) && (d.updatedAt is timestamp);
-
-      return structureValid && timestampValid;
+      return (d is map)
+        && d.keys().hasOnly(['stars', 'pros', 'freeplay', 'updatedAt'])
+        && ('updatedAt' in d)
+        && (d.updatedAt is timestamp);
     }
 
     match /user_stats/{uid} {
@@ -179,23 +171,81 @@ service cloud.firestore {
     }
 
     // ─────────────────────────────────────────
-    // Support & Leaderboards
+    // ✅ Support System (HARDENED)
     // ─────────────────────────────────────────
 
+    function ticketOwnerByResource() {
+      return isAuthenticated()
+        && resource != null
+        && resource.data.userId == request.auth.uid;
+    }
+
+    function ticketOwnerByGet(ticketId) {
+      return isAuthenticated()
+        && get(/databases/$(database)/documents/support_tickets/$(ticketId)).data.userId == request.auth.uid;
+    }
+
+    // (OPTIONAL but recommended) allow owner to bump ticket list fields only
+    // This prevents failing when client updates lastMessage/updatedAt on every new message.
+    function isSafeTicketOwnerUpdate() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let allowed = ['lastMessage', 'updatedAt'];
+
+      let ownerStillSame =
+        (request.resource.data.userId == resource.data.userId);
+
+      let lastMsgOk =
+        (!changed.hasAny(['lastMessage'])) || (request.resource.data.lastMessage is string);
+
+      let updatedAtOk =
+        (!changed.hasAny(['updatedAt'])) || (request.resource.data.updatedAt is timestamp);
+
+      return ticketOwnerByResource()
+        && changed.hasOnly(allowed)
+        && ownerStillSame
+        && lastMsgOk
+        && updatedAtOk;
+    }
+
     match /support_tickets/{ticketId} {
-      allow read: if isModerator() || (isAuthenticated() && resource.data.userId == request.auth.uid);
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isModerator();
+
+      // read: mod OR owner
+      allow read: if isModerator() || ticketOwnerByResource();
+
+      // create: user creates own ticket
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid;
+
+      // update/delete:
+      // - mods: full
+      // - owner: only bump fields (lastMessage/updatedAt)
+      allow update: if isModerator() || isSafeTicketOwnerUpdate();
+      allow delete: if isModerator();
 
       match /messages/{messageId} {
-        allow read, create, update, delete: if isModerator()
-          || (isAuthenticated() && get(/databases/$(database)/documents/support_tickets/$(ticketId)).data.userId == request.auth.uid);
+
+        // read: mod OR owner
+        allow read: if isModerator() || ticketOwnerByGet(ticketId);
+
+        // create: mod OR owner, with strict payload validation
+        allow create: if isAuthenticated()
+          && (isModerator() || ticketOwnerByGet(ticketId))
+          && request.resource.data.keys().hasOnly(['senderId','isAdminMessage','text','sentAt'])
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.isAdminMessage is bool
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 2000
+          && request.resource.data.sentAt is timestamp;
+
+        // messages are immutable for users
+        allow update, delete: if isModerator();
       }
     }
 
-    match /support_chats/{docId} {
-      allow read, write: if isModerator();
-    }
+    // ─────────────────────────────────────────
+    // Leaderboards
+    // ─────────────────────────────────────────
 
     match /leaderboards/{league}/entries/{uid} {
       allow read: if true;

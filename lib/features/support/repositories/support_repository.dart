@@ -1,4 +1,11 @@
 // PATH: lib/features/support/repositories/support_repository.dart
+//
+// FIX: Align SupportRepository writes with Firestore Rules (Support hardened)
+// ✅ No serverTimestamp() for fields validated as timestamp in rules
+// ✅ messages payload keys EXACTLY: senderId, isAdminMessage, text, sentAt
+// ✅ ticket owner update keys EXACTLY: lastMessage, updatedAt
+// ✅ ticket admin/mod update: full fields allowed (status/assignedTo/messageCount...)
+// ✅ Keeps existing public API as much as possible
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/constants/firestore_paths.dart';
@@ -21,10 +28,19 @@ class SupportRepository {
   // Ticket Methods
   // ─────────────────────────────────────────────────────────────────
 
-  /// Watches tickets for a specific user.
   Stream<List<SupportTicket>> watchUserTickets(String userId) {
     return _ticketsRef
         .where('userId', isEqualTo: userId)
+        .orderBy('updatedAt', descending: true)
+        .limit(20)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => SupportTicket.fromFirestore(d.data(), d.id))
+            .toList());
+  }
+
+  Stream<List<SupportTicket>> watchAllTickets() {
+    return _ticketsRef
         .orderBy('updatedAt', descending: true)
         .limit(50)
         .snapshots()
@@ -33,42 +49,34 @@ class SupportRepository {
             .toList());
   }
 
-  /// Watches all tickets (admin only).
-  Stream<List<SupportTicket>> watchAllTickets() {
-    return _ticketsRef
-        .orderBy('updatedAt', descending: true)
-        .limit(100)
-        .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => SupportTicket.fromFirestore(d.data(), d.id))
-            .toList());
-  }
-
-  /// Creates a new support ticket.
   Future<String> createTicket(
     String userId,
     String userName,
     String subject,
   ) async {
+    if (subject.trim().isEmpty) throw ArgumentError('Subject cannot be empty');
+
     final ticket = SupportTicket(
       id: '',
       userId: userId,
       userName: userName,
-      subject: subject,
+      subject: subject.trim(),
       status: TicketStatus.open,
       messageCount: 0,
     );
     ticket.validate();
 
+    final now = Timestamp.now();
+
     final data = ticket.toFirestore();
-    data['createdAt'] = FieldValue.serverTimestamp();
-    data['updatedAt'] = FieldValue.serverTimestamp();
+    // ✅ Use concrete timestamps (Rules that validate timestamp will pass)
+    data['createdAt'] = now;
+    data['updatedAt'] = now;
 
     final docRef = await _ticketsRef.add(data);
     return docRef.id;
   }
 
-  /// Updates the status of a ticket.
   Future<void> updateStatus(String ticketId, String status) async {
     if (!TicketStatus.isValid(status)) {
       throw ArgumentError('Invalid status: $status');
@@ -76,11 +84,10 @@ class SupportRepository {
 
     await _ticketsRef.doc(ticketId).update({
       'status': status,
-      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedAt': Timestamp.now(),
     });
   }
 
-  /// Assigns a ticket to an admin.
   Future<void> assignTicket(String ticketId, String adminUid) async {
     if (adminUid.trim().isEmpty) {
       throw ArgumentError('adminUid cannot be empty');
@@ -89,7 +96,7 @@ class SupportRepository {
     await _ticketsRef.doc(ticketId).update({
       'assignedTo': adminUid.trim(),
       'status': TicketStatus.inProgress,
-      'updatedAt': FieldValue.serverTimestamp(),
+      'updatedAt': Timestamp.now(),
     });
   }
 
@@ -101,18 +108,16 @@ class SupportRepository {
     return _ticketsRef.doc(ticketId).collection(_messagesSubcollection);
   }
 
-  /// Watches messages for a ticket (ordered by sentAt asc).
   Stream<List<SupportMessage>> watchMessages(String ticketId) {
     return _messagesRef(ticketId)
         .orderBy('sentAt', descending: false)
-        .limit(50)
+        .limit(100)
         .snapshots()
         .map((snap) => snap.docs
             .map((d) => SupportMessage.fromFirestore(d.data(), d.id))
             .toList());
   }
 
-  /// Sends a message to a ticket (uses transaction to increment messageCount).
   Future<String> sendMessage({
     required String ticketId,
     required String senderId,
@@ -120,12 +125,16 @@ class SupportRepository {
     required String text,
     required bool isAdmin,
   }) async {
+    final cleanText = text.trim();
+    if (cleanText.isEmpty) throw ArgumentError('Message text cannot be empty');
+
+    // Keep model validation (even though we will not store all fields in Firestore message doc)
     final message = SupportMessage(
       id: '',
       ticketId: ticketId,
       senderId: senderId,
       senderName: senderName,
-      text: text,
+      text: cleanText,
       isAdminMessage: isAdmin,
     );
     message.validate();
@@ -133,25 +142,46 @@ class SupportRepository {
     final ticketDoc = _ticketsRef.doc(ticketId);
     final messagesCol = _messagesRef(ticketId);
 
+    final now = Timestamp.now();
+
     return _firestore.runTransaction((tx) async {
       final ticketSnap = await tx.get(ticketDoc);
       if (!ticketSnap.exists) {
         throw ArgumentError('Ticket not found: $ticketId');
       }
 
-      final currentCount = (ticketSnap.data()?['messageCount'] as int?) ?? 0;
-
-      final messageData = message.toFirestore();
-      messageData['sentAt'] = FieldValue.serverTimestamp();
+      // ✅ Rules require EXACT message keys:
+      // senderId, isAdminMessage, text, sentAt
+      final messageData = <String, dynamic>{
+        'senderId': senderId,
+        'isAdminMessage': isAdmin,
+        'text': cleanText,
+        'sentAt': now,
+      };
 
       final newMessageRef = messagesCol.doc();
       tx.set(newMessageRef, messageData);
 
-      tx.update(ticketDoc, {
-        'messageCount': currentCount + 1,
-        'lastMessageAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      // ✅ Ticket update must match rules:
+      // - Moderator: full update allowed
+      // - Owner: ONLY lastMessage + updatedAt allowed
+      if (isAdmin) {
+        final currentCount = (ticketSnap.data()?['messageCount'] as int?) ?? 0;
+
+        tx.update(ticketDoc, {
+          'messageCount': currentCount + 1,
+          'lastMessage': cleanText,
+          // keep if your model/UI uses it (mods can write anything)
+          'lastMessageAt': now,
+          'updatedAt': now,
+        });
+      } else {
+        // Owner-safe update (matches hardened rules exactly)
+        tx.update(ticketDoc, {
+          'lastMessage': cleanText,
+          'updatedAt': now,
+        });
+      }
 
       return newMessageRef.id;
     });
