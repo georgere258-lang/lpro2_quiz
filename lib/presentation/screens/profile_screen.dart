@@ -15,6 +15,8 @@ import 'about_screen.dart';
 import 'login_screen.dart';
 import 'admin/admin_panel.dart';
 import 'stats_screen.dart';
+// ✅ التصحيح: بما أن ملف البروفايل وملف الشات كلاهما داخل مجلد screens، المسار الصحيح هو:
+import 'chat_support_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onSupportPressed;
@@ -68,7 +70,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             return Stack(
               children: [
-                // ✅ Ultra Premium Radial Glow
                 Positioned(
                   top: -50,
                   left: 0,
@@ -141,6 +142,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             MaterialPageRoute(
                                 builder: (_) => const AboutScreen()));
                       },
+                    ),
+                    // ✅ تم تفعيل زر الدعم بالمسار الصحيح
+                    _buildProfileBtn(
+                      "الدعم والمساعدة",
+                      Icons.support_agent_rounded,
+                      () {
+                        SoundManager.playTap();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ChatSupportScreen(),
+                          ),
+                        );
+                      },
+                      iconColor: deepTeal,
                     ),
                     _buildProfileBtn(
                       "تسجيل الخروج",
@@ -230,7 +246,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        // ✅ Sleek Micro-Cards
         Expanded(
             child: _buildPointCard("نجوم", starsPoints, Icons.stars_rounded)),
         const SizedBox(width: 14),
