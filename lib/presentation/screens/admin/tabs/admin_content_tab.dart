@@ -315,7 +315,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
         for (final item in chunk) {
           if (item is! Map) continue;
 
-          final data = Map<String, dynamic>.from(item as Map);
+          final data = Map<String, dynamic>.from(item);
 
           // Determine/Generate docId
           final docId = (data['docId']?.toString().trim().isNotEmpty == true)
