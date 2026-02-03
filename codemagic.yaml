@@ -1,0 +1,52 @@
+workflows:
+  ios_ipa:
+    name: iOS IPA (Runner)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      vars:
+        XCODE_WORKSPACE: "ios/Runner.xcworkspace"
+        XCODE_SCHEME: "Runner"
+    scripts:
+      - name: Flutter pub get
+        script: |
+          flutter --version
+          flutter pub get
+
+      - name: Pod install
+        script: |
+          cd ios
+          pod install
+          cd ..
+
+      - name: Build IPA
+        script: |
+          flutter build ipa --release
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - build/ios/archive/*.xcarchive
+      - flutter_drive.log
+
+  android_aab:
+    name: Android AAB (Release)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      flutter: stable
+    scripts:
+      - name: Flutter pub get
+        script: |
+          flutter --version
+          flutter pub get
+
+      - name: Build AAB
+        script: |
+          flutter build appbundle --release
+
+    artifacts:
+      - build/app/outputs/bundle/release/*.aab
+      - build/app/outputs/flutter-apk/*.apk
