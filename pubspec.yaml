@@ -1,10 +1,9 @@
-# PATH: pubspec.yaml
-
 name: lpro2_quiz
 description: "تطبيق L Pro العقاري المطور - نسخة بريميوم"
 publish_to: 'none'
 
-version: 1.0.0+1
+# ⚠️ تم تحديث الرقم لكي يقبله المتجر كنسخة جديدة
+version: 1.0.1+2
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -16,10 +15,10 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
-  # --- إدارة الحالة (مطلوبة لتشغيل UnitFlow + RepositoryProvider) ---
+  # --- إدارة الحالة ---
   flutter_bloc: ^8.1.6
 
-  # --- مكتبة التخزين المحلي (تمت إضافتها لحل مشكلة كسر التشغيل) ---
+  # --- مكتبة التخزين المحلي ---
   shared_preferences: ^2.2.2
 
   # الخطوط وتنسيق النصوص
@@ -72,16 +71,17 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
-  # أداة بناء الأيقونات (Dev Only)
+  # أداة بناء الأيقونات
   flutter_launcher_icons: ^0.13.1
 
-# إعدادات أيقونة التطبيق
+# ✅ إعدادات الأيقونة الموحدة (أندرويد و iOS)
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icon.png"
   min_sdk_android: 21
-  adaptive_icon_background: "#1B4D57"
+  # إعدادات الأندرويد الحديث (Adaptive Icons)
+  adaptive_icon_background: "#1B4D57"  # لون الخلفية البترولي
   adaptive_icon_foreground: "assets/icon.png"
 
 flutter:
@@ -92,7 +92,6 @@ flutter:
     - assets/logo.svg
     - assets/top_brand.png
     - assets/icon.png
-    # تم حذف الـ service_account.json نهائياً لأسباب أمنية
     - assets/sounds/click.mp3
     - assets/sounds/success.mp3
     - assets/sounds/wrong.mp3
