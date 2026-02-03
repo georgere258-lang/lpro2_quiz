@@ -1,13 +1,16 @@
+# ios/Podfile
+
 platform :ios, '13.0'
 
+# تحميل أدوات Flutter الرسمية
 load File.join(File.dirname(File.realpath(__FILE__)), 'Flutter', 'podhelper.rb')
 
 target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
-  # السطر ده دلوقت مطابق للدالة اللي فوق
-  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+  # ✅ التصحيح المهم هنا (argumentين بدل واحد)
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__)), 'Runner'
 end
 
 post_install do |installer|
