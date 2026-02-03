@@ -1,16 +1,21 @@
-# ios/Podfile
-
 platform :ios, '13.0'
 
-# تحميل أدوات Flutter الرسمية
+# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
 load File.join(File.dirname(File.realpath(__FILE__)), 'Flutter', 'podhelper.rb')
 
 target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
-  # ✅ التصحيح المهم هنا (argumentين بدل واحد)
-  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__)), 'Runner'
+  flutter_install_all_ios_pods(File.dirname(File.realpath(__FILE__)))
 end
 
 post_install do |installer|
