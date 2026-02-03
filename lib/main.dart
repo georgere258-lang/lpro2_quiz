@@ -15,7 +15,6 @@ import 'package:lpro2_quiz/core/utils/sound_manager.dart';
 
 import 'package:lpro2_quiz/presentation/screens/splash_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/login_screen.dart';
-import 'package:lpro2_quiz/presentation/screens/complete_profile_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/main_wrapper.dart';
 import 'package:lpro2_quiz/presentation/screens/about_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/admin/admin_panel.dart';
@@ -146,7 +145,6 @@ class _LProAppState extends State<LProApp> {
       routes: {
         '/': (_) => const SplashScreen(),
         '/login': (_) => const LoginScreen(),
-        '/complete_profile': (_) => const CompleteProfileScreen(),
         '/home': (_) => const MainWrapper(),
         '/about': (_) => const AboutScreen(),
         '/admin': (_) => const AdminPanel(),

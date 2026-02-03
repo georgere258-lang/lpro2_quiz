@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.lpro2_quiz"
+    namespace = "com.george.lpro"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -22,7 +22,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.lpro2_quiz"
+        applicationId = "com.george.lpro"
         minSdk = flutter.minSdkVersion 
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
