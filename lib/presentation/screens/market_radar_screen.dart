@@ -290,16 +290,18 @@ class MarketRadarScreen extends StatelessWidget {
           .limit(20)
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const Center(
               child: Padding(
                   padding: EdgeInsets.all(20),
                   child: CircularProgressIndicator()));
+        }
         final docs = snapshot.data!.docs;
-        if (docs.isEmpty)
+        if (docs.isEmpty) {
           return Center(
               child: Text('المكتبة فارغة حالياً',
                   style: GoogleFonts.cairo(color: Colors.grey)));
+        }
         return ListView.separated(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),

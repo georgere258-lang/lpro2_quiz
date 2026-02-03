@@ -224,7 +224,7 @@ class _ItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = AppColors.secondaryOrange;
+    const accent = AppColors.secondaryOrange;
 
     return Container(
       padding: const EdgeInsets.all(14),

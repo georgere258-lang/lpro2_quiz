@@ -42,8 +42,9 @@ class QuizRepositoryImpl {
 
     // Arabic / legacy
     if (k == 'دوري النجوم' || k.toLowerCase() == 'stars league') return 'stars';
-    if (k == 'دوري المحترفين' || k.toLowerCase() == 'pros league')
+    if (k == 'دوري المحترفين' || k.toLowerCase() == 'pros league') {
       return 'pros';
+    }
 
     // Free play labels
     if (k == 'لعب حر' || k == 'اللعب الحر' || k.toLowerCase() == 'free play') {
@@ -121,12 +122,15 @@ class QuizRepositoryImpl {
         };
 
         if (!isSameDay) {
-          if (dailyField != 'dailyStarsRounds')
+          if (dailyField != 'dailyStarsRounds') {
             userUpdates['dailyStarsRounds'] = 0;
-          if (dailyField != 'dailyProsRounds')
+          }
+          if (dailyField != 'dailyProsRounds') {
             userUpdates['dailyProsRounds'] = 0;
-          if (dailyField != 'dailyFreePlayRounds')
+          }
+          if (dailyField != 'dailyFreePlayRounds') {
             userUpdates['dailyFreePlayRounds'] = 0;
+          }
         }
 
         if (!isFreePlay) {
@@ -161,11 +165,13 @@ class QuizRepositoryImpl {
         };
 
         // preserve other leagues if present
-        if (rootData.containsKey('stars'))
+        if (rootData.containsKey('stars')) {
           cleanRoot['stars'] = rootData['stars'];
+        }
         if (rootData.containsKey('pros')) cleanRoot['pros'] = rootData['pros'];
-        if (rootData.containsKey('freeplay'))
+        if (rootData.containsKey('freeplay')) {
           cleanRoot['freeplay'] = rootData['freeplay'];
+        }
 
         cleanRoot[normalizedLeagueKey] = leagueMap;
 

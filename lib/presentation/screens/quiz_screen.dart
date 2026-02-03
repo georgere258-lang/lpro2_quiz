@@ -747,7 +747,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                             context,
                             MaterialPageRoute(
                                 // ✅ Fix 3: Return to MainWrapper(Home) for safe flow
-                                builder: (_) => MainWrapper(initialIndex: 0)),
+                                builder: (_) => const MainWrapper(initialIndex: 0)),
                             (route) => false),
                         child: Text("رجوع",
                             style: GoogleFonts.cairo(

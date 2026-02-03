@@ -242,8 +242,9 @@ class _AdminContentTabState extends State<AdminContentTab> {
       if (_coreC.text.isNotEmpty) data['core'] = _coreC.text.trim();
       if (_exampleC.text.isNotEmpty) data['example'] = _exampleC.text.trim();
       if (_lockC.text.isNotEmpty) data['lock'] = _lockC.text.trim();
-      if (_publishAt != null)
+      if (_publishAt != null) {
         data['publishAt'] = Timestamp.fromDate(_publishAt!);
+      }
 
       if (_selectedType == 'know_your_client') {
         data['sectionKey'] = (_selectedSectionKey ?? '').trim();
@@ -392,7 +393,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
             _sectionHeader('نوع المحتوى والقسم'),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
-              value: _selectedType,
+              initialValue: _selectedType,
               decoration: adminDropDecor().copyWith(labelText: 'نوع المحتوى'),
               items: _contentTypes.entries
                   .map((e) => DropdownMenuItem(
@@ -426,7 +427,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
             const SizedBox(height: 10),
             if (_selectedType == 'know_your_client') ...[
               DropdownButtonFormField<String>(
-                value: (_selectedSectionKey?.trim().isNotEmpty == true)
+                initialValue: (_selectedSectionKey?.trim().isNotEmpty == true)
                     ? _selectedSectionKey
                     : _kycKeyMapping.keys.first,
                 decoration: adminDropDecor()
@@ -454,7 +455,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
               const SizedBox(height: 10),
             ] else ...[
               DropdownButtonFormField<String>(
-                value: _selectedSection,
+                initialValue: _selectedSection,
                 decoration: adminDropDecor().copyWith(labelText: 'القسم (Tag)'),
                 items: (_sectionsByType[_selectedType] ?? const <String>[])
                     .map((s) => DropdownMenuItem(
@@ -625,7 +626,7 @@ class _AdminContentTabState extends State<AdminContentTab> {
             Switch(
               value: value,
               onChanged: onChanged,
-              activeColor: AppColors.secondaryOrange,
+              activeThumbColor: AppColors.secondaryOrange,
             ),
           ],
         ),

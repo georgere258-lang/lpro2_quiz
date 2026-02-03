@@ -151,7 +151,7 @@ class _AdminInlineControlsState extends State<AdminInlineControls> {
             color: AppColors.primaryDeepTeal.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(Icons.admin_panel_settings,
+          child: const Icon(Icons.admin_panel_settings,
               size: 18, color: AppColors.primaryDeepTeal),
         ),
         const SizedBox(width: 10),
@@ -285,10 +285,12 @@ class _AdminInlineControlsState extends State<AdminInlineControls> {
         String msg = newValue
             ? 'تم التفعيل: $key'
             : (key == 'isActive' ? 'تم الإخفاء' : 'تم الإلغاء');
-        if (key == 'isPinned')
+        if (key == 'isPinned') {
           msg = newValue ? '📌 تم التثبيت' : 'تم إلغاء التثبيت';
-        if (key == 'isActive')
+        }
+        if (key == 'isActive') {
           msg = newValue ? '👁️ تم الإظهار' : '🙈 تم الإخفاء';
+        }
 
         _showSnack(context, msg);
       }
