@@ -1,6 +1,6 @@
 // PATH: lib/main.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // ✅ ضروري جداً للتحكم في الزوايا السفلية
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -27,7 +27,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   print('FIREBASE projectId = ${Firebase.app().options.projectId}');
   print('FIREBASE appId = ${Firebase.app().options.appId}');
-  // لا نحتاج للـ seed هنا لأنه سيعمل في main
 }
 
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
@@ -43,11 +42,15 @@ void main() async {
   // 1. التهيئة الأساسية
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 2. تهيئة فايربيز (استخدام خياراتك الحالية)
+  // 2. تهيئة فايربيز
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // ✅ 3. استدعاء كود الرفع (سيعمل مرة واحدة فقط بفضل القفل الداخلي)
-  await SeedKnowYourClientV2.run();
+  // ✅ 3. تشغيل الـ Seed في الخلفية بدون انتظار (Async) لضمان عدم تعليق الشاشة البيضاء في iOS
+  SeedKnowYourClientV2.run().then((_) {
+    debugPrint('✅ Seed process completed in background');
+  }).catchError((e) {
+    debugPrint('❌ Seed process failed: $e');
+  });
 
   // 4. إعدادات النظام (الزوايا السفلية والبار العلوي)
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -88,7 +91,7 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  // 6. تشغيل التطبيق مع الـ RepositoryProvider الخاص بك
+  // 6. تشغيل التطبيق
   runApp(
     RepositoryProvider<UnitRepository>(
       create: (_) => LocalUnitRepository(),
