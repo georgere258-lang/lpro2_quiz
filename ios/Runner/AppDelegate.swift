@@ -1,6 +1,7 @@
 import UIKit
 import Flutter
-import Firebase // إضافة مكتبة Firebase
+import Firebase
+import UserNotifications
 
 @UIApplicationMain
 @objc class AppDelegate: FlutterAppDelegate {
@@ -10,12 +11,18 @@ import Firebase // إضافة مكتبة Firebase
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
 
-    // 1. تشغيل Firebase قبل أي شيء آخر لضمان استقرار المكتبات
+    // 1️⃣ Firebase لازم يشتغل قبل تسجيل أي Plugin
     if FirebaseApp.app() == nil {
-        FirebaseApp.configure()
+      FirebaseApp.configure()
     }
 
-    // 2. تسجيل الـ Plugins (بما فيها Firebase Cloud Messaging)
+    // 2️⃣ مهم جدًا: ربط UNUserNotificationCenter
+    // بدونها iOS أحيانًا يعلّق بعد شاشة إذن الإشعارات
+    if #available(iOS 10.0, *) {
+      UNUserNotificationCenter.current().delegate = self
+    }
+
+    // 3️⃣ تسجيل Plugins
     GeneratedPluginRegistrant.register(with: self)
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
