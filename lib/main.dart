@@ -1,4 +1,7 @@
 // PATH: lib/main.dart
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -19,14 +22,16 @@ import 'package:lpro2_quiz/presentation/screens/main_wrapper.dart';
 import 'package:lpro2_quiz/presentation/screens/about_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/admin/admin_panel.dart';
 import 'package:lpro2_quiz/presentation/screens/know_client_screen.dart';
-import 'package:lpro2_quiz/core/utils/seed_know_your_client_v2.dart';
+
 import 'core/curriculum/unit_repository.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  print('FIREBASE projectId = ${Firebase.app().options.projectId}');
-  print('FIREBASE appId = ${Firebase.app().options.appId}');
+  // Background isolate: safe init (do not assume initialized).
+  try {
+    await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform);
+  } catch (_) {}
 }
 
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
@@ -38,21 +43,12 @@ const AndroidNotificationChannel channel = AndroidNotificationChannel(
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
-void main() async {
-  // 1. التهيئة الأساسية
+bool _bootstrapStarted = false;
+
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 2. تهيئة فايربيز
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // ✅ 3. تشغيل الـ Seed في الخلفية بدون انتظار (Async) لضمان عدم تعليق الشاشة البيضاء في iOS
-  SeedKnowYourClientV2.run().then((_) {
-    debugPrint('✅ Seed process completed in background');
-  }).catchError((e) {
-    debugPrint('❌ Seed process failed: $e');
-  });
-
-  // 4. إعدادات النظام (الزوايا السفلية والبار العلوي)
+  // ✅ UI overlays (safe + sync)
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarDividerColor: Colors.transparent,
@@ -60,59 +56,111 @@ void main() async {
     statusBarColor: Colors.transparent,
   ));
 
-  // 5. تهيئة الخدمات الإضافية
-  SoundManager.init();
+  // ✅ Register background handler early (no await, no Firebase init here)
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
-
-  const InitializationSettings initializationSettings =
-      InitializationSettings(android: initializationSettingsAndroid);
-
-  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
-
-  await flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
-      ?.createNotificationChannel(channel);
-
-  await Permission.notification.request();
-
-  FirebaseMessaging messaging = FirebaseMessaging.instance;
-  await messaging.subscribeToTopic('all_users');
-
-  _subscribeToNotificationTopics();
-
-  await messaging.requestPermission(alert: true, badge: true, sound: true);
-
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
-
-  // 6. تشغيل التطبيق
+  // ✅ Render UI immediately (avoid iOS watchdog / white screen)
   runApp(
     RepositoryProvider<UnitRepository>(
       create: (_) => LocalUnitRepository(),
       child: const LProApp(),
     ),
   );
+
+  // ✅ Everything heavy AFTER first frame
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (_bootstrapStarted) return;
+    _bootstrapStarted = true;
+    unawaited(_bootstrapAfterRunApp());
+  });
+}
+
+Future<void> _bootstrapAfterRunApp() async {
+  try {
+    // 1) Orientation (keep out of pre-runApp)
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+
+    // 2) Firebase init (guarded + timeout so it never blocks UI forever)
+    await Firebase.initializeApp(
+            options: DefaultFirebaseOptions.currentPlatform)
+        .timeout(const Duration(seconds: 12));
+
+    // 3) Sounds (local, safe)
+    SoundManager.init();
+
+    // 4) Local notifications init (Android + iOS)
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosInit = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+
+    const initSettings = InitializationSettings(
+      android: androidInit,
+      iOS: iosInit,
+    );
+
+    await flutterLocalNotificationsPlugin.initialize(initSettings);
+
+    // 5) Android-only: channel + Android 13+ permission
+    if (Platform.isAndroid) {
+      await flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(channel);
+
+      // Android 13+ notification permission
+      await Permission.notification.request();
+    }
+
+    final messaging = FirebaseMessaging.instance;
+
+    // 6) iOS-only: request push permission (avoid iOS dialog at cold start blocking launch)
+    // NOTE: If you still want it at launch, keep it here (post-frame). Best practice:
+    // move it to after login/onboarding later — but we keep minimal now.
+    if (Platform.isIOS) {
+      await messaging
+          .requestPermission(alert: true, badge: true, sound: true)
+          .timeout(const Duration(seconds: 8));
+    }
+
+    // 7) Topics (non-fatal)
+    unawaited(
+      messaging
+          .subscribeToTopic('all_users')
+          .timeout(const Duration(seconds: 5)),
+    );
+
+    _subscribeToNotificationTopics();
+  } catch (_) {
+    // Intentionally swallow to avoid any startup crash/hang.
+    // Later: route to Crashlytics/Sentry once verified stable.
+  }
 }
 
 void _subscribeToNotificationTopics() {
   FirebaseAuth.instance.authStateChanges().listen((User? user) {
     if (user != null) {
-      FirebaseMessaging.instance.subscribeToTopic(user.uid);
+      unawaited(FirebaseMessaging.instance.subscribeToTopic(user.uid));
       if (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
-        FirebaseMessaging.instance.subscribeToTopic('admin_notifications');
+        unawaited(
+          FirebaseMessaging.instance.subscribeToTopic('admin_notifications'),
+        );
       }
     }
   });
 }
 
+/// Utility: fire-and-forget without analyzer noise.
+void unawaited(Future<void> future) {}
+
 class LProApp extends StatefulWidget {
   const LProApp({super.key});
+
   static void setLocale(BuildContext context, Locale newLocale) {
     final state = context.findAncestorStateOfType<_LProAppState>();
     state?.changeLanguage(newLocale);
@@ -124,6 +172,7 @@ class LProApp extends StatefulWidget {
 
 class _LProAppState extends State<LProApp> {
   Locale _locale = const Locale('ar', 'EG');
+
   void changeLanguage(Locale locale) {
     setState(() => _locale = locale);
   }
