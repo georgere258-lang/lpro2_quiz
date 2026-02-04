@@ -2,35 +2,37 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import 'package:lpro2_quiz/firebase_options.dart';
 import 'package:lpro2_quiz/core/theme/app_theme.dart';
 import 'package:lpro2_quiz/core/utils/sound_manager.dart';
 
-import 'package:lpro2_quiz/presentation/screens/splash_screen.dart';
-import 'package:lpro2_quiz/presentation/screens/login_screen.dart';
-import 'package:lpro2_quiz/presentation/screens/main_wrapper.dart';
 import 'package:lpro2_quiz/presentation/screens/about_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/admin/admin_panel.dart';
 import 'package:lpro2_quiz/presentation/screens/know_client_screen.dart';
+import 'package:lpro2_quiz/presentation/screens/login_screen.dart';
+import 'package:lpro2_quiz/presentation/screens/main_wrapper.dart';
+import 'package:lpro2_quiz/presentation/screens/splash_screen.dart';
 
 import 'core/curriculum/unit_repository.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Background isolate: safe init (do not assume initialized).
+  // Background isolate: must init Firebase here.
   try {
     await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform);
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
   } catch (_) {}
 }
 
@@ -43,9 +45,7 @@ const AndroidNotificationChannel channel = AndroidNotificationChannel(
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
-bool _bootstrapStarted = false;
-
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // ✅ UI overlays (safe + sync)
@@ -56,101 +56,104 @@ void main() {
     statusBarColor: Colors.transparent,
   ));
 
-  // ✅ Register background handler early (no await, no Firebase init here)
+  // ✅ Orientation (safe)
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  // ✅ Firebase MUST be initialized BEFORE any widget touches Auth/Messaging/Firestore
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // ✅ Register background handler AFTER Firebase init in main isolate
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // ✅ Render UI immediately (avoid iOS watchdog / white screen)
+  // ✅ Local init (safe)
+  SoundManager.init();
+  await _initLocalNotifications();
+
+  // ✅ Subscribe to topics (no permission prompt here)
+  _subscribeToNotificationTopics();
+
   runApp(
     RepositoryProvider<UnitRepository>(
       create: (_) => LocalUnitRepository(),
       child: const LProApp(),
     ),
   );
-
-  // ✅ Everything heavy AFTER first frame
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (_bootstrapStarted) return;
-    _bootstrapStarted = true;
-    unawaited(_bootstrapAfterRunApp());
-  });
 }
 
-Future<void> _bootstrapAfterRunApp() async {
-  try {
-    // 1) Orientation (keep out of pre-runApp)
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+Future<void> _initLocalNotifications() async {
+  const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const iosInit = DarwinInitializationSettings(
+    requestAlertPermission: false,
+    requestBadgePermission: false,
+    requestSoundPermission: false,
+  );
 
-    // 2) Firebase init (guarded + timeout so it never blocks UI forever)
-    await Firebase.initializeApp(
-            options: DefaultFirebaseOptions.currentPlatform)
-        .timeout(const Duration(seconds: 12));
+  const initSettings = InitializationSettings(
+    android: androidInit,
+    iOS: iosInit,
+  );
 
-    // 3) Sounds (local, safe)
-    SoundManager.init();
+  await flutterLocalNotificationsPlugin.initialize(initSettings);
 
-    // 4) Local notifications init (Android + iOS)
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosInit = DarwinInitializationSettings(
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
-    );
+  if (Platform.isAndroid) {
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
 
-    const initSettings = InitializationSettings(
-      android: androidInit,
-      iOS: iosInit,
-    );
-
-    await flutterLocalNotificationsPlugin.initialize(initSettings);
-
-    // 5) Android-only: channel + Android 13+ permission
-    if (Platform.isAndroid) {
-      await flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(channel);
-
-      // Android 13+ notification permission
-      await Permission.notification.request();
-    }
-
-    final messaging = FirebaseMessaging.instance;
-
-    // 6) iOS-only: request push permission (avoid iOS dialog at cold start blocking launch)
-    // NOTE: If you still want it at launch, keep it here (post-frame). Best practice:
-    // move it to after login/onboarding later — but we keep minimal now.
-    if (Platform.isIOS) {
-      await messaging
-          .requestPermission(alert: true, badge: true, sound: true)
-          .timeout(const Duration(seconds: 8));
-    }
-
-    // 7) Topics (non-fatal)
-    unawaited(
-      messaging
-          .subscribeToTopic('all_users')
-          .timeout(const Duration(seconds: 5)),
-    );
-
-    _subscribeToNotificationTopics();
-  } catch (_) {
-    // Intentionally swallow to avoid any startup crash/hang.
-    // Later: route to Crashlytics/Sentry once verified stable.
+    // Android 13+ notification permission
+    await Permission.notification.request();
   }
 }
 
 void _subscribeToNotificationTopics() {
-  FirebaseAuth.instance.authStateChanges().listen((User? user) {
-    if (user != null) {
-      unawaited(FirebaseMessaging.instance.subscribeToTopic(user.uid));
-      if (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
-        unawaited(
-          FirebaseMessaging.instance.subscribeToTopic('admin_notifications'),
-        );
+  // Important: don't call Messaging APIs before Firebase is initialized (now guaranteed).
+  final messaging = FirebaseMessaging.instance;
+
+  // Non-fatal global topic
+  unawaited(messaging.subscribeToTopic('all_users'));
+
+  FirebaseAuth.instance.authStateChanges().listen((User? user) async {
+    if (user == null) return;
+
+    // Per-user topic
+    unawaited(messaging.subscribeToTopic(user.uid));
+
+    // Admin topic
+    if (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
+      unawaited(messaging.subscribeToTopic('admin_notifications'));
+    }
+
+    // ✅ OPTIONAL (Safe): ensure user doc exists without crashing startup
+    try {
+      final userRef =
+          FirebaseFirestore.instance.collection('users').doc(user.uid);
+      final snap = await userRef.get();
+      if (!snap.exists) {
+        await userRef.set({
+          'uid': user.uid,
+          'name': 'عضو L Pro جديد',
+          'phone': user.phoneNumber,
+          'points': 0,
+          'starsPoints': 0,
+          'proPoints': 0,
+          'role':
+              (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') ? 'admin' : 'user',
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        await userRef.set({
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
       }
+    } catch (_) {
+      // swallow (no startup crash)
     }
   });
 }
