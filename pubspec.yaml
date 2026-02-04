@@ -3,7 +3,7 @@ description: "تطبيق L Pro العقاري المطور - نسخة بريمي
 publish_to: 'none'
 
 # ✅ تم تحديث رقم الـ Build إلى 3 لكي يقبله المتجر كنسخة جديدة فوق النسخة السابقة
-version: 1.0.1+7
+version: 1.0.1+8
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
