@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io'; // ✅ تمت الإضافة: للتعرف على نوع الجهاز
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -111,13 +112,21 @@ class _SplashScreenState extends State<SplashScreen>
             children: [
               ScaleTransition(
                 scale: _scaleAnimation,
-                child: SvgPicture.asset(
-                  'assets/logo.svg',
-                  width: MediaQuery.of(context).size.width * 0.8,
-                  fit: BoxFit.contain,
-                  placeholderBuilder: (c) => const Icon(Icons.business,
-                      size: 100, color: Colors.white),
-                ),
+                // ✅ بداية التعديل: شرط مخصص لنظام أبل فقط
+                child: Platform.isIOS
+                    ? Image.asset(
+                        'assets/top_brand.png',
+                        width: MediaQuery.of(context).size.width * 0.8,
+                        fit: BoxFit.contain,
+                      )
+                    : SvgPicture.asset(
+                        'assets/logo.svg',
+                        width: MediaQuery.of(context).size.width * 0.8,
+                        fit: BoxFit.contain,
+                        placeholderBuilder: (c) => const Icon(Icons.business,
+                            size: 100, color: Colors.white),
+                      ),
+                // ✅ نهاية التعديل
               ),
               const SizedBox(height: 5),
               FadeTransition(
@@ -154,7 +163,8 @@ class _SplashScreenState extends State<SplashScreen>
                               19), // الحواف نصف الارتفاع تماماً
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.secondaryOrange.withValues(alpha: 0.2),
+                              color: AppColors.secondaryOrange
+                                  .withValues(alpha: 0.2),
                               blurRadius: 10,
                               offset: const Offset(0, 3),
                             ),
