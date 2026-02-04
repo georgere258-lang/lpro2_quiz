@@ -1,5 +1,6 @@
 import UIKit
 import Flutter
+import Firebase // إضافة مكتبة Firebase
 
 @UIApplicationMain
 @objc class AppDelegate: FlutterAppDelegate {
@@ -9,11 +10,14 @@ import Flutter
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
 
-    // Minimal AppDelegate
-    // No Firebase, no Notifications, no native logic
-    // Let Flutter handle everything after first frame
+    // 1. تشغيل Firebase قبل أي شيء آخر لضمان استقرار المكتبات
+    if FirebaseApp.app() == nil {
+        FirebaseApp.configure()
+    }
 
+    // 2. تسجيل الـ Plugins (بما فيها Firebase Cloud Messaging)
     GeneratedPluginRegistrant.register(with: self)
+
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 }
