@@ -5,16 +5,16 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'dart:ui'; // PlatformDispatcher
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+
 import 'package:lpro2_quiz/firebase_options.dart';
 import 'package:lpro2_quiz/core/theme/app_theme.dart';
 import 'package:lpro2_quiz/core/utils/sound_manager.dart';
@@ -30,7 +30,6 @@ import 'core/curriculum/unit_repository.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Background isolate: must init Firebase here.
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -47,10 +46,12 @@ const AndroidNotificationChannel channel = AndroidNotificationChannel(
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
-Future<void> main() async {
+bool _bootstrapStarted = false;
+
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ✅ UI overlays (safe + sync)
+  // UI overlays (sync, safe)
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarDividerColor: Colors.transparent,
@@ -58,43 +59,73 @@ Future<void> main() async {
     statusBarColor: Colors.transparent,
   ));
 
-  // ✅ Orientation (safe)
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  // Background handler early (no Firebase init here)
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // ✅ Firebase MUST be initialized BEFORE any widget touches Auth/Messaging/Firestore
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  // ✅ Crashlytics hooks (after Firebase init)
+  // Crash handlers early (guarded: may run before Firebase init)
   FlutterError.onError = (FlutterErrorDetails details) {
-    FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+    FlutterError.presentError(details);
+    try {
+      if (Firebase.apps.isNotEmpty) {
+        FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+      }
+    } catch (_) {}
   };
 
   PlatformDispatcher.instance.onError = (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    try {
+      if (Firebase.apps.isNotEmpty) {
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      }
+    } catch (_) {}
     return true;
   };
 
-  // ✅ Register background handler AFTER Firebase init in main isolate
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  // ✅ Local init (safe)
-  SoundManager.init();
-  await _initLocalNotifications();
-
-  // ✅ Subscribe to topics (no permission prompt here)
-  _subscribeToNotificationTopics();
-
+  // Render UI immediately (prevents iOS watchdog / black or grey screen)
   runApp(
     RepositoryProvider<UnitRepository>(
       create: (_) => LocalUnitRepository(),
       child: const LProApp(),
     ),
   );
+
+  // Heavy work AFTER first frame
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (_bootstrapStarted) return;
+    _bootstrapStarted = true;
+    unawaited(_bootstrapAfterFirstFrame());
+  });
+}
+
+Future<void> _bootstrapAfterFirstFrame() async {
+  try {
+    // Orientation (post-frame)
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+
+    // Firebase init (guarded + timeout)
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).timeout(const Duration(seconds: 12));
+
+    // Optional: Crashlytics collection (safe after init)
+    try {
+      await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
+    } catch (_) {}
+
+    // Sounds
+    SoundManager.init();
+
+    // Local notifications init (NO iOS permission prompt here)
+    await _initLocalNotifications();
+
+    // Topics (non-fatal)
+    _subscribeToNotificationTopics();
+  } catch (_) {
+    // swallow to avoid any startup crash/hang
+  }
 }
 
 Future<void> _initLocalNotifications() async {
@@ -124,7 +155,6 @@ Future<void> _initLocalNotifications() async {
 }
 
 void _subscribeToNotificationTopics() {
-  // Important: don't call Messaging APIs before Firebase is initialized (now guaranteed).
   final messaging = FirebaseMessaging.instance;
 
   // Non-fatal global topic
@@ -141,7 +171,7 @@ void _subscribeToNotificationTopics() {
       unawaited(messaging.subscribeToTopic('admin_notifications'));
     }
 
-    // ✅ OPTIONAL (Safe): ensure user doc exists without crashing startup
+    // Ensure user doc exists (safe, no crash)
     try {
       final userRef =
           FirebaseFirestore.instance.collection('users').doc(user.uid);
@@ -164,9 +194,7 @@ void _subscribeToNotificationTopics() {
           'updatedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
       }
-    } catch (_) {
-      // swallow (no startup crash)
-    }
+    } catch (_) {}
   });
 }
 
