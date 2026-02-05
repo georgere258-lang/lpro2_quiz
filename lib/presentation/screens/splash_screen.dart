@@ -1,6 +1,9 @@
 // PATH: lib/presentation/screens/splash_screen.dart
+// STATUS: ✅ iOS uses PNG logo (assets/logo.png) + Android keeps SVG + safer init order
+
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -36,26 +39,18 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
-    _initApp();
-  }
 
-  void _initApp() {
-    final user = FirebaseAuth.instance.currentUser;
-    isUserLoggedIn = (user != null);
-
-    // 1) Logo: أبطأ + أوضح
+    // ✅ 1) Controllers أولاً (علشان dispose آمن حتى لو أي جزء فشل)
     _logoController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1900),
     );
 
-    // 2) Text/Button: يبدأ بعد اللوجو
     _textController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 750),
     );
 
-    // 3) Pulse بعد ما النص يظهر
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -77,7 +72,7 @@ class _SplashScreenState extends State<SplashScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    // تشغيل: اللوجو -> بعده النص -> بعده النبض
+    // ✅ 2) شغل الأنيميشن
     _logoController.forward();
     Future.delayed(const Duration(milliseconds: 1200), () {
       if (!mounted) return;
@@ -87,9 +82,26 @@ class _SplashScreenState extends State<SplashScreen>
       });
     });
 
+    // ✅ 3) Resolve auth + navigation (محمي)
+    _resolveAuthAndNavigate();
+
+    // ✅ 4) Notifications (محمي)
+    _initNotifications();
+  }
+
+  void _resolveAuthAndNavigate() {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      isUserLoggedIn = (user != null);
+    } catch (_) {
+      // لو لأي سبب Firebase مش جاهز/في مشكلة مؤقتة: اعتبره مش مسجل
+      isUserLoggedIn = false;
+    }
+
     // وقت كافي لظهور الأنيميشن قبل الانتقال
     Future.delayed(const Duration(milliseconds: 4200), () {
       if (!mounted) return;
+
       if (isUserLoggedIn) {
         Navigator.pushReplacement(
           context,
@@ -99,19 +111,26 @@ class _SplashScreenState extends State<SplashScreen>
         setState(() => showLoginButton = true);
       }
     });
-
-    _initNotifications();
   }
 
   void _initNotifications() async {
     try {
       final messaging = FirebaseMessaging.instance;
-      await messaging.subscribeToTopic('all_users');
+
+      // Non-fatal ops (مش عايزين أي تعليق على السبلاش)
+      unawaited(messaging.subscribeToTopic('all_users').timeout(
+            const Duration(seconds: 5),
+          ));
+
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        await messaging.subscribeToTopic(user.uid);
+        unawaited(messaging.subscribeToTopic(user.uid).timeout(
+              const Duration(seconds: 5),
+            ));
         if (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
-          await messaging.subscribeToTopic('admin_notifications');
+          unawaited(messaging.subscribeToTopic('admin_notifications').timeout(
+                const Duration(seconds: 5),
+              ));
         }
       }
     } catch (e) {
@@ -128,21 +147,23 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   double _logoWidthFactorForPlatform() {
-    // iPhone screenshot واضح إن الصورة كبيرة — نقللها على iOS فقط.
+    // iOS: أقل شوية
     return Platform.isIOS ? 0.62 : 0.78;
   }
 
   Widget _buildLogo(BuildContext context) {
     final w = MediaQuery.of(context).size.width * _logoWidthFactorForPlatform();
 
+    // ✅ iOS => PNG (assets/logo.png)
     if (Platform.isIOS) {
       return Image.asset(
-        'assets/top_brand.png',
+        'assets/logo.png',
         width: w,
         fit: BoxFit.contain,
       );
     }
 
+    // ✅ Android => SVG (assets/logo.svg)
     return SvgPicture.asset(
       'assets/logo.svg',
       width: w,
@@ -151,6 +172,8 @@ class _SplashScreenState extends State<SplashScreen>
           const Icon(Icons.business, size: 100, color: Colors.white),
     );
   }
+
+  void unawaited(Future<void> f) {}
 
   @override
   Widget build(BuildContext context) {
@@ -180,8 +203,6 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
               ),
               const SizedBox(height: 10),
-
-              // النص + الزر يظهروا بعد اللوجو
               FadeTransition(
                 opacity: _textFade,
                 child: Column(
@@ -234,7 +255,8 @@ class _SplashScreenState extends State<SplashScreen>
                             Navigator.pushReplacement(
                               context,
                               MaterialPageRoute(
-                                  builder: (c) => const LoginScreen()),
+                                builder: (c) => const LoginScreen(),
+                              ),
                             );
                           },
                           child: Text(
@@ -251,7 +273,8 @@ class _SplashScreenState extends State<SplashScreen>
                       )
                     else if (isUserLoggedIn)
                       const CircularProgressIndicator(
-                          color: AppColors.secondaryOrange),
+                        color: AppColors.secondaryOrange,
+                      ),
                   ],
                 ),
               ),
