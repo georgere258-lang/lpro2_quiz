@@ -1,14 +1,11 @@
 // PATH: lib/presentation/screens/splash_screen.dart
-// STATUS: ✅ iOS uses PNG logo (assets/logo.png) + Android keeps SVG + safer init order
-
 import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'package:firebase_core/firebase_core.dart';
 
 import '../../core/constants/app_colors.dart';
 import 'login_screen.dart';
@@ -39,8 +36,27 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
+    _initApp();
+  }
 
-    // ✅ 1) Controllers أولاً (علشان dispose آمن حتى لو أي جزء فشل)
+  Future<void> _initApp() async {
+    // ✅ 1) Guard Firebase readiness (prevents core/no-app race)
+    try {
+      await _ensureFirebaseReady();
+    } catch (_) {
+      // حتى لو فشل الـ guard يسمح للسبلاش يشتغل بدل شاشة سودا
+      // (هنشوف النتيجة على الجهاز)
+    }
+
+    // ✅ 2) Auth check (safe after guard)
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      isUserLoggedIn = (user != null);
+    } catch (_) {
+      isUserLoggedIn = false;
+    }
+
+    // 3) Animations
     _logoController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1900),
@@ -72,7 +88,6 @@ class _SplashScreenState extends State<SplashScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    // ✅ 2) شغل الأنيميشن
     _logoController.forward();
     Future.delayed(const Duration(milliseconds: 1200), () {
       if (!mounted) return;
@@ -82,23 +97,9 @@ class _SplashScreenState extends State<SplashScreen>
       });
     });
 
-    // ✅ 3) Resolve auth + navigation (محمي)
-    _resolveAuthAndNavigate();
+    // ✅ 4) IMPORTANT: no FCM calls here (avoid iOS blocking)
+    // سيتم عمل subscribe للـ topics لاحقاً بعد Login / داخل Settings / داخل MainWrapper.
 
-    // ✅ 4) Notifications (محمي)
-    _initNotifications();
-  }
-
-  void _resolveAuthAndNavigate() {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      isUserLoggedIn = (user != null);
-    } catch (_) {
-      // لو لأي سبب Firebase مش جاهز/في مشكلة مؤقتة: اعتبره مش مسجل
-      isUserLoggedIn = false;
-    }
-
-    // وقت كافي لظهور الأنيميشن قبل الانتقال
     Future.delayed(const Duration(milliseconds: 4200), () {
       if (!mounted) return;
 
@@ -113,29 +114,36 @@ class _SplashScreenState extends State<SplashScreen>
     });
   }
 
-  void _initNotifications() async {
-    try {
-      final messaging = FirebaseMessaging.instance;
-
-      // Non-fatal ops (مش عايزين أي تعليق على السبلاش)
-      unawaited(messaging.subscribeToTopic('all_users').timeout(
-            const Duration(seconds: 5),
-          ));
-
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        unawaited(messaging.subscribeToTopic(user.uid).timeout(
-              const Duration(seconds: 5),
-            ));
-        if (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
-          unawaited(messaging.subscribeToTopic('admin_notifications').timeout(
-                const Duration(seconds: 5),
-              ));
-        }
-      }
-    } catch (e) {
-      debugPrint("FCM Error: $e");
+  Future<void> _ensureFirebaseReady() async {
+    // لو Firebase اتعملها init في main.dart المفروض Firebase.apps مش فاضية.
+    // على iOS أحياناً plugins بتحتاج وقت بسيط بعد init.
+    int attempts = 0;
+    while (Firebase.apps.isEmpty && attempts < 50) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      attempts++;
     }
+    if (Firebase.apps.isEmpty) {
+      throw Exception('Firebase not ready');
+    }
+
+    if (Platform.isIOS) {
+      // مهلة صغيرة لتفادي race مع FirebaseAuth على iOS
+      await Future.delayed(const Duration(milliseconds: 350));
+    }
+  }
+
+  Widget _buildLogo(BuildContext context) {
+    final w =
+        MediaQuery.of(context).size.width * (Platform.isIOS ? 0.62 : 0.78);
+
+    // ✅ Unified: PNG for both platforms (avoids svg/iOS surprises)
+    return Image.asset(
+      'assets/logo.png',
+      width: w,
+      fit: BoxFit.contain,
+      errorBuilder: (_, __, ___) =>
+          const Icon(Icons.business, size: 100, color: Colors.white),
+    );
   }
 
   @override
@@ -145,35 +153,6 @@ class _SplashScreenState extends State<SplashScreen>
     _pulseController.dispose();
     super.dispose();
   }
-
-  double _logoWidthFactorForPlatform() {
-    // iOS: أقل شوية
-    return Platform.isIOS ? 0.62 : 0.78;
-  }
-
-  Widget _buildLogo(BuildContext context) {
-    final w = MediaQuery.of(context).size.width * _logoWidthFactorForPlatform();
-
-    // ✅ iOS => PNG (assets/logo.png)
-    if (Platform.isIOS) {
-      return Image.asset(
-        'assets/logo.png',
-        width: w,
-        fit: BoxFit.contain,
-      );
-    }
-
-    // ✅ Android => SVG (assets/logo.svg)
-    return SvgPicture.asset(
-      'assets/logo.svg',
-      width: w,
-      fit: BoxFit.contain,
-      placeholderBuilder: (c) =>
-          const Icon(Icons.business, size: 100, color: Colors.white),
-    );
-  }
-
-  void unawaited(Future<void> f) {}
 
   @override
   Widget build(BuildContext context) {
@@ -255,8 +234,7 @@ class _SplashScreenState extends State<SplashScreen>
                             Navigator.pushReplacement(
                               context,
                               MaterialPageRoute(
-                                builder: (c) => const LoginScreen(),
-                              ),
+                                  builder: (c) => const LoginScreen()),
                             );
                           },
                           child: Text(
@@ -273,8 +251,7 @@ class _SplashScreenState extends State<SplashScreen>
                       )
                     else if (isUserLoggedIn)
                       const CircularProgressIndicator(
-                        color: AppColors.secondaryOrange,
-                      ),
+                          color: AppColors.secondaryOrange),
                   ],
                 ),
               ),
