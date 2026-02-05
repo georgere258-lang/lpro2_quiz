@@ -1,5 +1,6 @@
+// PATH: lib/presentation/screens/splash_screen.dart
 import 'dart:async';
-import 'dart:io'; // ✅ تمت الإضافة: للتعرف على نوع الجهاز
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -19,11 +20,15 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
-  late AnimationController _controller;
-  late AnimationController _pulseController;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _pulseAnimation;
+  late final AnimationController _logoController;
+  late final AnimationController _textController;
+  late final AnimationController _pulseController;
+
+  late final Animation<double> _logoScale;
+  late final Animation<double> _logoFade;
+
+  late final Animation<double> _textFade;
+  late final Animation<double> _pulseScale;
 
   bool isUserLoggedIn = false;
   bool showLoginButton = false;
@@ -34,31 +39,62 @@ class _SplashScreenState extends State<SplashScreen>
     _initApp();
   }
 
-  void _initApp() async {
+  void _initApp() {
     final user = FirebaseAuth.instance.currentUser;
     isUserLoggedIn = (user != null);
 
-    _controller = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1500));
+    // 1) Logo: أبطأ + أوضح
+    _logoController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1900),
+    );
+
+    // 2) Text/Button: يبدأ بعد اللوجو
+    _textController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 750),
+    );
+
+    // 3) Pulse بعد ما النص يظهر
     _pulseController = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1200));
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
 
-    _scaleAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
-        CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0)
-        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.03).animate(
-        CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut));
+    _logoScale = Tween<double>(begin: 0.55, end: 1.0).animate(
+      CurvedAnimation(parent: _logoController, curve: Curves.easeOutCubic),
+    );
 
-    _controller.forward().then((_) {
-      if (mounted) _pulseController.repeat(reverse: true);
+    _logoFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _logoController, curve: Curves.easeIn),
+    );
+
+    _textFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _textController, curve: Curves.easeIn),
+    );
+
+    _pulseScale = Tween<double>(begin: 1.0, end: 1.035).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    // تشغيل: اللوجو -> بعده النص -> بعده النبض
+    _logoController.forward();
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      if (!mounted) return;
+      _textController.forward().then((_) {
+        if (!mounted) return;
+        _pulseController.repeat(reverse: true);
+      });
     });
 
-    Future.delayed(const Duration(seconds: 3), () {
+    // وقت كافي لظهور الأنيميشن قبل الانتقال
+    Future.delayed(const Duration(milliseconds: 4200), () {
       if (!mounted) return;
       if (isUserLoggedIn) {
         Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (c) => const MainWrapper()));
+          context,
+          MaterialPageRoute(builder: (c) => const MainWrapper()),
+        );
       } else {
         setState(() => showLoginButton = true);
       }
@@ -69,7 +105,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _initNotifications() async {
     try {
-      FirebaseMessaging messaging = FirebaseMessaging.instance;
+      final messaging = FirebaseMessaging.instance;
       await messaging.subscribeToTopic('all_users');
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
@@ -85,9 +121,35 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
-    _controller.dispose();
+    _logoController.dispose();
+    _textController.dispose();
     _pulseController.dispose();
     super.dispose();
+  }
+
+  double _logoWidthFactorForPlatform() {
+    // iPhone screenshot واضح إن الصورة كبيرة — نقللها على iOS فقط.
+    return Platform.isIOS ? 0.62 : 0.78;
+  }
+
+  Widget _buildLogo(BuildContext context) {
+    final w = MediaQuery.of(context).size.width * _logoWidthFactorForPlatform();
+
+    if (Platform.isIOS) {
+      return Image.asset(
+        'assets/top_brand.png',
+        width: w,
+        fit: BoxFit.contain,
+      );
+    }
+
+    return SvgPicture.asset(
+      'assets/logo.svg',
+      width: w,
+      fit: BoxFit.contain,
+      placeholderBuilder: (c) =>
+          const Icon(Icons.business, size: 100, color: Colors.white),
+    );
   }
 
   @override
@@ -110,31 +172,22 @@ class _SplashScreenState extends State<SplashScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              ScaleTransition(
-                scale: _scaleAnimation,
-                // ✅ بداية التعديل: شرط مخصص لنظام أبل فقط
-                child: Platform.isIOS
-                    ? Image.asset(
-                        'assets/top_brand.png',
-                        width: MediaQuery.of(context).size.width * 0.8,
-                        fit: BoxFit.contain,
-                      )
-                    : SvgPicture.asset(
-                        'assets/logo.svg',
-                        width: MediaQuery.of(context).size.width * 0.8,
-                        fit: BoxFit.contain,
-                        placeholderBuilder: (c) => const Icon(Icons.business,
-                            size: 100, color: Colors.white),
-                      ),
-                // ✅ نهاية التعديل
-              ),
-              const SizedBox(height: 5),
               FadeTransition(
-                opacity: _fadeAnimation,
+                opacity: _logoFade,
+                child: ScaleTransition(
+                  scale: _logoScale,
+                  child: _buildLogo(context),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // النص + الزر يظهروا بعد اللوجو
+              FadeTransition(
+                opacity: _textFade,
                 child: Column(
                   children: [
                     ScaleTransition(
-                      scale: _pulseAnimation,
+                      scale: _pulseScale,
                       child: Text(
                         "المعلومة بتفرق",
                         textAlign: TextAlign.center,
@@ -155,12 +208,10 @@ class _SplashScreenState extends State<SplashScreen>
                     const SizedBox(height: 35),
                     if (showLoginButton)
                       Container(
-                        // ✅ تم التصغير مجدداً: العرض 130 والارتفاع 38
                         width: 130,
                         height: 38,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(
-                              19), // الحواف نصف الارتفاع تماماً
+                          borderRadius: BorderRadius.circular(19),
                           boxShadow: [
                             BoxShadow(
                               color: AppColors.secondaryOrange
@@ -176,20 +227,21 @@ class _SplashScreenState extends State<SplashScreen>
                             elevation: 0,
                             padding: EdgeInsets.zero,
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(19)),
+                              borderRadius: BorderRadius.circular(19),
+                            ),
                           ),
                           onPressed: () {
                             Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (c) => const LoginScreen()));
+                              context,
+                              MaterialPageRoute(
+                                  builder: (c) => const LoginScreen()),
+                            );
                           },
                           child: Text(
                             "اهلا Pro",
                             textAlign: TextAlign.center,
                             style: GoogleFonts.cairo(
-                              fontSize:
-                                  15, // تصغير إضافي ليتناسب مع الحجم الصغير
+                              fontSize: 15,
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                               height: 1.0,
