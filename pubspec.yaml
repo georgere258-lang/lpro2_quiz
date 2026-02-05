@@ -2,7 +2,7 @@ name: lpro2_quiz
 description: "تطبيق L Pro العقاري المطور - نسخة بريميوم"
 publish_to: 'none'
 
-version: 1.0.1+13
+version: 1.0.1+14
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -63,6 +63,7 @@ flutter:
   assets:
     - assets/
     - assets/logo.svg
+    - assets/logo.png
     - assets/top_brand.png
     - assets/icon.png
     - assets/sounds/click.mp3
