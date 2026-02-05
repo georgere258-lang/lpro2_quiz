@@ -45,7 +45,7 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 
 bool _bootstrapStarted = false;
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -54,6 +54,11 @@ void main() {
     systemNavigationBarIconBrightness: Brightness.light,
     statusBarColor: Colors.transparent,
   ));
+
+  // ✅ لازم Firebase قبل runApp (علشان Splash مايكراش مع FirebaseAuth)
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  ).timeout(const Duration(seconds: 12));
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
@@ -77,10 +82,6 @@ Future<void> _bootstrapAfterRunApp() async {
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
-
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    ).timeout(const Duration(seconds: 12));
 
     SoundManager.init();
 
@@ -109,7 +110,7 @@ Future<void> _bootstrapAfterRunApp() async {
       await Permission.notification.request();
     }
 
-    // ✅ iOS: ممنوع نطلب Permission على أول فتحة (ده كان بيطلع Prompt بدري)
+    // ✅ iOS: ممنوع نطلب Permission على أول فتحة
     // هنفعل الإشعارات لاحقًا بعد Login/داخل Settings.
     if (Platform.isAndroid) {
       // Topics (non-fatal)
