@@ -2,35 +2,31 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'dart:ui'; // PlatformDispatcher
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
 import 'package:lpro2_quiz/firebase_options.dart';
 import 'package:lpro2_quiz/core/theme/app_theme.dart';
 import 'package:lpro2_quiz/core/utils/sound_manager.dart';
 
+import 'package:lpro2_quiz/presentation/screens/splash_screen.dart';
+import 'package:lpro2_quiz/presentation/screens/login_screen.dart';
+import 'package:lpro2_quiz/presentation/screens/main_wrapper.dart';
 import 'package:lpro2_quiz/presentation/screens/about_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/admin/admin_panel.dart';
 import 'package:lpro2_quiz/presentation/screens/know_client_screen.dart';
-import 'package:lpro2_quiz/presentation/screens/login_screen.dart';
-import 'package:lpro2_quiz/presentation/screens/main_wrapper.dart';
-import 'package:lpro2_quiz/presentation/screens/splash_screen.dart';
 
 import 'core/curriculum/unit_repository.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Background isolate: must init Firebase here.
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -47,10 +43,11 @@ const AndroidNotificationChannel channel = AndroidNotificationChannel(
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
-Future<void> main() async {
+bool _bootstrapStarted = false;
+
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ✅ UI overlays (safe + sync)
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarDividerColor: Colors.transparent,
@@ -58,36 +55,7 @@ Future<void> main() async {
     statusBarColor: Colors.transparent,
   ));
 
-  // ✅ Orientation (safe)
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
-
-  // ✅ Firebase MUST be initialized BEFORE any widget touches Auth/Messaging/Firestore
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  // ✅ Crashlytics hooks (after Firebase init)
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FirebaseCrashlytics.instance.recordFlutterFatalError(details);
-  };
-
-  PlatformDispatcher.instance.onError = (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    return true;
-  };
-
-  // ✅ Register background handler AFTER Firebase init in main isolate
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  // ✅ Local init (safe)
-  SoundManager.init();
-  await _initLocalNotifications();
-
-  // ✅ Subscribe to topics (no permission prompt here)
-  _subscribeToNotificationTopics();
 
   runApp(
     RepositoryProvider<UnitRepository>(
@@ -95,82 +63,81 @@ Future<void> main() async {
       child: const LProApp(),
     ),
   );
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (_bootstrapStarted) return;
+    _bootstrapStarted = true;
+    unawaited(_bootstrapAfterRunApp());
+  });
 }
 
-Future<void> _initLocalNotifications() async {
-  const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const iosInit = DarwinInitializationSettings(
-    requestAlertPermission: false,
-    requestBadgePermission: false,
-    requestSoundPermission: false,
-  );
+Future<void> _bootstrapAfterRunApp() async {
+  try {
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
 
-  const initSettings = InitializationSettings(
-    android: androidInit,
-    iOS: iosInit,
-  );
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).timeout(const Duration(seconds: 12));
 
-  await flutterLocalNotificationsPlugin.initialize(initSettings);
+    SoundManager.init();
 
-  if (Platform.isAndroid) {
-    await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(channel);
+    // Local notifications init (Android + iOS) — بدون طلب permissions هنا.
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosInit = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
 
-    // Android 13+ notification permission
-    await Permission.notification.request();
+    const initSettings = InitializationSettings(
+      android: androidInit,
+      iOS: iosInit,
+    );
+
+    await flutterLocalNotificationsPlugin.initialize(initSettings);
+
+    // Android-only: channel + Android 13+ permission
+    if (Platform.isAndroid) {
+      await flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(channel);
+
+      await Permission.notification.request();
+    }
+
+    // ✅ iOS: ممنوع نطلب Permission على أول فتحة (ده كان بيطلع Prompt بدري)
+    // هنفعل الإشعارات لاحقًا بعد Login/داخل Settings.
+    if (Platform.isAndroid) {
+      // Topics (non-fatal)
+      unawaited(
+        FirebaseMessaging.instance
+            .subscribeToTopic('all_users')
+            .timeout(const Duration(seconds: 5)),
+      );
+      _subscribeToNotificationTopics();
+    }
+  } catch (_) {
+    // swallow intentionally to avoid startup crash/hang
   }
 }
 
 void _subscribeToNotificationTopics() {
-  // Important: don't call Messaging APIs before Firebase is initialized (now guaranteed).
-  final messaging = FirebaseMessaging.instance;
-
-  // Non-fatal global topic
-  unawaited(messaging.subscribeToTopic('all_users'));
-
-  FirebaseAuth.instance.authStateChanges().listen((User? user) async {
-    if (user == null) return;
-
-    // Per-user topic
-    unawaited(messaging.subscribeToTopic(user.uid));
-
-    // Admin topic
-    if (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
-      unawaited(messaging.subscribeToTopic('admin_notifications'));
-    }
-
-    // ✅ OPTIONAL (Safe): ensure user doc exists without crashing startup
-    try {
-      final userRef =
-          FirebaseFirestore.instance.collection('users').doc(user.uid);
-      final snap = await userRef.get();
-      if (!snap.exists) {
-        await userRef.set({
-          'uid': user.uid,
-          'name': 'عضو L Pro جديد',
-          'phone': user.phoneNumber,
-          'points': 0,
-          'starsPoints': 0,
-          'proPoints': 0,
-          'role':
-              (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') ? 'admin' : 'user',
-          'createdAt': FieldValue.serverTimestamp(),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-      } else {
-        await userRef.set({
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+  FirebaseAuth.instance.authStateChanges().listen((User? user) {
+    if (user != null) {
+      unawaited(FirebaseMessaging.instance.subscribeToTopic(user.uid));
+      if (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
+        unawaited(
+          FirebaseMessaging.instance.subscribeToTopic('admin_notifications'),
+        );
       }
-    } catch (_) {
-      // swallow (no startup crash)
     }
   });
 }
 
-/// Utility: fire-and-forget without analyzer noise.
 void unawaited(Future<void> future) {}
 
 class LProApp extends StatefulWidget {

@@ -2,6 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+
   <key>CFBundleDevelopmentRegion</key>
   <string>$(DEVELOPMENT_LANGUAGE)</string>
 
@@ -35,13 +36,14 @@
   <key>LSRequiresIPhoneOS</key>
   <true/>
 
+  <!-- Launch -->
   <key>UILaunchStoryboardName</key>
   <string>LaunchScreen</string>
 
   <key>UIMainStoryboardFile</key>
   <string>Main</string>
 
-  <!-- ✅ IMPORTANT: iOS 13+ Scene Manifest (required for proper presentation flows) -->
+  <!-- iOS 13+ Scene -->
   <key>UIApplicationSceneManifest</key>
   <dict>
     <key>UIApplicationSupportsMultipleScenes</key>
@@ -60,6 +62,7 @@
     </dict>
   </dict>
 
+  <!-- Orientations -->
   <key>UISupportedInterfaceOrientations</key>
   <array>
     <string>UIInterfaceOrientationPortrait</string>
@@ -75,7 +78,7 @@
     <string>UIInterfaceOrientationLandscapeRight</string>
   </array>
 
-  <!-- Flutter / Rendering -->
+  <!-- Flutter -->
   <key>FLTEnableImpeller</key>
   <false/>
 
@@ -88,6 +91,17 @@
   <true/>
   <key>FirebaseScreenReportingEnabled</key>
   <false/>
+
+  <!-- 🔴 REQUIRED FOR FIREBASE PHONE AUTH (reCAPTCHA fallback) -->
+  <key>CFBundleURLTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleURLSchemes</key>
+      <array>
+        <string>com.googleusercontent.apps.905243871570-1e1rl17ir696ml70u9ejvdev651t81f6</string>
+      </array>
+    </dict>
+  </array>
 
   <!-- Notifications -->
   <key>NSUserNotificationsUsageDescription</key>
@@ -103,5 +117,6 @@
   <true/>
   <key>UIApplicationSupportsIndirectInputEvents</key>
   <true/>
+
 </dict>
 </plist>
