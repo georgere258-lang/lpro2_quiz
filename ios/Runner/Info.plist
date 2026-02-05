@@ -41,7 +41,7 @@
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
 
-    <!-- ✅ MUST be TRUE for Flutter + Firebase Messaging -->
+    <!-- ✅ لازم تفضل TRUE (أو احذف المفتاح) عشان Firebase/PhoneAuth/FCM مايتكسروش -->
     <key>FirebaseAppDelegateProxyEnabled</key>
     <true/>
 
