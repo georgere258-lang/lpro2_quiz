@@ -240,20 +240,54 @@ class _AdminInlineControlsState extends State<AdminInlineControls> {
 
   // ─── الوظائف (Functions) ───
 
-  // 1. نقل للأرشيف
+  // 1. نقل للأرشيف (✅ FIX: Clone into a NEW doc; do NOT modify the slot doc)
   Future<void> _moveToArchive(BuildContext context) async {
     if (widget.docRef == null) return;
     _startBusy();
 
     try {
-      await widget.docRef!.update({
-        'isArchived': true,
-        'createdAtMs': DateTime.now().millisecondsSinceEpoch,
-      });
-      HapticFeedback.mediumImpact(); // اهتزاز للتأكيد
+      final snap = await widget.docRef!.get();
+      if (!snap.exists) {
+        _showSnack(context, 'خطأ: المستند غير موجود');
+        return;
+      }
+
+      final data = snap.data() ?? {};
+      final isAlreadyArchived = (data['isArchived'] ?? false) == true;
+      if (isAlreadyArchived) {
+        HapticFeedback.lightImpact();
+        _showSnack(context, 'هذا الموضوع موجود بالأرشيف بالفعل');
+        return;
+      }
+
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+
+      // Create a NEW doc in the same collection
+      final parentCol = widget.docRef!.parent;
+      final newRef = parentCol.doc();
+
+      // Clone current content into archive doc
+      final Map<String, dynamic> archiveData = Map<String, dynamic>.from(data);
+
+      archiveData['isArchived'] = true;
+      archiveData['createdAtMs'] = nowMs; // ✅ must be int milliseconds
+      archiveData['updatedAtMs'] = nowMs;
+      archiveData['sourceSlot'] =
+          widget.docRef!.id; // hotPulse/areaBrief/caseFile
+      if ((archiveData['sectionKey']?.toString().trim().isEmpty ?? true)) {
+        archiveData['sectionKey'] = widget.sectionKey ?? 'market_radar';
+      }
+
+      // Ensure archived doc doesn't accidentally carry an "id" field that conflicts
+      // (safe no-op if not present)
+      archiveData.remove('id');
+
+      await newRef.set(archiveData);
+
+      HapticFeedback.mediumImpact();
       if (context.mounted) {
         Navigator.pop(context); // إغلاق
-        _showSnack(context, '✅ تم النقل للأرشيف بنجاح');
+        _showSnack(context, '✅ تم حفظ نسخة في السجلات بنجاح');
       }
     } catch (e) {
       _showSnack(context, 'خطأ: $e');
