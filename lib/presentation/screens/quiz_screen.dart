@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/quiz_screen.dart
-// STATUS: Phase 4 Platinum + Lottie Premium (Unified Sizing & Timing Fix) ✅
+// STATUS: Phase 4 Platinum + Lottie + Premium Confetti (Identity Colors) ✅
 
 import 'dart:async';
 import 'dart:convert';
@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lottie/lottie.dart';
+import 'package:confetti/confetti.dart'; // ✅ الاستيراد الجديد
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/firestore_paths.dart';
@@ -67,6 +68,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   bool _showLottie = false;
   bool _isLastAnswerCorrect = false;
 
+  // ✅ Confetti Controller
+  late ConfettiController _confettiController;
+
   String? _selectedOption;
   int _currentQuestionIndex = 0;
   int _questionIndexInRound = 0;
@@ -115,6 +119,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     _glowController =
         AnimationController(vsync: this, duration: const Duration(seconds: 9))
           ..repeat(reverse: true);
+
+    // ✅ تعريف متحكم القصاصات
+    _confettiController =
+        ConfettiController(duration: const Duration(seconds: 3));
+
     _initQuizEngine();
   }
 
@@ -122,11 +131,12 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   void dispose() {
     _timer?.cancel();
     _glowController.dispose();
+    _confettiController.dispose(); // ✅ تنظيف الذاكرة
     super.dispose();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // PART A: Engine Logics
+  // PART A: Engine Logics (Unchanged)
   // ═══════════════════════════════════════════════════════════════════════════
 
   String get _recentlySeenPrefsKey =>
@@ -367,6 +377,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       _roundScore = 0;
       _correctAnswersCount = 0;
     });
+    _confettiController.stop(); // إيقاف القصاصات عند بداية جولة جديدة
     _startTimer();
   }
 
@@ -404,7 +415,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       }
     });
 
-    // ✅ زيادة وقت الانتظار لضمان ظهور الأنيميشن كاملاً (1.6 ثانية)
     Future.delayed(const Duration(milliseconds: 1600), () {
       if (!mounted) return;
       if (_isSaving || !_gameStarted) return;
@@ -472,6 +482,12 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
     if (mounted) {
       setState(() => _isSaving = false);
+
+      // ✅ تشغيل القصاصات فقط عند الفوز الكامل 5/5
+      if (_correctAnswersCount == _questionsPerRound) {
+        _confettiController.play();
+      }
+
       _showResultSheet();
     }
   }
@@ -518,6 +534,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: Stack(
+          alignment: Alignment.topCenter, // لتوسيط القصاصات في الأعلى
           children: [
             _animatedGlowBackground(),
             Column(
@@ -559,7 +576,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                         fontWeight: FontWeight.w900,
                                         color: primaryColor)))),
                         const SizedBox(height: 20),
-
                         Expanded(
                           flex: 0,
                           child: ListView.separated(
@@ -592,11 +608,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                             },
                           ),
                         ),
-
-                        // ✅ مسافة فاصلة مدروسة بصرياً
                         const SizedBox(height: 35),
-
-                        // ✅ تعديل أحجام الأنيميشن لتوحيدها ومعالجة مشكلة التفاوت
                         if (_showLottie)
                           IgnorePointer(
                             child: Center(
@@ -604,9 +616,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                 _isLastAnswerCorrect
                                     ? 'assets/lottie/success.json'
                                     : 'assets/lottie/error.json',
-                                width: 145, // توحيد الحجم للاثنين
+                                width: 145,
                                 height: 145,
-                                fit: BoxFit.contain, // ضمان عدم تمدد العلامة
+                                fit: BoxFit.contain,
                                 repeat: false,
                               ),
                             ),
@@ -617,12 +629,28 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                 ),
               ],
             ),
+
+            // ✅ أداة القصاصات (Confetti) بألوان الهوية
+            ConfettiWidget(
+              confettiController: _confettiController,
+              blastDirectionality:
+                  BlastDirectionality.explosive, // انفجار في كل الاتجاهات
+              shouldLoop: false,
+              colors: const [
+                AppColors.primaryDeepTeal,
+                AppColors.secondaryOrange,
+                Colors.amber, // الذهبي
+              ],
+              gravity: 0.15, // جاذبية خفيفة لـ Slow Motion
+              numberOfParticles: 25,
+            ),
           ],
         ),
       ),
     );
   }
 
+  // --- بقية دوال الـ UI (لم يتم تغيير أي حرف) ---
   Widget _buildIntro() {
     return Scaffold(
       backgroundColor: const Color(0xFFFDFBF7),
