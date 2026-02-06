@@ -40,15 +40,12 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _initApp() async {
-    // ✅ 1) Guard Firebase readiness (prevents core/no-app race)
+    // ✅ 1) الحماية للتأكد من جاهزية Firebase قبل أي استدعاء
     try {
       await _ensureFirebaseReady();
-    } catch (_) {
-      // حتى لو فشل الـ guard يسمح للسبلاش يشتغل بدل شاشة سودا
-      // (هنشوف النتيجة على الجهاز)
-    }
+    } catch (_) {}
 
-    // ✅ 2) Auth check (safe after guard)
+    // ✅ 2) فحص حالة تسجيل الدخول بعد التأكد من Firebase
     try {
       final user = FirebaseAuth.instance.currentUser;
       isUserLoggedIn = (user != null);
@@ -56,7 +53,7 @@ class _SplashScreenState extends State<SplashScreen>
       isUserLoggedIn = false;
     }
 
-    // 3) Animations
+    // 3) إعدادات الأنيميشن
     _logoController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1900),
@@ -97,9 +94,7 @@ class _SplashScreenState extends State<SplashScreen>
       });
     });
 
-    // ✅ 4) IMPORTANT: no FCM calls here (avoid iOS blocking)
-    // سيتم عمل subscribe للـ topics لاحقاً بعد Login / داخل Settings / داخل MainWrapper.
-
+    // ✅ 4) توقيت الانتقال للشاشة التالية
     Future.delayed(const Duration(milliseconds: 4200), () {
       if (!mounted) return;
 
@@ -115,8 +110,6 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _ensureFirebaseReady() async {
-    // لو Firebase اتعملها init في main.dart المفروض Firebase.apps مش فاضية.
-    // على iOS أحياناً plugins بتحتاج وقت بسيط بعد init.
     int attempts = 0;
     while (Firebase.apps.isEmpty && attempts < 50) {
       await Future.delayed(const Duration(milliseconds: 100));
@@ -127,19 +120,20 @@ class _SplashScreenState extends State<SplashScreen>
     }
 
     if (Platform.isIOS) {
-      // مهلة صغيرة لتفادي race مع FirebaseAuth على iOS
       await Future.delayed(const Duration(milliseconds: 350));
     }
   }
 
   Widget _buildLogo(BuildContext context) {
-    final w =
-        MediaQuery.of(context).size.width * (Platform.isIOS ? 0.62 : 0.78);
+    // ✅ ضبط المقاس ليكون مناسباً لـ Apple (iOS) بدقة
+    // تم تقليل النسبة قليلاً لتجنب ظهور اللوجو بشكل ضخم جداً على الآيفون
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double logoWidth =
+        Platform.isIOS ? screenWidth * 0.55 : screenWidth * 0.70;
 
-    // ✅ Unified: PNG for both platforms (avoids svg/iOS surprises)
     return Image.asset(
-      'assets/logo.png',
-      width: w,
+      'assets/icon.png', // ✅ استخدام PNG كما تم الاتفاق عليه لتجنب مشاكل SVG
+      width: logoWidth,
       fit: BoxFit.contain,
       errorBuilder: (_, __, ___) =>
           const Icon(Icons.business, size: 100, color: Colors.white),
@@ -181,7 +175,7 @@ class _SplashScreenState extends State<SplashScreen>
                   child: _buildLogo(context),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 15), // تعديل المسافة قليلاً للتناسق
               FadeTransition(
                 opacity: _textFade,
                 child: Column(
@@ -199,7 +193,7 @@ class _SplashScreenState extends State<SplashScreen>
                             Shadow(
                               offset: const Offset(0, 2),
                               blurRadius: 10.0,
-                              color: Colors.black.withValues(alpha: 0.3),
+                              color: Colors.black.withOpacity(0.3),
                             ),
                           ],
                         ),
@@ -214,8 +208,7 @@ class _SplashScreenState extends State<SplashScreen>
                           borderRadius: BorderRadius.circular(19),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.secondaryOrange
-                                  .withValues(alpha: 0.2),
+                              color: AppColors.secondaryOrange.withOpacity(0.2),
                               blurRadius: 10,
                               offset: const Offset(0, 3),
                             ),
