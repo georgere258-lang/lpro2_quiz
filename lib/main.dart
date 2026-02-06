@@ -43,9 +43,7 @@ const AndroidNotificationChannel channel = AndroidNotificationChannel(
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
-bool _bootstrapStarted = false;
-
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -55,74 +53,140 @@ Future<void> main() async {
     statusBarColor: Colors.transparent,
   ));
 
-  // ✅ لازم Firebase قبل runApp (علشان Splash مايكراش مع FirebaseAuth)
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  ).timeout(const Duration(seconds: 12));
-
+  // ✅ لا نعمل await هنا على iOS
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   runApp(
     RepositoryProvider<UnitRepository>(
       create: (_) => LocalUnitRepository(),
-      child: const LProApp(),
+      child: const _BootApp(),
     ),
   );
-
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (_bootstrapStarted) return;
-    _bootstrapStarted = true;
-    unawaited(_bootstrapAfterRunApp());
-  });
 }
 
-Future<void> _bootstrapAfterRunApp() async {
-  try {
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+class _BootApp extends StatefulWidget {
+  const _BootApp();
 
-    SoundManager.init();
+  @override
+  State<_BootApp> createState() => _BootAppState();
+}
 
-    // Local notifications init (Android + iOS) — بدون طلب permissions هنا.
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosInit = DarwinInitializationSettings(
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
-    );
+class _BootAppState extends State<_BootApp> {
+  bool _ready = false;
+  bool _failed = false;
 
-    const initSettings = InitializationSettings(
-      android: androidInit,
-      iOS: iosInit,
-    );
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
 
-    await flutterLocalNotificationsPlugin.initialize(initSettings);
+  Future<void> _init() async {
+    try {
+      // Orientation (safe)
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
 
-    // Android-only: channel + Android 13+ permission
-    if (Platform.isAndroid) {
-      await flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(channel);
+      // ✅ Firebase init AFTER UI tree exists
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      ).timeout(const Duration(seconds: 12));
 
-      await Permission.notification.request();
-    }
+      // non-blocking init
+      SoundManager.init();
 
-    // ✅ iOS: ممنوع نطلب Permission على أول فتحة
-    // هنفعل الإشعارات لاحقًا بعد Login/داخل Settings.
-    if (Platform.isAndroid) {
-      // Topics (non-fatal)
-      unawaited(
-        FirebaseMessaging.instance
-            .subscribeToTopic('all_users')
-            .timeout(const Duration(seconds: 5)),
+      // Local notifications init (Android + iOS) — بدون طلب permissions هنا.
+      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const iosInit = DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
       );
-      _subscribeToNotificationTopics();
+
+      const initSettings = InitializationSettings(
+        android: androidInit,
+        iOS: iosInit,
+      );
+
+      await flutterLocalNotificationsPlugin.initialize(initSettings);
+
+      // Android-only: channel + Android 13+ permission
+      if (Platform.isAndroid) {
+        await flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>()
+            ?.createNotificationChannel(channel);
+
+        await Permission.notification.request();
+
+        // Topics (non-fatal)
+        unawaited(
+          FirebaseMessaging.instance
+              .subscribeToTopic('all_users')
+              .timeout(const Duration(seconds: 5)),
+        );
+        _subscribeToNotificationTopics();
+      }
+
+      if (mounted) {
+        setState(() {
+          _ready = true;
+          _failed = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _failed = true;
+          _ready = false;
+        });
+      }
     }
-  } catch (_) {
-    // swallow intentionally to avoid startup crash/hang
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_ready) return const LProApp();
+
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: LproTheme.lightTheme,
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/logo.png',
+                  width: 140,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 18),
+                if (_failed)
+                  Column(
+                    children: [
+                      const Icon(Icons.error_outline, size: 34),
+                      const SizedBox(height: 10),
+                      const Text('فشل تشغيل التطبيق. جرّب مرة أخرى.'),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        onPressed: _init,
+                        child: const Text('إعادة المحاولة'),
+                      ),
+                    ],
+                  )
+                else
+                  const CircularProgressIndicator(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
