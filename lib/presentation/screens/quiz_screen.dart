@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/quiz_screen.dart
-// STATUS: Phase 4 Platinum - (Repo + FreePlay + Date Fix + Crash Guards + Timestamp Type Fix)
+// STATUS: Phase 4 Platinum + Lottie + Premium Confetti (Identity Colors) ✅
 
 import 'dart:async';
 import 'dart:convert';
@@ -10,15 +10,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:lottie/lottie.dart'; 
+import 'package:confetti/confetti.dart'; // ✅ الاستيراد الجديد
 
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/firestore_paths.dart'; // ✅ Uses Constants
+import '../../core/constants/firestore_paths.dart';
 import '../../core/utils/sound_manager.dart';
 import '../home/widgets/section_identity_card.dart';
 import '../widgets/lpro_bottom_nav_bar.dart';
 import 'main_wrapper.dart';
-
-// ✅ Import the new Repository
 import '../../features/quiz/repositories/quiz_repository_impl.dart';
 
 class QuizScreen extends StatefulWidget {
@@ -35,7 +35,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   // Constants & Repos
   // ═══════════════════════════════════════════════════════════════════════════
 
-  // ✅ Inject Repository (The Maestro)
   final QuizRepositoryImpl _quizRepo = QuizRepositoryImpl();
 
   static const int _roundsPerDay = 4;
@@ -65,6 +64,13 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   bool _isLoading = true;
   bool _gameStarted = false;
   bool _showFeedback = false;
+
+  bool _showLottie = false;
+  bool _isLastAnswerCorrect = false;
+
+  // ✅ Confetti Controller
+  late ConfettiController _confettiController;
+
   String? _selectedOption;
   int _currentQuestionIndex = 0;
   int _questionIndexInRound = 0;
@@ -78,7 +84,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   Timer? _timer;
   int _timeLeft = 0;
   bool _isFreePlaySession = false;
-  bool _isSaving = false; // Prevent double submission
+  bool _isSaving = false;
 
   int get _roundsDoneToday => _isStars ? _starsRoundsToday : _prosRoundsToday;
   bool get _isCurrentLeagueLocked => _roundsDoneToday >= _roundsPerDay;
@@ -113,6 +119,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     _glowController =
         AnimationController(vsync: this, duration: const Duration(seconds: 9))
           ..repeat(reverse: true);
+    
+    // ✅ تعريف متحكم القصاصات
+    _confettiController = ConfettiController(duration: const Duration(seconds: 3));
+
     _initQuizEngine();
   }
 
@@ -120,11 +130,12 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   void dispose() {
     _timer?.cancel();
     _glowController.dispose();
+    _confettiController.dispose(); // ✅ تنظيف الذاكرة
     super.dispose();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // PART A: Engine Logics
+  // PART A: Engine Logics (Unchanged)
   // ═══════════════════════════════════════════════════════════════════════════
 
   String get _recentlySeenPrefsKey =>
@@ -170,7 +181,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
   Future<void> _loadCandidatePool() async {
     try {
-      // ✅ Fix 3: Use FirestorePaths
       final snap1 = await FirebaseFirestore.instance
           .collection(FirestorePaths.quizzes)
           .where('category', isEqualTo: widget.categoryTitle)
@@ -189,7 +199,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     }
 
     try {
-      // ✅ Fix 3: Use FirestorePaths
       final snap2 = await FirebaseFirestore.instance
           .collection(FirestorePaths.quizzes)
           .where('category', isEqualTo: widget.categoryTitle)
@@ -209,26 +218,27 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
   List<_QuizQuestion> _parseQuestionDocs(
       List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
-    return docs.map((d) {
-      final data = d.data();
-      final options = ((data['options'] as List?) ?? []).cast<String>();
-      int rawCorrect =
-          (data['correctAnswer'] ?? data['correctOptionIndex'] ?? 0) as int;
-      final difficulty = ((data['difficulty'] as int?) ?? 3).clamp(1, 5);
-      return _QuizQuestion(
-        docId: d.id,
-        question: (data['question'] ?? '').toString(),
-        options: options,
-        correctAnswer:
-            options.isNotEmpty ? rawCorrect.clamp(0, options.length - 1) : 0,
-        createdAtMs:
-            (data['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0,
-        difficulty: difficulty,
-      );
-    })
-    // ✅ Guard 3 (Pre-game): Filter invalid questions
-    .where((q) => q.options.length >= 2 && q.question.trim().isNotEmpty)
-    .toList();
+    return docs
+        .map((d) {
+          final data = d.data();
+          final options = ((data['options'] as List?) ?? []).cast<String>();
+          int rawCorrect =
+              (data['correctAnswer'] ?? data['correctOptionIndex'] ?? 0) as int;
+          final difficulty = ((data['difficulty'] as int?) ?? 3).clamp(1, 5);
+          return _QuizQuestion(
+            docId: d.id,
+            question: (data['question'] ?? '').toString(),
+            options: options,
+            correctAnswer: options.isNotEmpty
+                ? rawCorrect.clamp(0, options.length - 1)
+                : 0,
+            createdAtMs:
+                (data['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0,
+            difficulty: difficulty,
+          );
+        })
+        .where((q) => q.options.length >= 2 && q.question.trim().isNotEmpty)
+        .toList();
   }
 
   void _selectQuestionsForRound() {
@@ -287,12 +297,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     _displayCorrectIndex = pairs.indexWhere((e) => e.value);
   }
 
-  // ✅ IMPROVED: Loads progress and resets correctly based on Year/Month/Day
   Future<void> _loadUserDailyProgress() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
-      // ✅ Fix 3: Use FirestorePaths
       final doc = await FirebaseFirestore.instance
           .collection(FirestorePaths.users)
           .doc(user.uid)
@@ -301,15 +309,13 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         final data = doc.data()!;
         final Timestamp? lastTs = data['lastQuizDate'] as Timestamp?;
         final now = DateTime.now();
-        
-        // ✅ Corrected Date Logic (Include Year)
+
         bool isSameDay = lastTs != null &&
-            lastTs.toDate().year == now.year && 
+            lastTs.toDate().year == now.year &&
             lastTs.toDate().month == now.month &&
             lastTs.toDate().day == now.day;
 
         if (!isSameDay) {
-          // ✅ Fix 3: Use FirestorePaths
           await FirebaseFirestore.instance
               .collection(FirestorePaths.users)
               .doc(user.uid)
@@ -317,9 +323,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             'dailyStarsRounds': 0,
             'dailyProsRounds': 0,
             'dailyFreePlayRounds': 0,
-            // ✅ CRITICAL FIX: Use concrete Timestamp to pass Rules validation
-            // Prevents infinite reset loop if rule expects 'is timestamp'
-            'lastQuizDate': Timestamp.fromDate(now), 
+            'lastQuizDate': Timestamp.fromDate(now),
           });
           if (mounted) {
             setState(() {
@@ -359,20 +363,20 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   void _startRound({required bool freePlay}) {
     if (_candidatePool.length < _questionsPerRound) return;
     _selectQuestionsForRound();
-    
-    // ✅ Fix 3 (Stability): Ensure we have enough valid questions after filtering
     if (_runQuestions.isEmpty) return;
-    
+
     _shuffleAndSetDisplayForQuestion(_runQuestions[0]);
     setState(() {
       _isFreePlaySession = freePlay;
       _gameStarted = true;
       _showFeedback = false;
+      _showLottie = false; 
       _currentQuestionIndex = 0;
       _questionIndexInRound = 0;
       _roundScore = 0;
       _correctAnswersCount = 0;
     });
+    _confettiController.stop(); // إيقاف القصاصات عند بداية جولة جديدة
     _startTimer();
   }
 
@@ -380,11 +384,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     if (_showFeedback) return;
     _timer?.cancel();
 
-    // ✅ Guard 1: Safety Check against crash (missing options)
-    if (_displayOptions.isEmpty || 
-        _displayCorrectIndex < 0 || 
+    if (_displayOptions.isEmpty ||
+        _displayCorrectIndex < 0 ||
         _displayCorrectIndex >= _displayOptions.length) {
-      // ✅ Safer flow: Check if we should finish or next
       if (_questionIndexInRound + 1 >= _questionsPerRound) {
         _finishRound();
       } else {
@@ -396,9 +398,13 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     final correct = _displayOptions[_displayCorrectIndex];
     final isCorrect = answer == correct && answer.isNotEmpty;
     _updateDifficultyProgression(isCorrect);
+
     setState(() {
       _selectedOption = answer;
       _showFeedback = true;
+      _isLastAnswerCorrect = isCorrect;
+      _showLottie = true; 
+
       if (isCorrect) {
         SoundManager.playCorrect();
         _roundScore += _isStars ? 2 : 5;
@@ -407,12 +413,12 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         SoundManager.playWrong();
       }
     });
-    
-    // ✅ ASYNC GUARD (Fix 1): Prevent race conditions after delay
-    Future.delayed(const Duration(milliseconds: 900), () {
+
+    Future.delayed(const Duration(milliseconds: 1600), () {
       if (!mounted) return;
-      // If user exited or saving started, do NOT continue flow
-      if (_isSaving || !_gameStarted) return; 
+      if (_isSaving || !_gameStarted) return;
+
+      setState(() => _showLottie = false);
 
       if (_questionIndexInRound + 1 >= _questionsPerRound) {
         _finishRound();
@@ -423,13 +429,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   void _nextQuestion() {
-    // ✅ GUARD (Fix 2): Prevent double navigation/saving
     if (_isSaving) return;
-
     _currentQuestionIndex++;
     _questionIndexInRound++;
 
-    // ✅ Guard: Safety Check against Index Out of Range
     if (_currentQuestionIndex >= _runQuestions.length) {
       _finishRound();
       return;
@@ -443,30 +446,23 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     _startTimer();
   }
 
-  // ✅ MODIFIED: Uses Repository for Unified Source of Truth
   Future<void> _finishRound() async {
-    // ✅ Fix: Cancel timer immediately to prevent delayed callbacks
     _timer?.cancel();
-    
     if (_isSaving) return;
     setState(() => _isSaving = true);
 
     final user = FirebaseAuth.instance.currentUser;
-    
-    // Only save if user exists
     if (user != null) {
       try {
-        // ✅ Call Repo (Handles Users + UserStats + FreePlay)
         await _quizRepo.saveGameSession(
           uid: user.uid,
-          leagueKey: _isFreePlaySession ? 'freeplay' : (_isStars ? 'stars' : 'pros'),
+          leagueKey:
+              _isFreePlaySession ? 'freeplay' : (_isStars ? 'stars' : 'pros'),
           score: _roundScore,
           correctAnswers: _correctAnswersCount,
-          totalQuestions: _questionsPerRound, // Or _runQuestions.length
+          totalQuestions: _questionsPerRound,
         );
 
-        // Update local state manually for immediate UI feedback
-        // (Repo handles Firestore, we handle local state for responsiveness)
         if (mounted) {
           setState(() {
             if (_isFreePlaySession) {
@@ -485,12 +481,18 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
     if (mounted) {
       setState(() => _isSaving = false);
+      
+      // ✅ تشغيل القصاصات فقط عند الفوز الكامل 5/5
+      if (_correctAnswersCount == _questionsPerRound) {
+        _confettiController.play();
+      }
+      
       _showResultSheet();
     }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // PART B: UI Implementation (Unchanged)
+  // PART B: UI Implementation
   // ═══════════════════════════════════════════════════════════════════════════
 
   @override
@@ -531,6 +533,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: Stack(
+          alignment: Alignment.topCenter, // لتوسيط القصاصات في الأعلى
           children: [
             _animatedGlowBackground(),
             Column(
@@ -572,9 +575,13 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                         fontWeight: FontWeight.w900,
                                         color: primaryColor)))),
                         const SizedBox(height: 20),
+                        
                         Expanded(
+                          flex: 0, 
                           child: ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                            shrinkWrap: true, 
+                            physics: const NeverScrollableScrollPhysics(), 
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                             itemCount: options.length,
                             separatorBuilder: (_, __) =>
                                 const SizedBox(height: 10),
@@ -601,11 +608,42 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                             },
                           ),
                         ),
+
+                        const SizedBox(height: 35), 
+
+                        if (_showLottie)
+                          IgnorePointer(
+                            child: Center(
+                              child: Lottie.asset(
+                                _isLastAnswerCorrect
+                                    ? 'assets/lottie/success.json'
+                                    : 'assets/lottie/error.json',
+                                width: 145, 
+                                height: 145, 
+                                fit: BoxFit.contain,
+                                repeat: false,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
                 ),
               ],
+            ),
+
+            // ✅ أداة القصاصات (Confetti) بألوان الهوية
+            ConfettiWidget(
+              confettiController: _confettiController,
+              blastDirectionality: BlastDirectionality.explosive, // انفجار في كل الاتجاهات
+              shouldLoop: false,
+              colors: const [
+                AppColors.primaryDeepTeal,
+                AppColors.secondaryOrange,
+                Colors.amber, // الذهبي
+              ],
+              gravity: 0.15, // جاذبية خفيفة لـ Slow Motion
+              numberOfParticles: 25,
             ),
           ],
         ),
@@ -613,6 +651,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     );
   }
 
+  // --- بقية دوال الـ UI (لم يتم تغيير أي حرف) ---
   Widget _buildIntro() {
     return Scaffold(
       backgroundColor: const Color(0xFFFDFBF7),
@@ -746,8 +785,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                         onPressed: () => Navigator.pushAndRemoveUntil(
                             context,
                             MaterialPageRoute(
-                                // ✅ Fix 3: Return to MainWrapper(Home) for safe flow
-                                builder: (_) => const MainWrapper(initialIndex: 0)),
+                                builder: (_) =>
+                                    const MainWrapper(initialIndex: 0)),
                             (route) => false),
                         child: Text("رجوع",
                             style: GoogleFonts.cairo(
@@ -824,7 +863,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.92),
+                  color: Colors.white.withOpacity(0.92),
                   borderRadius:
                       const BorderRadius.vertical(top: Radius.circular(26))),
               child: Column(
@@ -1047,7 +1086,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                       _gameStarted = false;
                                       _isFreePlaySession = false;
                                       _usedThisRun.clear();
-                                      _isLoading = false; // Ensure not stuck
+                                      _isLoading = false;
                                     });
                                   },
                                   style: ElevatedButton.styleFrom(
@@ -1086,7 +1125,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
+                color: Colors.black.withOpacity(0.03),
                 blurRadius: 8,
                 offset: const Offset(0, 4))
           ]),
@@ -1104,7 +1143,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: color.withValues(alpha: 0.15))),
+              border: Border.all(color: color.withOpacity(0.15))),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(icon, size: 15, color: color),
             const SizedBox(width: 5),
@@ -1117,7 +1156,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: accentColor.withValues(alpha: 0.25))),
+          border: Border.all(color: accentColor.withOpacity(0.25))),
       child: Text(v,
           style: GoogleFonts.poppins(
               fontSize: 22, fontWeight: FontWeight.w800, color: accentColor)));
@@ -1127,11 +1166,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-              color: primaryColor.withValues(alpha: 0.2), width: 1.5),
+          border: Border.all(color: primaryColor.withOpacity(0.2), width: 1.5),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
+                color: Colors.black.withOpacity(0.04),
                 blurRadius: 12,
                 offset: const Offset(0, 6))
           ]),
@@ -1149,9 +1187,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           width: double.infinity,
           padding: padding,
           decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.88),
+              color: Colors.white.withOpacity(0.88),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.black.withValues(alpha: 0.04))),
+              border: Border.all(color: Colors.black.withOpacity(0.04))),
           child: child);
 }
 
