@@ -1,6 +1,5 @@
 import UIKit
 import Flutter
-import Firebase
 import UserNotifications
 
 @UIApplicationMain
@@ -11,18 +10,12 @@ import UserNotifications
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
 
-    // 1️⃣ Firebase لازم يشتغل قبل تسجيل أي Plugin
-    if FirebaseApp.app() == nil {
-      FirebaseApp.configure()
-    }
-
-    // 2️⃣ مهم جدًا: ربط UNUserNotificationCenter
-    // بدونها iOS أحيانًا يعلّق بعد شاشة إذن الإشعارات
+    // ✅ مهم: ربط UNUserNotificationCenter
     if #available(iOS 10.0, *) {
       UNUserNotificationCenter.current().delegate = self
     }
 
-    // 3️⃣ تسجيل Plugins
+    // ✅ تسجيل Plugins (Firebase سيتم تهيئته من Dart فقط)
     GeneratedPluginRegistrant.register(with: self)
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
