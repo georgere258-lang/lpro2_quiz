@@ -25,7 +25,11 @@ Flutter/app.zip
 Flutter/flutter_assets/
 Flutter/flutter_export_environment.sh
 ServiceDefinitions.json
-Runner/GeneratedPluginRegistrant.*
+
+# 🛠️ التعديل الجذري: قمنا بإلغاء حظر ملفات المسجل مؤقتاً 
+# لضمان رفع نسخة "نظيفة" بدون Firebase لكسر الشاشة السوداء
+!Runner/GeneratedPluginRegistrant.h
+!Runner/GeneratedPluginRegistrant.m
 
 # Exceptions to above rules.
 !default.mode1v3
