@@ -2,7 +2,7 @@ import UIKit
 import Flutter
 import UserNotifications
 
-@UIApplicationMain
+@main // التغيير من @UIApplicationMain لضمان التوافق مع Xcode الحديث
 @objc class AppDelegate: FlutterAppDelegate {
 
   override func application(
@@ -10,14 +10,22 @@ import UserNotifications
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
 
-    // ✅ مهم: ربط UNUserNotificationCenter
+    // 🟢 طباعة سجل للتأكد من وصول التنفيذ لهذه النقطة في Codemagic logs
+    print("🟢 [AppDelegate] Application Launching...")
+
+    // ربط UNUserNotificationCenter للإشعارات
     if #available(iOS 10.0, *) {
       UNUserNotificationCenter.current().delegate = self
     }
 
-    // ✅ تسجيل Plugins (Firebase سيتم تهيئته من Dart فقط)
+    // تسجيل الإضافات (Plugins)
     GeneratedPluginRegistrant.register(with: self)
 
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    // نستخدم القيمة الراجعة من super لضمان اكتمال دورة حياة التطبيق بشكل صحيح
+    let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
+    
+    print("🟢 [AppDelegate] Launch Finished with result: \(result)")
+    
+    return result
   }
 }

@@ -2,121 +2,90 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-
-  <key>CFBundleDevelopmentRegion</key>
-  <string>$(DEVELOPMENT_LANGUAGE)</string>
-
-  <key>CFBundleDisplayName</key>
-  <string>LPro</string>
-
-  <key>CFBundleExecutable</key>
-  <string>$(EXECUTABLE_NAME)</string>
-
-  <key>CFBundleIdentifier</key>
-  <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-
-  <key>CFBundleInfoDictionaryVersion</key>
-  <string>6.0</string>
-
-  <key>CFBundleName</key>
-  <string>LPro</string>
-
-  <key>CFBundlePackageType</key>
-  <string>APPL</string>
-
-  <key>CFBundleShortVersionString</key>
-  <string>$(FLUTTER_BUILD_NAME)</string>
-
-  <key>CFBundleSignature</key>
-  <string>????</string>
-
-  <key>CFBundleVersion</key>
-  <string>$(FLUTTER_BUILD_NUMBER)</string>
-
-  <key>LSRequiresIPhoneOS</key>
-  <true/>
-
-  <!-- Launch -->
-  <key>UILaunchStoryboardName</key>
-  <string>LaunchScreen</string>
-
-  <key>UIMainStoryboardFile</key>
-  <string>Main</string>
-
-  <!-- iOS 13+ Scene -->
-  <key>UIApplicationSceneManifest</key>
-  <dict>
-    <key>UIApplicationSupportsMultipleScenes</key>
-    <false/>
-    <key>UISceneConfigurations</key>
-    <dict>
-      <key>UIWindowSceneSessionRoleApplication</key>
-      <array>
-        <dict>
-          <key>UISceneConfigurationName</key>
-          <string>Default Configuration</string>
-          <key>UISceneDelegateClassName</key>
-          <string>FlutterSceneDelegate</string>
-        </dict>
-      </array>
-    </dict>
-  </dict>
-
-  <!-- Orientations -->
-  <key>UISupportedInterfaceOrientations</key>
-  <array>
-    <string>UIInterfaceOrientationPortrait</string>
-    <string>UIInterfaceOrientationLandscapeLeft</string>
-    <string>UIInterfaceOrientationLandscapeRight</string>
-  </array>
-
-  <key>UISupportedInterfaceOrientations~ipad</key>
-  <array>
-    <string>UIInterfaceOrientationPortrait</string>
-    <string>UIInterfaceOrientationPortraitUpsideDown</string>
-    <string>UIInterfaceOrientationLandscapeLeft</string>
-    <string>UIInterfaceOrientationLandscapeRight</string>
-  </array>
-
-  <!-- Flutter -->
-  <key>FLTEnableImpeller</key>
-  <false/>
-
-  <!-- App Store encryption -->
-  <key>ITSAppUsesNonExemptEncryption</key>
-  <false/>
-
-  <!-- Firebase -->
-  <key>FirebaseAppDelegateProxyEnabled</key>
-  <true/>
-  <key>FirebaseScreenReportingEnabled</key>
-  <false/>
-
-  <!-- 🔴 REQUIRED FOR FIREBASE PHONE AUTH (reCAPTCHA fallback) -->
-  <key>CFBundleURLTypes</key>
-  <array>
-    <dict>
-      <key>CFBundleURLSchemes</key>
-      <array>
-        <string>com.googleusercontent.apps.905243871570-1e1rl17ir696ml70u9ejvdev651t81f6</string>
-      </array>
-    </dict>
-  </array>
-
-  <!-- Notifications -->
-  <key>NSUserNotificationsUsageDescription</key>
-  <string>نستخدم الإشعارات لإرسال تحديثات وتنبيهات مهمة داخل تطبيق L Pro.</string>
-
-  <key>UIBackgroundModes</key>
-  <array>
-    <string>remote-notification</string>
-  </array>
-
-  <!-- Misc -->
-  <key>CADisableMinimumFrameDurationOnPhone</key>
-  <true/>
-  <key>UIApplicationSupportsIndirectInputEvents</key>
-  <true/>
-
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>LPro</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>LPro</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+					<key>UISceneStoryboardFile</key>
+					<string>Main</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>FLTEnableImpeller</key>
+	<false/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<true/>
+	<key>FirebaseScreenReportingEnabled</key>
+	<false/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.905243871570-1e1rl17ir696ml70u9ejvdev651t81f6</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>نستخدم الإشعارات لإرسال تحديثات وتنبيهات مهمة داخل تطبيق L Pro.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
 </dict>
 </plist>
