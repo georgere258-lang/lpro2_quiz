@@ -2,7 +2,8 @@ name: lpro2_quiz
 description: "تطبيق L Pro العقاري المطور - نسخة بريميوم"
 publish_to: 'none'
 
-version: 1.0.1+24
+# ✅ تحديث رقم النسخة إلى 25 كما اتفقنا
+version: 1.0.1+25
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -49,6 +50,7 @@ dev_dependencies:
   flutter_lints: ^3.0.0
   flutter_launcher_icons: ^0.13.1
 
+# ✅ إعدادات الأيقونات المحدثة لبيئة Apple و Android
 flutter_launcher_icons:
   android: true
   ios: true
@@ -56,6 +58,9 @@ flutter_launcher_icons:
   min_sdk_android: 21
   adaptive_icon_background: "#1B4D57"
   adaptive_icon_foreground: "assets/icon.png"
+  # ✅ الإضافات الجديدة لضمان قبول App Store وإزالة الشفافية
+  background_color_ios: "#1B4D57"
+  remove_alpha_ios: true
 
 flutter:
   uses-material-design: true
