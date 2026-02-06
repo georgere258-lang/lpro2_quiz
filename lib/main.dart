@@ -9,7 +9,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:lpro2_quiz/firebase_options.dart';
@@ -27,7 +26,6 @@ import 'core/curriculum/unit_repository.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Background isolate: safe init (do not assume initialized).
   try {
     await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform);
@@ -48,7 +46,6 @@ bool _bootstrapStarted = false;
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ✅ UI overlays (safe + sync)
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarDividerColor: Colors.transparent,
@@ -56,10 +53,8 @@ void main() {
     statusBarColor: Colors.transparent,
   ));
 
-  // ✅ Register background handler early (no await, no Firebase init here)
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // ✅ Render UI immediately (avoid iOS watchdog / white screen)
   runApp(
     RepositoryProvider<UnitRepository>(
       create: (_) => LocalUnitRepository(),
@@ -67,7 +62,6 @@ void main() {
     ),
   );
 
-  // ✅ Everything heavy AFTER first frame
   WidgetsBinding.instance.addPostFrameCallback((_) {
     if (_bootstrapStarted) return;
     _bootstrapStarted = true;
@@ -77,21 +71,17 @@ void main() {
 
 Future<void> _bootstrapAfterRunApp() async {
   try {
-    // 1) Orientation (keep out of pre-runApp)
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
 
-    // 2) Firebase init (guarded + timeout so it never blocks UI forever)
     await Firebase.initializeApp(
             options: DefaultFirebaseOptions.currentPlatform)
         .timeout(const Duration(seconds: 12));
 
-    // 3) Sounds (local, safe)
     SoundManager.init();
 
-    // 4) Local notifications init (Android + iOS)
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings(
       requestAlertPermission: false,
@@ -106,29 +96,25 @@ Future<void> _bootstrapAfterRunApp() async {
 
     await flutterLocalNotificationsPlugin.initialize(initSettings);
 
-    // 5) Android-only: channel + Android 13+ permission
+    // ✅ Android: تهيئة القناة فقط بدون طلب الإذن (تم تأجيل الإذن لـ MainWrapper)
     if (Platform.isAndroid) {
       await flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>()
           ?.createNotificationChannel(channel);
-
-      // Android 13+ notification permission
-      await Permission.notification.request();
     }
 
     final messaging = FirebaseMessaging.instance;
 
-    // 6) iOS-only: request push permission (avoid iOS dialog at cold start blocking launch)
-    // NOTE: If you still want it at launch, keep it here (post-frame). Best practice:
-    // move it to after login/onboarding later — but we keep minimal now.
+    // ✅ iOS: تم التعليق لتأجيل طلب الإذن لما بعد الدخول
+    /*
     if (Platform.isIOS) {
       await messaging
           .requestPermission(alert: true, badge: true, sound: true)
           .timeout(const Duration(seconds: 8));
     }
+    */
 
-    // 7) Topics (non-fatal)
     unawaited(
       messaging
           .subscribeToTopic('all_users')
@@ -136,10 +122,7 @@ Future<void> _bootstrapAfterRunApp() async {
     );
 
     _subscribeToNotificationTopics();
-  } catch (_) {
-    // Intentionally swallow to avoid any startup crash/hang.
-    // Later: route to Crashlytics/Sentry once verified stable.
-  }
+  } catch (_) {}
 }
 
 void _subscribeToNotificationTopics() {
@@ -155,7 +138,6 @@ void _subscribeToNotificationTopics() {
   });
 }
 
-/// Utility: fire-and-forget without analyzer noise.
 void unawaited(Future<void> future) {}
 
 class LProApp extends StatefulWidget {

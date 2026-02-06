@@ -1,17 +1,18 @@
 // PATH: lib/presentation/screens/main_wrapper.dart
-// STATUS: FIXED SEAMLESS INTEGRATION ✅
+// STATUS: NOTIFICATIONS DELAYED & FIXED ✅
 
+import 'dart:io'; // أضفنا هذا للتحقق من نوع المنصة
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:permission_handler/permission_handler.dart'; // أضفنا هذا لطلب الإذن
 
 import '../../core/constants/app_colors.dart';
 import '../../core/services/app_config_service.dart';
 import 'home_screen.dart';
 import 'leaderboard_screen.dart';
 import 'chat_support_screen.dart';
-// ✅ تم إضافة الاستيراد المفقود لحل مشكلة الشاشة الحمراء
 import 'profile_screen.dart';
 import '../../features/news_ticker/presentation/news_ticker_widget.dart';
 import '../widgets/lpro_bottom_nav_bar.dart';
@@ -35,13 +36,25 @@ class _MainWrapperState extends State<MainWrapper> {
     if (widget.initialIndex != null) {
       _currentIndex = widget.initialIndex!.clamp(0, 2);
     }
-    // ✅ التأكد من استدعاء الصفحات بالمسارات الصحيحة
+
     _pages = [
       const HomeScreen(),
       const LeaderboardScreen(),
       ProfileScreen(onSupportPressed: _handleSupportPressed),
       const ChatSupportScreen(),
     ];
+
+    // ✅ طلب إذن الإشعارات هنا (بعد الدخول للتطبيق وليس عند فتحه)
+    _requestNotificationPermission();
+  }
+
+  // دالة طلب الإذن الخاصة بأندرويد 13+ و iOS
+  Future<void> _requestNotificationPermission() async {
+    // ننتظر قليلاً حتى تظهر الواجهة بوضوح للمستخدم
+    await Future.delayed(const Duration(seconds: 1));
+    if (Platform.isAndroid || Platform.isIOS) {
+      await Permission.notification.request();
+    }
   }
 
   void _handleSupportPressed() {
@@ -121,6 +134,8 @@ class _MainWrapperState extends State<MainWrapper> {
       return _buildHomeAppBar();
     } else if (_currentIndex == 1) {
       return _buildCustomTitleAppBar("ترتيب L Pro");
+    } else if (_currentIndex == 3) {
+      return _buildCustomTitleAppBar("الدعم الفني");
     } else {
       return _buildCustomTitleAppBar("ملفي الشخصي");
     }
@@ -138,10 +153,7 @@ class _MainWrapperState extends State<MainWrapper> {
           gradient: RadialGradient(
             center: Alignment(0, -0.6),
             radius: 1.6,
-            colors: [
-              Color(0xFF136161),
-              AppColors.primaryDeepTeal,
-            ],
+            colors: [Color(0xFF136161), AppColors.primaryDeepTeal],
           ),
         ),
       ),
@@ -184,10 +196,7 @@ class _MainWrapperState extends State<MainWrapper> {
           gradient: RadialGradient(
             center: Alignment(0, -0.5),
             radius: 1.5,
-            colors: [
-              Color(0xFF136161),
-              AppColors.primaryDeepTeal,
-            ],
+            colors: [Color(0xFF136161), AppColors.primaryDeepTeal],
           ),
         ),
       ),
