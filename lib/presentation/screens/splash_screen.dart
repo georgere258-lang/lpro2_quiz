@@ -39,15 +39,15 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
 
-    // ✅ 1. مدة زمنية طويلة (3.5 ثانية) للنعومة الفائقة
+    // ✅ تم تعديل المدة لتكون (1.8 ثانية) بدلاً من (3.5 ثانية) لزيادة السرعة
     _logoController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3500),
+      duration: const Duration(milliseconds: 1800),
     );
 
     _textController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 800),
     );
 
     _pulseController = AnimationController(
@@ -55,19 +55,19 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(milliseconds: 2000),
     );
 
-    // ✅ 2. استخدام Expo Curve: أهدأ وأفخم منحنى حركة في Flutter
+    // ✅ استخدام Curves.easeOutQuart ليكون التكبير أسرع وأكثر مرونة
     _logoScale = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _logoController,
-        curve: const Interval(0.0, 0.9, curve: Curves.easeOutExpo),
+        curve: const Interval(0.0, 0.9, curve: Curves.easeOutQuart),
       ),
     );
 
-    // ✅ 3. شفافية ناعمة جداً تبدأ متأخرة قليلاً
+    // ✅ تعديل الـ Interval لتبدأ الشفافية فوراً مع الحركة
     _logoFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _logoController,
-        curve: const Interval(0.1, 0.6, curve: Curves.easeIn),
+        curve: const Interval(0.0, 0.6, curve: Curves.easeIn),
       ),
     );
 
@@ -79,7 +79,7 @@ class _SplashScreenState extends State<SplashScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOutSine),
     );
 
-    // البدء الفوري
+    // البدء الفوري للوجو
     _logoController.forward();
     _initApp();
   }
@@ -97,8 +97,8 @@ class _SplashScreenState extends State<SplashScreen>
       if (mounted) setState(() => isUserLoggedIn = false);
     }
 
-    // ظهور النص الترحيبي ببطء بعد استقرار اللوجو الجزئي
-    Future.delayed(const Duration(milliseconds: 2200), () {
+    // ✅ تقليل وقت التأخير ليظهر النص فور استقرار اللوجو (1.0 ثانية بدلاً من 2.2 ثانية)
+    Future.delayed(const Duration(milliseconds: 1000), () {
       if (!mounted) return;
       _textController.forward().then((_) {
         if (!mounted) return;
@@ -106,8 +106,8 @@ class _SplashScreenState extends State<SplashScreen>
       });
     });
 
-    // مهلة كافية للمستخدم للاستمتاع بالمنظر قبل الانتقال
-    Future.delayed(const Duration(milliseconds: 5500), () {
+    // ✅ تقليل وقت الانتقال الكلي ليكون (4 ثواني بدلاً من 5.5 ثانية)
+    Future.delayed(const Duration(milliseconds: 4000), () {
       if (!mounted) return;
       if (isUserLoggedIn) {
         Navigator.pushReplacement(
@@ -211,8 +211,8 @@ class _SplashScreenState extends State<SplashScreen>
       opacity: showLoginButton ? 1.0 : 0.0,
       duration: const Duration(milliseconds: 800),
       child: Container(
-        width: 150,
-        height: 45,
+        width: 170, // ✅ تم زيادة العرض لضمان ظهور كلمة "أهلاً Pro" بوضوح
+        height: 50, // ✅ تم زيادة الطول قليلاً للتناسق
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(25),
           boxShadow: [
@@ -229,6 +229,7 @@ class _SplashScreenState extends State<SplashScreen>
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
             elevation: 0,
+            padding: EdgeInsets.zero, // تأكيد عدم وجود حواف داخلية تضيق النص
           ),
           onPressed: () {
             Navigator.pushReplacement(
@@ -237,9 +238,9 @@ class _SplashScreenState extends State<SplashScreen>
             );
           },
           child: Text(
-            "اهلا Pro",
+            "أهلاً Pro",
             style: GoogleFonts.cairo(
-              fontSize: 17,
+              fontSize: 18, // زيادة حجم الخط قليلاً للوضوح
               color: Colors.white,
               fontWeight: FontWeight.bold,
             ),
