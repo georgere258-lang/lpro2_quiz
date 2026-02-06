@@ -2,8 +2,7 @@ name: lpro2_quiz
 description: "تطبيق L Pro العقاري المطور - نسخة بريميوم"
 publish_to: 'none'
 
-# ✅ تم تحديث رقم الـ Build إلى 3 لكي يقبله المتجر كنسخة جديدة فوق النسخة السابقة
-version: 1.0.1+8
+version: 1.0.1+23
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -11,88 +10,65 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
   flutter_localizations:
     sdk: flutter
 
-  # --- إدارة الحالة ---
+  # --- State Management & Logic ---
   flutter_bloc: ^8.1.6
-
-  # --- مكتبة التخزين المحلي ---
   shared_preferences: ^2.2.2
+  intl: ^0.20.2
+  http: ^1.2.1
+  crypto: ^3.0.3
 
-  # الخطوط وتنسيق النصوص
+  # --- UI & Design ---
   google_fonts: ^6.2.1
-
-  # شريط الأخبار السريع
   marquee: ^2.2.3
-
-  # الأيقونات
   cupertino_icons: ^1.0.6
   font_awesome_flutter: ^10.7.0
-
-  # تشغيل ملفات SVG
   flutter_svg: ^2.0.10+1
+  cached_network_image: ^3.3.1
 
-  # منظومة الفايربيز
+  # --- Firebase Suite ---
   firebase_core: ^3.1.0
   cloud_firestore: ^5.0.2
   firebase_auth: ^5.1.0
   firebase_storage: ^12.0.1
-
-  # --- منظومة الإشعارات والتفاعل ---
   firebase_messaging: ^15.1.3
+  firebase_crashlytics: ^4.0.0
+
+  # --- Notifications & Permissions ---
   flutter_local_notifications: ^17.2.1
   permission_handler: ^11.3.1
-
-  # المكتبة (قيد المراجعة والعزل أمنياً)
   googleapis_auth: ^2.0.0
 
-  # --- إضافة مكتبة الأصوات والتأثيرات ---
+  # --- Media & Interaction ---
   audioplayers: ^6.1.0
   confetti: ^0.7.0
-  lottie: ^3.1.2
-
-  # تحسين أداء الصور
-  cached_network_image: ^3.3.1
-
-  # أدوات اختيار الصور من الموبايل
+  lottie: ^3.1.2 # تم دمجها هنا لضمان نسخة واحدة مستقرة
   image_picker: ^1.0.7
-
-  # أدوات المشاركة والوقت
   share_plus: ^10.0.0
-  intl: ^0.20.2
-
-  # لإرسال طلبات الـ HTTP
-  http: ^1.2.1
-  crypto: ^3.0.3
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
-  # أداة بناء الأيقونات
   flutter_launcher_icons: ^0.13.1
 
-# ✅ إعدادات الأيقونة الموحدة (أندرويد و iOS)
+# ✅ إعدادات الأيقونات الاحترافية - متوافقة مع أندرويد 14 و iOS 17+
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icon.png"
-  min_sdk_android: 21
-  # إعدادات الأندرويد الحديث (Adaptive Icons)
-  adaptive_icon_background: "#1B4D57"  # لون الخلفية البترولي
+  min_sdk_android: 23
+  remove_alpha_ios: true
+  adaptive_icon_background: "#1B4D57"
   adaptive_icon_foreground: "assets/icon.png"
 
 flutter:
   uses-material-design: true
 
+  # ✅ تنظيم المسارات لضمان وصول التطبيق لكل الموارد بسلاسة
   assets:
     - assets/
-    - assets/logo.svg
-    - assets/top_brand.png
-    - assets/icon.png
-    - assets/sounds/click.mp3
-    - assets/sounds/success.mp3
-    - assets/sounds/wrong.mp3
-    - assets/lottie/
+    - assets/sounds/
+    - assets/lottie/ # المجلد الذي سنضع فيه السحر الحركي
