@@ -68,7 +68,8 @@ class MoneyEconomyScreen extends StatelessWidget {
               color: AppColors.primaryDeepTeal,
             ),
             const SizedBox(height: 35),
-            _sectionHeader('الأرشيف المالي', Icons.history_edu, contentColor),
+            _sectionHeader(
+                'ادواتك الماليه و الاقتصاديه', Icons.history_edu, contentColor),
             const SizedBox(height: 12),
             _buildArchiveList(contentColor),
             const SizedBox(height: 40),
