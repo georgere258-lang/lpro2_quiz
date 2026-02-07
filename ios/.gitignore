@@ -1,3 +1,4 @@
+# إعدادات ملفات مشروع Xcode و iOS
 **/dgph
 *.mode1v3
 *.mode2v3
@@ -15,6 +16,8 @@ Icon?
 profile
 xcuserdata
 **/.generated/
+
+# ملفات فلوتر الداخلية والمؤقتة (تنشأ عند البناء)
 Flutter/App.framework
 Flutter/Flutter.framework
 Flutter/Flutter.podspec
@@ -27,8 +30,17 @@ Flutter/flutter_export_environment.sh
 ServiceDefinitions.json
 Runner/GeneratedPluginRegistrant.*
 
-# Exceptions to above rules.
+# استثناءات للملفات الضرورية لنظام Xcode
 !default.mode1v3
 !default.mode2v3
 !default.pbxuser
 !default.perspectivev3
+
+# ============================================
+# ✅ السماح برفع ملفات Firebase (لأن المستودع خاص)
+# ============================================
+!Runner/GoogleService-Info.plist
+
+# منع رفع الشهادات الشخصية (يفضل دائماً رفعها يدوياً لـ Codemagic)
+*.p12
+*.mobileprovision
