@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lpro2_quiz/core/constants/app_colors.dart';
-// تأكد من استيراد ملف الألوان بشكل صحيح، يمكنك حذفه وإعادة كتابته ليقترح عليك المسار التلقائي
 
+import '../../../features/pro_card/models/pro_card_banner.dart';
 
 class InfoCardWidget extends StatefulWidget {
-  final String text;
+  final ProCardBanner banner;
   final VoidCallback? onRead;
 
   const InfoCardWidget({
     super.key,
-    required this.text,
+    required this.banner,
     this.onRead,
   });
 
@@ -39,14 +39,25 @@ class _InfoCardWidgetState extends State<InfoCardWidget>
 
   @override
   Widget build(BuildContext context) {
+    final banner = widget.banner;
+
+    final text = banner.text.trim();
+    final imageUrl = banner.imageUrl.trim();
+
+    final bool hasValidText = banner.isText && text.isNotEmpty;
+    final bool hasValidImage = banner.isImage && imageUrl.isNotEmpty;
+
+    // Safety: لو البيانات غلط، نخفي الكارت بالكامل بدل UI غريب
+    if (!hasValidText && !hasValidImage) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
-      // محاذاة العرض مع كروت HomeScreen
       margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          // ✅ تم التصحيح: إزالة كلمة alpha واستخدام القيمة مباشرة
           color: const Color(0xFF003D3D).withValues(alpha: 0.08),
           width: 0.8,
         ),
@@ -79,7 +90,9 @@ class _InfoCardWidgetState extends State<InfoCardWidget>
                   ScaleTransition(
                     scale: Tween(begin: 1.0, end: 1.2).animate(
                       CurvedAnimation(
-                          parent: _pulseController, curve: Curves.easeInOut),
+                        parent: _pulseController,
+                        curve: Curves.easeInOut,
+                      ),
                     ),
                     child: const Icon(
                       Icons.tips_and_updates_rounded,
@@ -107,16 +120,18 @@ class _InfoCardWidgetState extends State<InfoCardWidget>
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
               color: Colors.white,
-              child: Text(
-                widget.text,
-                textAlign: TextAlign.right,
-                style: GoogleFonts.cairo(
-                  fontSize: 15,
-                  height: 1.7,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF2D3142),
-                ),
-              ),
+              child: hasValidImage
+                  ? _ProCardImage(url: imageUrl)
+                  : Text(
+                      text,
+                      textAlign: TextAlign.right,
+                      style: GoogleFonts.cairo(
+                        fontSize: 15,
+                        height: 1.7,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF2D3142),
+                      ),
+                    ),
             ),
 
             /// ===== Button Section =====
@@ -135,8 +150,8 @@ class _InfoCardWidgetState extends State<InfoCardWidget>
                         color: const Color(0xFFF8F4F0),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          // ✅ تم التصحيح هنا أيضاً
-                          color: AppColors.secondaryOrange.withValues(alpha: 0.3),
+                          color:
+                              AppColors.secondaryOrange.withValues(alpha: 0.3),
                           width: 1,
                         ),
                       ),
@@ -155,6 +170,48 @@ class _InfoCardWidgetState extends State<InfoCardWidget>
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProCardImage extends StatelessWidget {
+  final String url;
+  const _ProCardImage({required this.url});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Image.network(
+          url,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            color: Colors.grey[100],
+            alignment: Alignment.center,
+            child: Text(
+              "فشل تحميل الصورة",
+              style: GoogleFonts.cairo(
+                fontWeight: FontWeight.w800,
+                color: Colors.grey[700],
+              ),
+            ),
+          ),
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return Container(
+              color: Colors.grey[50],
+              alignment: Alignment.center,
+              child: const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            );
+          },
         ),
       ),
     );
