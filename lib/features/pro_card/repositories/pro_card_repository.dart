@@ -33,8 +33,14 @@ class ProCardRepository {
   }
 
   /// Creates or updates the current pro card banner.
+  ///
+  /// - contentType: text/image
+  /// - text: required if contentType == text
+  /// - imageUrl: required if contentType == image
   Future<void> upsertCurrent({
+    required ProCardContentType contentType,
     required String text,
+    required String imageUrl,
     required bool isActive,
     DateTime? publishAt,
     DateTime? expireAt,
@@ -51,6 +57,8 @@ class ProCardRepository {
     final model = ProCardBanner(
       id: FirestorePaths.currentDoc,
       text: text.trim(),
+      imageUrl: imageUrl.trim(),
+      contentType: contentType,
       control: control,
     );
     model.validate();

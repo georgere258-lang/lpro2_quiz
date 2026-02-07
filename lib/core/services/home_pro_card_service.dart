@@ -4,9 +4,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/firestore_paths.dart';
+import '../../features/pro_card/models/pro_card_banner.dart';
+import '../../core/models/admin_control_models.dart';
 
 /// مصدر واحد: home_pro_card/current
-/// يُرجِع نصًا صالحًا لو:
+/// يُرجِع ProCardBanner صالح لو:
 /// isActive && (publishAt == null || publishAt <= now) && (expireAt == null || now < expireAt)
 /// مع Cache محلي لمنع الوميض والاختفاء المؤقت.
 class HomeProCardService {
@@ -14,54 +16,74 @@ class HomeProCardService {
   HomeProCardService({FirebaseFirestore? db})
       : _db = db ?? FirebaseFirestore.instance;
 
-  static const _cacheKey = 'home_pro_card_last_text';
+  static const _cacheTypeKey = 'home_pro_card_last_type';
+  static const _cacheTextKey = 'home_pro_card_last_text';
+  static const _cacheImageKey = 'home_pro_card_last_image';
 
-  Stream<String?> streamText() async* {
+  Stream<ProCardBanner?> streamBanner() async* {
     final prefs = await SharedPreferences.getInstance();
-    final cached = prefs.getString(_cacheKey);
+    final cachedTypeStr = prefs.getString(_cacheTypeKey);
+    final cachedText = prefs.getString(_cacheTextKey);
+    final cachedImage = prefs.getString(_cacheImageKey);
 
-    // بثّ القيمة المخزنة فورًا (إن وُجدت) لمنع الوميض
-    if (cached != null && cached.trim().isNotEmpty) {
-      yield cached;
+    ProCardBanner? cachedBanner;
+
+    if ((cachedText != null && cachedText.trim().isNotEmpty) ||
+        (cachedImage != null && cachedImage.trim().isNotEmpty)) {
+      final type = (cachedTypeStr ?? 'text').toLowerCase() == 'image'
+          ? ProCardContentType.image
+          : ProCardContentType.text;
+
+      cachedBanner = ProCardBanner(
+        id: FirestorePaths.currentDoc,
+        text: cachedText ?? '',
+        imageUrl: cachedImage ?? '',
+        contentType: type,
+        control: AdminControlFields(
+          isActive: true,
+          publishAt: null,
+          expireAt: null,
+          sectionKey: FirestorePaths.sectionKeyProCard,
+        ),
+      );
+
+      // بثّ القيمة المخزنة فورًا (إن وُجدت) لمنع الوميض
+      yield cachedBanner;
     }
 
     yield* _db
-        .collection(FirestorePaths.proCardCurrent)
+        .collection(FirestorePaths.homeProCard)
         .doc(FirestorePaths.currentDoc)
         .snapshots()
         .map((snap) {
       final d = snap.data();
       if (d == null) return null;
 
-      final isActive = d['isActive'] == true;
-      final publishAt = _asDateTime(d['publishAt']);
-      final expireAt = _asDateTime(d['expireAt']);
+      final banner = ProCardBanner.fromFirestore(d, snap.id);
+
       final now = DateTime.now().toUtc();
+      final publishUtc = banner.publishAt?.toUtc();
+      final expireUtc = banner.expireAt?.toUtc();
 
-      // Convert timestamps to UTC for consistent comparison
-      final publishUtc = publishAt?.toUtc();
-      final expireUtc = expireAt?.toUtc();
-
-      if (!isActive) return null;
+      if (!banner.isActive) return null;
       if (publishUtc != null && now.isBefore(publishUtc)) return null;
       if (expireUtc != null && !now.isBefore(expireUtc)) return null;
 
-      final text = (d['text'] ?? '').toString().trim();
-      return text.isEmpty ? null : text;
-    }).asyncMap((text) async {
-      // تحديث الكاش عند وجود نص صالح
-      if (text != null && text.trim().isNotEmpty) {
-        await prefs.setString(_cacheKey, text);
-        return text;
+      // تحقق من المحتوى حسب النوع
+      if (banner.isText) {
+        return banner.text.trim().isEmpty ? null : banner;
+      } else {
+        return banner.imageUrl.trim().isEmpty ? null : banner;
+      }
+    }).asyncMap((banner) async {
+      if (banner != null) {
+        await prefs.setString(_cacheTypeKey, banner.isImage ? 'image' : 'text');
+        await prefs.setString(_cacheTextKey, banner.text.trim());
+        await prefs.setString(_cacheImageKey, banner.imageUrl.trim());
+        return banner;
       }
       // fallback: رجّع آخر قيمة محفوظة بدل الاختفاء
-      return cached;
+      return cachedBanner;
     });
-  }
-
-  DateTime? _asDateTime(dynamic v) {
-    if (v == null) return null;
-    if (v is Timestamp) return v.toDate();
-    return null;
   }
 }
