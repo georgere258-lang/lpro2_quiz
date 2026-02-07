@@ -1,11 +1,11 @@
 // PATH: lib/presentation/screens/splash_screen.dart
-import 'dart:async';
-import 'dart:io';
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+// import 'package:flutter_svg/flutter_svg.dart'; // 👈 لم نعد بحاجة لهذه المكتبة هنا
 
 import '../../core/constants/app_colors.dart';
 import 'login_screen.dart';
@@ -20,15 +20,12 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with TickerProviderStateMixin {
-  late final AnimationController _logoController;
-  late final AnimationController _textController;
-  late final AnimationController _pulseController;
+  late AnimationController _controller;
+  late AnimationController _pulseController;
 
-  late final Animation<double> _logoScale;
-  late final Animation<double> _logoFade;
-
-  late final Animation<double> _textFade;
-  late final Animation<double> _pulseScale;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _pulseAnimation;
 
   bool isUserLoggedIn = false;
   bool showLoginButton = false;
@@ -39,29 +36,14 @@ class _SplashScreenState extends State<SplashScreen>
     _initApp();
   }
 
-  Future<void> _initApp() async {
-    // ✅ 1) الحماية للتأكد من جاهزية Firebase قبل أي استدعاء
-    try {
-      await _ensureFirebaseReady();
-    } catch (_) {}
+  void _initApp() {
+    final user = FirebaseAuth.instance.currentUser;
+    isUserLoggedIn = (user != null);
 
-    // ✅ 2) فحص حالة تسجيل الدخول بعد التأكد من Firebase
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      isUserLoggedIn = (user != null);
-    } catch (_) {
-      isUserLoggedIn = false;
-    }
-
-    // 3) إعدادات الأنيميشن
-    _logoController = AnimationController(
+    // ✅ Logo: slower + stronger
+    _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1900),
-    );
-
-    _textController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 750),
+      duration: const Duration(milliseconds: 2800),
     );
 
     _pulseController = AnimationController(
@@ -69,33 +51,33 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(milliseconds: 1200),
     );
 
-    _logoScale = Tween<double>(begin: 0.55, end: 1.0).animate(
-      CurvedAnimation(parent: _logoController, curve: Curves.easeOutCubic),
+    // ✅ Logo: stronger scale with smooth curve
+    _scaleAnimation = Tween<double>(begin: 0.45, end: 1.02).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutExpo),
     );
 
-    _logoFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _logoController, curve: Curves.easeIn),
+    // ✅ Text: delayed fade (starts after logo has clearly appeared)
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.58, 1.0, curve: Curves.easeIn),
+      ),
     );
 
-    _textFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _textController, curve: Curves.easeIn),
-    );
-
-    _pulseScale = Tween<double>(begin: 1.0, end: 1.035).animate(
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.03).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    _logoController.forward();
-    Future.delayed(const Duration(milliseconds: 1200), () {
+    _controller.forward();
+
+    // ✅ Start pulse after the text becomes visible
+    Future.delayed(const Duration(milliseconds: 1700), () {
       if (!mounted) return;
-      _textController.forward().then((_) {
-        if (!mounted) return;
-        _pulseController.repeat(reverse: true);
-      });
+      _pulseController.repeat(reverse: true);
     });
 
-    // ✅ 4) توقيت الانتقال للشاشة التالية
-    Future.delayed(const Duration(milliseconds: 4200), () {
+    // ✅ Navigation timing unchanged (3s)
+    Future.delayed(const Duration(seconds: 3), () {
       if (!mounted) return;
 
       if (isUserLoggedIn) {
@@ -107,43 +89,32 @@ class _SplashScreenState extends State<SplashScreen>
         setState(() => showLoginButton = true);
       }
     });
+
+    _initNotifications();
   }
 
-  Future<void> _ensureFirebaseReady() async {
-    int attempts = 0;
-    while (Firebase.apps.isEmpty && attempts < 50) {
-      await Future.delayed(const Duration(milliseconds: 100));
-      attempts++;
-    }
-    if (Firebase.apps.isEmpty) {
-      throw Exception('Firebase not ready');
-    }
+  void _initNotifications() async {
+    try {
+      final messaging = FirebaseMessaging.instance;
 
-    if (Platform.isIOS) {
-      await Future.delayed(const Duration(milliseconds: 350));
+      await messaging.subscribeToTopic('all_users');
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await messaging.subscribeToTopic(user.uid);
+
+        if (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
+          await messaging.subscribeToTopic('admin_notifications');
+        }
+      }
+    } catch (e) {
+      debugPrint("FCM Error: $e");
     }
-  }
-
-  Widget _buildLogo(BuildContext context) {
-    // ✅ ضبط المقاس ليكون مناسباً لـ Apple (iOS) بدقة
-    // تم تقليل النسبة قليلاً لتجنب ظهور اللوجو بشكل ضخم جداً على الآيفون
-    final double screenWidth = MediaQuery.of(context).size.width;
-    final double logoWidth =
-        Platform.isIOS ? screenWidth * 0.55 : screenWidth * 0.70;
-
-    return Image.asset(
-      'assets/icon.png', // ✅ استخدام PNG كما تم الاتفاق عليه لتجنب مشاكل SVG
-      width: logoWidth,
-      fit: BoxFit.contain,
-      errorBuilder: (_, __, ___) =>
-          const Icon(Icons.business, size: 100, color: Colors.white),
-    );
   }
 
   @override
   void dispose() {
-    _logoController.dispose();
-    _textController.dispose();
+    _controller.dispose();
     _pulseController.dispose();
     super.dispose();
   }
@@ -168,20 +139,23 @@ class _SplashScreenState extends State<SplashScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              FadeTransition(
-                opacity: _logoFade,
-                child: ScaleTransition(
-                  scale: _logoScale,
-                  child: _buildLogo(context),
+              ScaleTransition(
+                scale: _scaleAnimation,
+                child: Image.asset(
+                  // ✅ تم التغيير لاستخدام PNG
+                  'assets/logo.png', // ✅ نفس الصورة المستخدمة في Native Splash
+                  width: MediaQuery.of(context).size.width * 0.8,
+                  fit: BoxFit.contain,
+                  // إزالة placeholderBuilder لأنه خاص بالـ SVG
                 ),
               ),
-              const SizedBox(height: 15), // تعديل المسافة قليلاً للتناسق
+              const SizedBox(height: 5),
               FadeTransition(
-                opacity: _textFade,
+                opacity: _fadeAnimation,
                 child: Column(
                   children: [
                     ScaleTransition(
-                      scale: _pulseScale,
+                      scale: _pulseAnimation,
                       child: Text(
                         "المعلومة بتفرق",
                         textAlign: TextAlign.center,
@@ -193,7 +167,7 @@ class _SplashScreenState extends State<SplashScreen>
                             Shadow(
                               offset: const Offset(0, 2),
                               blurRadius: 10.0,
-                              color: Colors.black.withOpacity(0.3),
+                              color: Colors.black.withValues(alpha: 0.3),
                             ),
                           ],
                         ),
@@ -208,7 +182,8 @@ class _SplashScreenState extends State<SplashScreen>
                           borderRadius: BorderRadius.circular(19),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.secondaryOrange.withOpacity(0.2),
+                              color: AppColors.secondaryOrange
+                                  .withValues(alpha: 0.2),
                               blurRadius: 10,
                               offset: const Offset(0, 3),
                             ),
@@ -244,7 +219,8 @@ class _SplashScreenState extends State<SplashScreen>
                       )
                     else if (isUserLoggedIn)
                       const CircularProgressIndicator(
-                          color: AppColors.secondaryOrange),
+                        color: AppColors.secondaryOrange,
+                      ),
                   ],
                 ),
               ),

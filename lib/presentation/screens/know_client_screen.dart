@@ -537,27 +537,33 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
     bool isPrimary = false,
     required VoidCallback onTap,
   }) {
+    // ✅ ONLY CHANGE: make primary button match Fact (Orange solid + white text/icons)
+    final bgColor = isPrimary ? AppColors.secondaryOrange : Colors.white;
+    final borderColor = isPrimary
+        ? AppColors.secondaryOrange.withValues(alpha: 0.0)
+        : AppColors.primaryDeepTeal.withValues(alpha: 0.10);
+    final shadowColor = isPrimary
+        ? AppColors.secondaryOrange.withValues(alpha: 0.25)
+        : Colors.black.withValues(alpha: 0.05);
+    final iconColor = isPrimary ? Colors.white : AppColors.primaryDeepTeal;
+    final textColor = isPrimary ? Colors.white : AppColors.primaryDeepTeal;
+    final arrowColor = isPrimary ? Colors.white : AppColors.secondaryOrange;
+
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: isPrimary
-              ? AppColors.primaryDeepTeal.withValues(alpha: 0.05)
-              : Colors.white,
+          color: bgColor,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isPrimary
-                ? AppColors.primaryDeepTeal.withValues(alpha: 0.18)
-                : AppColors.primaryDeepTeal.withValues(alpha: 0.10),
-            width: isPrimary ? 1.2 : 1,
+            color: borderColor,
+            width: isPrimary ? 0 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: isPrimary
-                  ? AppColors.primaryDeepTeal.withValues(alpha: 0.08)
-                  : Colors.black.withValues(alpha: 0.05),
+              color: shadowColor,
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -565,7 +571,7 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
         ),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: AppColors.primaryDeepTeal),
+            Icon(icon, size: 20, color: iconColor),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -573,7 +579,7 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                 style: GoogleFonts.cairo(
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
-                  color: AppColors.primaryDeepTeal,
+                  color: textColor,
                 ),
               ),
             ),
@@ -594,8 +600,7 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                 ),
               ),
             const SizedBox(width: 6),
-            const Icon(Icons.arrow_forward_ios,
-                size: 14, color: AppColors.secondaryOrange),
+            Icon(Icons.arrow_forward_ios, size: 14, color: arrowColor),
           ],
         ),
       ),

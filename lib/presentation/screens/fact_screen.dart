@@ -25,9 +25,6 @@ class _FactScreenState extends State<FactScreen> {
   static const String _prefsFavKey = 'pro_insight_fav_titles';
   static const String _prefsLastSeenKey = 'pro_insight_last_seen_title';
 
-  // ✅ Recent window
-  static const int _recentDaysWindow = 7;
-
   String _lastSeenTitle = '';
   Set<String> _favoriteTitles = {};
 
@@ -353,7 +350,7 @@ class _FactScreenState extends State<FactScreen> {
         // ✅ Base ordering for normal list
         allItems.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
 
-        // ✅ Featured (ترشيحات L Pro)
+        // ✅ Featured (ترشيحات L Pro) — always show card even if empty
         final now = DateTime.now();
         final featured = allItems
             .where((e) => e.isFeatured == true && e.isFeaturedValid(now))
@@ -364,16 +361,8 @@ class _FactScreenState extends State<FactScreen> {
           return b.createdAtMs.compareTo(a.createdAtMs);
         });
 
-        // ✅ Recent (جديد L Pro)
-        final recentCutoff =
-            now.subtract(const Duration(days: _recentDaysWindow));
-        final recent = allItems
-            .where((e) =>
-                e.createdAtMs > 0 &&
-                DateTime.fromMillisecondsSinceEpoch(e.createdAtMs)
-                    .isAfter(recentCutoff))
-            .take(5)
-            .toList();
+        // ✅ Recent (جديد L Pro) — ALWAYS last 5 by createdAtMs (no window)
+        final recent = allItems.take(5).toList();
 
         return SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -386,7 +375,7 @@ class _FactScreenState extends State<FactScreen> {
 
               const SizedBox(height: 14),
 
-              // 2️⃣ Sections Button (Full width + prominent)
+              // 2️⃣ Sections Button (Full width + prominent) — highlighted ORANGE
               _fullWidthButton(
                 icon: Icons.category_outlined,
                 label: 'تصفّح كل الأقسام',
@@ -421,24 +410,25 @@ class _FactScreenState extends State<FactScreen> {
 
               const SizedBox(height: 16),
 
-              // 5️⃣ جديد L Pro (last 5)
-              if (recent.isNotEmpty) ...[
-                _topicsCard(
-                  title: 'جديد L Pro',
-                  icon: Icons.new_releases_rounded,
-                  items: recent.take(5).toList(),
-                ),
-                const SizedBox(height: 12),
-              ],
+              // 5️⃣ جديد L Pro — ALWAYS visible (last 5)
+              _topicsCard(
+                title: 'جديد L Pro',
+                icon: Icons.new_releases_rounded,
+                items: recent,
+                emptyText:
+                    'لا توجد مواضيع بعد.\nأول ما يتم إضافة مواضيع ستظهر هنا تلقائيًا.',
+              ),
 
-              // 6️⃣ ترشيحات L Pro (last 5)
-              if (featured.isNotEmpty) ...[
-                _topicsCard(
-                  title: 'ترشيحات L Pro',
-                  icon: Icons.star_rounded,
-                  items: featured.take(5).toList(),
-                ),
-              ],
+              const SizedBox(height: 12),
+
+              // 6️⃣ ترشيحات L Pro — ALWAYS visible (even if empty)
+              _topicsCard(
+                title: 'ترشيحات L Pro',
+                icon: Icons.star_rounded,
+                items: featured.take(5).toList(),
+                emptyText:
+                    'لا توجد ترشيحات مثبتة الآن.\nعند تثبيت أي موضوع سيظهر هنا فورًا.',
+              ),
             ],
           ),
         );
@@ -517,27 +507,32 @@ class _FactScreenState extends State<FactScreen> {
     bool isPrimary = false,
     required VoidCallback onTap,
   }) {
+    final bg = isPrimary ? AppColors.secondaryOrange : Colors.white;
+    final border = isPrimary
+        ? AppColors.secondaryOrange.withValues(alpha: 0.95)
+        : AppColors.primaryDeepTeal.withValues(alpha: 0.10);
+    final shadowColor = isPrimary
+        ? AppColors.secondaryOrange.withValues(alpha: 0.25)
+        : Colors.black.withValues(alpha: 0.05);
+    final iconColor = isPrimary ? Colors.white : AppColors.primaryDeepTeal;
+    final textColor = isPrimary ? Colors.white : AppColors.primaryDeepTeal;
+    final arrowColor = isPrimary ? Colors.white : AppColors.secondaryOrange;
+
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: isPrimary
-              ? AppColors.primaryDeepTeal.withValues(alpha: 0.05)
-              : Colors.white,
+          color: bg,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isPrimary
-                ? AppColors.primaryDeepTeal.withValues(alpha: 0.18)
-                : AppColors.primaryDeepTeal.withValues(alpha: 0.10),
+            color: border,
             width: isPrimary ? 1.2 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: isPrimary
-                  ? AppColors.primaryDeepTeal.withValues(alpha: 0.08)
-                  : Colors.black.withValues(alpha: 0.05),
+              color: shadowColor,
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -545,7 +540,7 @@ class _FactScreenState extends State<FactScreen> {
         ),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: AppColors.primaryDeepTeal),
+            Icon(icon, size: 20, color: iconColor),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -553,16 +548,15 @@ class _FactScreenState extends State<FactScreen> {
                 style: GoogleFonts.cairo(
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
-                  color: AppColors.primaryDeepTeal,
+                  color: textColor,
                 ),
               ),
             ),
             if (badge != null)
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.secondaryOrange,
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -570,13 +564,12 @@ class _FactScreenState extends State<FactScreen> {
                   style: GoogleFonts.cairo(
                     fontSize: 10,
                     fontWeight: FontWeight.w900,
-                    color: Colors.white,
+                    color: AppColors.secondaryOrange,
                   ),
                 ),
               ),
             const SizedBox(width: 6),
-            const Icon(Icons.arrow_forward_ios,
-                size: 14, color: AppColors.secondaryOrange),
+            Icon(Icons.arrow_forward_ios, size: 14, color: arrowColor),
           ],
         ),
       ),
@@ -633,6 +626,7 @@ class _FactScreenState extends State<FactScreen> {
     required String title,
     required IconData icon,
     required List<_FactTopicItem> items,
+    required String emptyText,
   }) {
     return Container(
       width: double.infinity,
@@ -668,7 +662,22 @@ class _FactScreenState extends State<FactScreen> {
             ],
           ),
           const Divider(height: 16, thickness: 0.5),
-          ...items.map((item) => _verticalTopicRow(item)),
+          if (items.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Text(
+                emptyText,
+                textAlign: TextAlign.right,
+                style: GoogleFonts.cairo(
+                  fontSize: 12,
+                  height: 1.6,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black54,
+                ),
+              ),
+            )
+          else
+            ...items.map((item) => _verticalTopicRow(item)),
         ],
       ),
     );
