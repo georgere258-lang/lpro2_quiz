@@ -126,9 +126,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _navigateUser() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      _activateNotifications(user.uid);
+    final String? uid = user?.uid;
 
+    if (user != null) {
       try {
         final usersRef = FirebaseFirestore.instance.collection('users');
         final userRef = usersRef.doc(user.uid);
@@ -181,6 +181,13 @@ class _LoginScreenState extends State<LoginScreen> {
     if (mounted) {
       Navigator.pushReplacement(
           context, MaterialPageRoute(builder: (c) => const MainWrapper()));
+
+      // ✅ طلب إذن الإشعارات بعد دخول المستخدم للتطبيق (بعد نجاح OTP)
+      if (uid != null) {
+        Future.delayed(const Duration(milliseconds: 600), () {
+          _activateNotifications(uid);
+        });
+      }
     }
   }
 

@@ -15,7 +15,6 @@ import 'about_screen.dart';
 import 'login_screen.dart';
 import 'admin/admin_panel.dart';
 import 'stats_screen.dart';
-// ✅ التصحيح: بما أن ملف البروفايل وملف الشات كلاهما داخل مجلد screens، المسار الصحيح هو:
 import 'chat_support_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -33,6 +32,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final Color deepTeal = AppColors.primaryDeepTeal;
   final Color safetyOrange = AppColors.secondaryOrange;
 
+  // ✅ ضع الروابط الحقيقية هنا (مهم جدًا)
+  // مثال أندرويد: https://play.google.com/store/apps/details?id=com.company.app
+  // مثال iOS: https://apps.apple.com/app/id1234567890
+  static const String _androidStoreUrl = 'PUT_PLAY_STORE_LINK_HERE';
+  static const String _iosStoreUrl = 'PUT_APP_STORE_LINK_HERE';
+
   final List<IconData> avatars = [
     Icons.workspace_premium,
     Icons.person_pin,
@@ -47,6 +52,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (points >= 1500) return "🔥 شغوف بالتطوير";
     if (points >= 500) return "🚀 منطلق نحو المعرفة";
     return "Pro جديد ✨";
+  }
+
+  String _buildInviteMessage() {
+    final uid = user?.uid ?? '';
+    final ref =
+        uid.isEmpty ? '' : uid.substring(0, uid.length < 8 ? uid.length : 8);
+
+    // ✅ لو لسه ماحطتش الروابط، هتطلع نص فقط (عشان ما نكسرش الشير)
+    final hasAndroid = _androidStoreUrl.startsWith('http');
+    final hasIos = _iosStoreUrl.startsWith('http');
+
+    final buffer = StringBuffer()
+      ..writeln("✨ انضم إلى L Pro — طريقك لتطوير نفسك في العقار.")
+      ..writeln("ابدأ رحلتك الآن 💪");
+
+    if (hasAndroid) buffer.writeln("Android: $_androidStoreUrl");
+    if (hasIos) buffer.writeln("iOS: $_iosStoreUrl");
+
+    if (ref.isNotEmpty) buffer.writeln("كود دعوة: $ref");
+
+    return buffer.toString().trim();
   }
 
   @override
@@ -143,7 +169,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 builder: (_) => const AboutScreen()));
                       },
                     ),
-                    // ✅ تم تفعيل زر الدعم بالمسار الصحيح
                     _buildProfileBtn(
                       "الدعم والمساعدة",
                       Icons.support_agent_rounded,
@@ -371,8 +396,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _invitePro() async {
-    const message =
-        "✨ انضم إلى L Pro — طريقك لتطوير نفسك في العقار.\nحمّل التطبيق وابدأ رحلتك الآن 💪";
+    final message = _buildInviteMessage();
     try {
       await Share.share(message);
     } catch (e) {

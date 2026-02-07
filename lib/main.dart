@@ -9,7 +9,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:lpro2_quiz/firebase_options.dart';
@@ -104,23 +103,19 @@ Future<void> _postBootstrap() async {
 
     await flutterLocalNotificationsPlugin.initialize(initSettings);
 
-    // 4) Android: channel + permission
+    // 4) Android: channel (بدون طلب إذن هنا)
     if (Platform.isAndroid) {
       await flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>()
           ?.createNotificationChannel(channel);
-
-      await Permission.notification.request();
     }
 
-    // 5) iOS: request push permission (post-frame)
-    final messaging = FirebaseMessaging.instance;
-    if (Platform.isIOS) {
-      await messaging.requestPermission(alert: true, badge: true, sound: true);
-    }
+    // 5) iOS: (بدون طلب إذن هنا)
+    // ⚠️ طلب الإذن تم نقله لمرحلة ما بعد OTP داخل LoginScreen._activateNotifications()
 
     // 6) Topics (non-fatal)
+    final messaging = FirebaseMessaging.instance;
     unawaited(messaging.subscribeToTopic('all_users'));
 
     _subscribeToNotificationTopics();
