@@ -1,7 +1,7 @@
 import UIKit
 import Flutter
 import Firebase
-import FirebaseMessaging  // ✅ ضروري لربط توكن الإشعارات بـ Firebase
+import FirebaseMessaging
 import UserNotifications
 
 @main
@@ -12,12 +12,24 @@ import UserNotifications
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     
-    // 1️⃣ تهيئة فايربيز أولاً لضمان جاهزية الخدمات قبل الإضافات
+    // 1️⃣ تهيئة فايربيز برمجياً (بدون الاعتماد على ملف Plist المفقود)
     if FirebaseApp.app() == nil {
-        FirebaseApp.configure()
+        // إنشاء الإعدادات يدوياً باستخدام بياناتك الخاصة
+        let options = FirebaseOptions(
+            googleAppID: "1:905243871570:ios:7dd006b803e36a4c66928b",
+            gcmSenderID: "905243871570"
+        )
+        options.apiKey = "AIzaSyBWYT8L88sd9Vz1tvnKRg1TJZmaEi_HMZw"
+        options.projectID = "lpro2-quiz"
+        options.bundleID = "com.george.lpro"
+        options.clientID = "905243871570-1e1rl17ir696ml70u9ejvdev651t81f6.apps.googleusercontent.com"
+        options.storageBucket = "lpro2-quiz.firebasestorage.app"
+        
+        // تشغيل فايربيز بالإعدادات اليدوية
+        FirebaseApp.configure(options: options)
     }
     
-    // 2️⃣ ضبط مفوض الإشعارات (بدون casting معقد لتجنب الكراش)
+    // 2️⃣ ضبط مفوض الإشعارات
     if #available(iOS 10.0, *) {
       UNUserNotificationCenter.current().delegate = self
     }
@@ -28,19 +40,16 @@ import UserNotifications
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
   
-  // 4️⃣ ✅ استلام توكن Apple وتمريره لـ Firebase (هذا يمنع كراش الإشعارات)
+  // 4️⃣ استلام توكن Apple وتمريره لـ Firebase
   override func application(
     _ application: UIApplication,
     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
   ) {
-    // تمرير التوكن لـ Firebase Messaging
     Messaging.messaging().apnsToken = deviceToken
-    
-    // تمرير التوكن للمحرك الأصلي لضمان عمل الإشعارات المحلية
     super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
   }
   
-  // 5️⃣ ✅ تسجيل أخطاء الوصول للإشعارات (مفيد جداً في تتبع أسباب الكراش)
+  // 5️⃣ تسجيل أخطاء الوصول للإشعارات
   override func application(
     _ application: UIApplication,
     didFailToRegisterForRemoteNotificationsWithError error: Error
