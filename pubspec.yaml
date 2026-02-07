@@ -2,8 +2,8 @@ name: lpro2_quiz
 description: "تطبيق L Pro العقاري المطور - نسخة بريميوم"
 publish_to: 'none'
 
-# ✅ تحديث رقم النسخة إلى 25 كما اتفقنا
-version: 1.0.1+25
+# ✅ تحديث رقم النسخة إلى 26 كما اتفقنا
+version: 1.0.1+26
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
