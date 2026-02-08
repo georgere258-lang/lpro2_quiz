@@ -2,6 +2,7 @@
 // STATUS: CLEAN SEAMLESS TEXT ✅ (FULL FILE)
 
 import 'dart:async';
+import 'dart:io'; // ✅ تمت الإضافة للتحقق من نوع الجهاز
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -140,18 +141,34 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
       padding: const EdgeInsets.symmetric(vertical: 7),
       child: Text(
         text,
-        style: GoogleFonts.cairo(
-          fontSize: 12.5,
-          fontWeight: FontWeight.w800,
-          color: const Color(0xFFFDFBF7), // العاجي الفخم
-          shadows: [
-            Shadow(
-              color: Colors.black.withValues(alpha: 0.15),
-              offset: const Offset(0, 1),
-              blurRadius: 1,
-            ),
-          ],
-        ),
+        // ✅ التعديل: إذا كان آيفون نستخدم خط النظام، وإذا أندرويد نستخدم كايرو
+        style: Platform.isIOS
+            ? TextStyle(
+                fontFamily: null, // خط النظام الرسمي (يمنع القص)
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+                height: 1.5, // مسافة أمان إضافية لذيول الحروف
+                color: const Color(0xFFFDFBF7),
+                shadows: [
+                  Shadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    offset: const Offset(0, 1),
+                    blurRadius: 1,
+                  ),
+                ],
+              )
+            : GoogleFonts.cairo(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFFFDFBF7), // العاجي الفخم
+                shadows: [
+                  Shadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    offset: const Offset(0, 1),
+                    blurRadius: 1,
+                  ),
+                ],
+              ),
       ),
     );
   }
