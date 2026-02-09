@@ -1,11 +1,5 @@
 // PATH: lib/presentation/screens/fact_articles_screen.dart
-// STATUS: Full File – Stable Navigation + Share + Favorites + Last seen
-//         + ✅ Admin Tools (role-based)
-//         + ✅ Improved Admin UI (compact chips, readable text)
-//         + ✅ Featured control: isFeatured + featuredOrder + featuredUntil
-//         + ✅ Section control: sectionKey + orderInSection (with dropdown + arrows)
-//         + ✅ FIX: bottom favorite now clickable
-//         + ✅ FINAL FIX: AppBar title forced to Sub-Section Name from Tags/Labels
+// STATUS: FINAL SHARE LOGIC + STICKY FOOTER ✅
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -31,6 +25,10 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
 
   static const String _prefsFavKey = 'pro_insight_fav_titles';
   static const String _prefsLastSeenKey = 'pro_insight_last_seen_title';
+
+  // ✅ روابط المتجر
+  static const String _androidStoreUrl = 'PUT_PLAY_STORE_LINK_HERE';
+  static const String _iosStoreUrl = 'PUT_APP_STORE_LINK_HERE';
 
   final ProInsightRepository _proInsightRepo = ProInsightRepository();
 
@@ -89,22 +87,18 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
 
   // ✅ Computed Header Title (The Architectural Fix)
   String get _appBarTitle {
-    // 1. Try mapping from sectionKey first (Modern way)
     if (_sectionLabels.containsKey(_sectionKey)) {
       return _sectionLabels[_sectionKey]!;
     }
-    // 2. Fallback: Search tags for any known Arabic section name (Legacy/Old way)
     for (final tag in _tags) {
       final normalized = _normalizeTag(tag);
       if (_proInsightSections.contains(normalized)) {
         return normalized;
       }
     }
-    // 3. Last resort
     return 'المعلومة بتفرق';
   }
 
-  // ✅ Tag normalization for pro_insight
   static String _normalizeTag(String tag) {
     final t = tag.trim();
     if (t == 'سيستم الشركة') return 'سيستم الشركات';
@@ -217,7 +211,6 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
     });
 
     try {
-      // 1) direct by raw title
       final direct = await FirebaseFirestore.instance
           .collection(_collectionName)
           .where('title', isEqualTo: _rawTitle.trim())
@@ -231,7 +224,6 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
         return;
       }
 
-      // 2) fallback: scan active and match normalized title
       final snap = await FirebaseFirestore.instance
           .collection(_collectionName)
           .where('isActive', isEqualTo: true)
@@ -290,7 +282,6 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
         ? orderRaw
         : int.tryParse((orderRaw ?? '0').toString()) ?? 0;
 
-    // ✅ Read tags (Essential for Header Fallback)
     List<String> tags = [];
     final tagsRaw = data['tags'];
     if (tagsRaw is List) {
@@ -372,11 +363,24 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
     );
   }
 
+  // ✅ تحديث دالة الشير (Logic Only Update)
   void _shareTopic() {
-    final title = _normTitle;
+    final sb = StringBuffer();
+    sb.writeln(_normTitle);
+
     final h = _hook.trim().isEmpty ? "موضوع من L Pro" : _hook.trim();
-    final shareText = "$title\n\n$h\n\n#LPro #المعلومة_بتفرق";
-    Share.share(shareText);
+    sb.writeln("\n$h");
+    sb.writeln("\n#LPro #المعلومة_بتفرق");
+
+    // إضافة الروابط فقط إذا كانت صحيحة (تبدأ بـ http)
+    if (_androidStoreUrl.startsWith('http')) {
+      sb.writeln("\nAndroid: $_androidStoreUrl");
+    }
+    if (_iosStoreUrl.startsWith('http')) {
+      sb.writeln("iOS: $_iosStoreUrl");
+    }
+
+    Share.share(sb.toString());
   }
 
   // =========================
@@ -513,7 +517,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
     }
   }
 
-  // ✅ Featured + Ordering + Section control (compact + no red screen)
+  // ✅ Featured + Ordering + Section control
   Future<void> _openFeaturedControl() async {
     if (_docId.isEmpty) {
       _snack("لا يوجد docId للموضوع.");
@@ -528,7 +532,6 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
         ? (_sectionKeys.isNotEmpty ? _sectionKeys.first : '')
         : _sectionKey;
 
-    // لو sectionKey غير موجود في القائمة (لسبب ما)، نخليه موجود كـ custom
     final sectionOptions = <String>{
       ..._sectionKeys,
       if (_sectionKey.isNotEmpty) _sectionKey,
@@ -628,7 +631,6 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        // ✅ Explanatory hint for Featured
                         Text(
                           "• ترتيب المختارات = ترتيب داخل \"ترشيحات Pro\"",
                           textAlign: TextAlign.right,
@@ -639,8 +641,6 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                           ),
                         ),
                         const SizedBox(height: 10),
-
-                        // Featured toggle
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 10),
@@ -670,8 +670,6 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                           ),
                         ),
                         const SizedBox(height: 10),
-
-                        // Featured order stepper
                         stepperRow(
                           label: "ترتيب داخل المختارات",
                           value: featuredOrderLocal,
@@ -682,8 +680,6 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                           onUp: () => setLocal(() => featuredOrderLocal++),
                         ),
                         const SizedBox(height: 10),
-
-                        // Featured until
                         Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 10),
@@ -734,7 +730,6 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                             ],
                           ),
                         ),
-
                         const SizedBox(height: 14),
                         Text(
                           "نقل/ترتيب داخل الأقسام",
@@ -746,7 +741,6 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        // ✅ Explanatory hints
                         Text(
                           "• القسم = مكان الظهور في \"المعلومة بتفرق\"\n• الترتيب = ترتيب داخل نفس القسم",
                           textAlign: TextAlign.right,
@@ -758,8 +752,6 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-
-                        // section dropdown with Arabic labels
                         DropdownButtonFormField<String>(
                           initialValue: sectionOptions.contains(sectionKeyLocal)
                               ? sectionKeyLocal
@@ -792,8 +784,6 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                           ),
                         ),
                         const SizedBox(height: 10),
-
-                        // orderInSection stepper
                         stepperRow(
                           label: "ترتيب داخل القسم",
                           value: orderInSectionLocal,
@@ -803,9 +793,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                           }),
                           onUp: () => setLocal(() => orderInSectionLocal++),
                         ),
-
                         const SizedBox(height: 14),
-                        // ✅ Save button: adaptive height, no clipping
                         Align(
                           alignment: Alignment.center,
                           child: ConstrainedBox(
@@ -822,7 +810,6 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                               onPressed: () async {
                                 final nav = Navigator.of(context);
                                 try {
-                                  // ✅ Only update sectionKey/orderInSection, DO NOT touch tags
                                   await _proInsightRepo.update(_docId, {
                                     'isFeatured': isFeaturedLocal,
                                     'featuredOrder': featuredOrderLocal,
@@ -874,14 +861,12 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
     );
   }
 
-  // ✅ Move Section via tags (within pro_insight only)
   Future<void> _openMoveSectionSheet() async {
     if (_docId.isEmpty) {
       _snack("الملف غير جاهز.");
       return;
     }
 
-    // Detect current section from tags
     String currentSection = '';
     for (final tag in _tags) {
       final norm = _normalizeTag(tag);
@@ -890,7 +875,6 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
         break;
       }
     }
-    // Default to first section if none found
     if (currentSection.isEmpty) {
       currentSection = _proInsightSections.first;
     }
@@ -998,7 +982,6 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                             onPressed: () async {
                               final nav = Navigator.of(context);
                               try {
-                                // Build nextTags:
                                 final existingTags = _tags
                                     .map((t) => _normalizeTag(t))
                                     .where((t) => t.isNotEmpty)
@@ -1122,7 +1105,6 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
                     const SizedBox(height: 10),
                     _tf(lockC, "إغلاق/سلوك عملي (lock)", maxLines: 4),
                     const SizedBox(height: 12),
-                    // ✅ Save button: adaptive height, no clipping
                     Align(
                       alignment: Alignment.center,
                       child: ConstrainedBox(
@@ -1410,6 +1392,7 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
           const SizedBox(width: 6),
         ],
       ),
+      // ✅ Same layout structure as before (Sticky Footer)
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: _loadingArticle
@@ -1422,97 +1405,128 @@ class _FactArticlesScreenState extends State<FactArticlesScreen> {
               )
             : (!_articleExists
                 ? _centerMsg("الموضوع غير موجود أو اتغير عنوانه.")
-                : SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _infoBox(_hook.isEmpty ? "—" : _hook),
-                        const SizedBox(height: 14),
+                : Column(
+                    children: [
+                      // 1. Scrollable Content Area (Expanded)
+                      Expanded(
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _infoBox(_hook.isEmpty ? "—" : _hook),
+                              const SizedBox(height: 14),
 
-                        if (_reset.isNotEmpty) ...[
-                          _sectionBox(title: 'تصحيح المفهوم', body: _reset),
-                          const SizedBox(height: 14),
-                        ],
+                              if (_reset.isNotEmpty) ...[
+                                _sectionBox(
+                                    title: 'تصحيح المفهوم', body: _reset),
+                                const SizedBox(height: 14),
+                              ],
 
-                        if (_core.isNotEmpty) ...[
-                          _sectionBox(
-                              title: 'المعلومة اللي بتفرق', body: _core),
-                          const SizedBox(height: 14),
-                        ],
+                              if (_core.isNotEmpty) ...[
+                                _sectionBox(
+                                    title: 'المعلومة اللي بتفرق', body: _core),
+                                const SizedBox(height: 14),
+                              ],
 
-                        if (_example.isNotEmpty) ...[
-                          _sectionBox(title: 'مثال واقعي', body: _example),
-                          const SizedBox(height: 16),
-                        ],
+                              if (_example.isNotEmpty) ...[
+                                _sectionBox(
+                                    title: 'مثال واقعي', body: _example),
+                                const SizedBox(height: 16),
+                              ],
 
-                        if (_lock.isNotEmpty) ...[
-                          _lockBox(_lock),
-                          const SizedBox(height: 14),
-                        ],
+                              if (_lock.isNotEmpty) ...[
+                                _lockBox(_lock),
+                                const SizedBox(height: 14),
+                              ],
 
-                        // ✅ TRIPLE ACTION ICONS ROW (Matched with Image requirements)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            // 1. Share Icon
-                            _actionIconCircle(
-                              icon: Icons.ios_share_rounded,
-                              onTap: _shareTopic,
-                              color: AppColors.secondaryOrange,
-                            ),
-                            const SizedBox(width: 25),
-                            // 2. Favorite Icon (Synced with Header)
-                            _actionIconCircle(
-                              icon: _isFavorite
-                                  ? Icons.bookmark_rounded
-                                  : Icons.bookmark_outline_rounded,
-                              onTap: _toggleFavorite,
-                              color: AppColors.primaryDeepTeal,
-                            ),
-                            const SizedBox(width: 25),
-                            // 3. Grid/Sections Icon
-                            _actionIconCircle(
-                              icon: Icons.grid_view_rounded,
-                              onTap: () => Navigator.pop(context),
-                              color: AppColors.primaryDeepTeal,
+                              // ✅ TRIPLE ACTION ICONS ROW (Stays with content)
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _actionIconCircle(
+                                    icon: Icons.ios_share_rounded,
+                                    onTap: _shareTopic,
+                                    color: AppColors.secondaryOrange,
+                                  ),
+                                  const SizedBox(width: 25),
+                                  _actionIconCircle(
+                                    icon: _isFavorite
+                                        ? Icons.bookmark_rounded
+                                        : Icons.bookmark_outline_rounded,
+                                    onTap: _toggleFavorite,
+                                    color: AppColors.primaryDeepTeal,
+                                  ),
+                                  const SizedBox(width: 25),
+                                  _actionIconCircle(
+                                    icon: Icons.grid_view_rounded,
+                                    onTap: () => Navigator.pop(context),
+                                    color: AppColors.primaryDeepTeal,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // 2. Fixed Sticky Footer (Navigation Arrows)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, -4),
                             ),
                           ],
                         ),
-
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _navCircle(
-                              enabled: _hasPrev,
-                              icon: Icons.arrow_back_ios_new,
-                              color: AppColors.primaryDeepTeal,
-                              onTap: _hasPrev
-                                  ? () => _goToTitleRaw(
-                                      _nav[_currentIndex - 1].titleRaw)
-                                  : null,
-                            ),
-                            _navCircle(
-                              enabled: _hasNext,
-                              icon: Icons.arrow_forward_ios,
-                              color: AppColors.secondaryOrange,
-                              onTap: _hasNext
-                                  ? () => _goToTitleRaw(
-                                      _nav[_currentIndex + 1].titleRaw)
-                                  : null,
-                            ),
-                          ],
+                        child: SafeArea(
+                          top: false, // Only respect bottom safe area
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _navCircle(
+                                enabled: _hasPrev,
+                                icon: Icons.arrow_back_ios_new,
+                                color: AppColors.primaryDeepTeal,
+                                onTap: _hasPrev
+                                    ? () => _goToTitleRaw(
+                                        _nav[_currentIndex - 1].titleRaw)
+                                    : null,
+                              ),
+                              Text(
+                                "${_currentIndex + 1} / ${_nav.length}",
+                                style: GoogleFonts.cairo(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[400],
+                                  fontSize: 14,
+                                ),
+                              ),
+                              _navCircle(
+                                enabled: _hasNext,
+                                icon: Icons.arrow_forward_ios,
+                                color: AppColors.secondaryOrange,
+                                onTap: _hasNext
+                                    ? () => _goToTitleRaw(
+                                        _nav[_currentIndex + 1].titleRaw)
+                                    : null,
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   )),
       ),
     );
   }
 
-  // ✅ UI HELPER: Component for Action Icons (Circular/Transparent style)
   Widget _actionIconCircle(
       {required IconData icon,
       required VoidCallback onTap,
