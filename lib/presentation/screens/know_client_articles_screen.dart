@@ -1,8 +1,5 @@
 // PATH: lib/presentation/screens/know_client_articles_screen.dart
-// STATUS: Full Original File – STRICT FIXES APPLIED
-// ✅ FIX 1: Header shows Sub-Section Name (_sectionDisplayName) NOT Article Title
-// ✅ FIX 2: Navigation Arrows logic fixed to load immediately within the section
-// ✅ RESTORED: All Admin Tools & Logic (Uncut/Uncleaned)
+// STATUS: FINAL SHARE LOGIC + STICKY FOOTER ✅
 
 import 'dart:async';
 
@@ -34,6 +31,10 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
   static const String _collectionName = 'know_your_client';
   static const String _prefsFavKey = 'kyc_fav_titles';
   static const String _prefsLastSeenKey = 'kyc_last_seen_title';
+
+  // ✅ روابط المتجر (سيتم تفعيلها تلقائياً عند وضع الرابط الحقيقي)
+  static const String _androidStoreUrl = 'PUT_PLAY_STORE_LINK_HERE';
+  static const String _iosStoreUrl = 'PUT_APP_STORE_LINK_HERE';
 
   bool _loading = true;
   bool _isFavorite = false;
@@ -68,7 +69,6 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
   bool get _hasPrev => _navIndex > 0;
   bool get _hasNext => _navIndex >= 0 && _navIndex < _nav.length - 1;
 
-  // ✅ هذا هو الجزء المسؤول عن عرض "اسم القسم" في الهيدر
   String get _sectionDisplayName {
     switch (_sectionKey) {
       case 'client_basics':
@@ -197,7 +197,6 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
       await _markLastSeen(_title, _docId);
       await _loadFavoriteState();
 
-      // ✅ بناء شريط التنقل فوراً بعد تحميل البيانات لضمان ظهور الأسهم
       await _buildSectionNav();
 
       setState(() => _loading = false);
@@ -207,14 +206,12 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
   }
 
   Future<void> _buildSectionNav() async {
-    // إذا لم يكن هناك قسم محدد، لا يمكن بناء التنقل
     if (_sectionKey.isEmpty) {
       _nav = [];
       _navIndex = -1;
       return;
     }
 
-    // جلب كل المواضيع المفعلة التي تنتمي لنفس القسم
     final snap = await FirebaseFirestore.instance
         .collection(_collectionName)
         .where('sectionKey', isEqualTo: _sectionKey)
@@ -243,7 +240,6 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
       ));
     }
 
-    // الترتيب لضمان تسلسل الأسهم (السابق والتالي)
     list.sort((a, b) {
       final byOrder = a.orderInSection.compareTo(b.orderInSection);
       if (byOrder != 0) return byOrder;
@@ -293,8 +289,22 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
     } catch (_) {}
   }
 
+  // ✅ تحديث دالة الشير (Logic Only Update)
   void _shareTopic() {
-    Share.share("$_title\n\n$_hook\n\n#LPro");
+    final sb = StringBuffer();
+    sb.writeln(_title);
+    if (_hook.isNotEmpty) sb.writeln("\n$_hook");
+    sb.writeln("\n#LPro #اعرف_عميلك");
+
+    // إضافة الروابط فقط إذا كانت صحيحة (تبدأ بـ http)
+    if (_androidStoreUrl.startsWith('http')) {
+      sb.writeln("\nAndroid: $_androidStoreUrl");
+    }
+    if (_iosStoreUrl.startsWith('http')) {
+      sb.writeln("iOS: $_iosStoreUrl");
+    }
+
+    Share.share(sb.toString());
   }
 
   Future<void> _goToDoc(String docId, String title) async {
@@ -333,7 +343,7 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
   }
 
   // =========================
-  // ✅ ADMIN TOOLS (FULL ORIGINAL UNTOUCHED)
+  // ADMIN TOOLS
   // =========================
 
   Future<void> _toggleActive(bool value) async {
@@ -909,7 +919,6 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
         backgroundColor: AppColors.primaryDeepTeal,
         foregroundColor: Colors.white,
         centerTitle: true,
-        // ✅ هذا هو التصحيح النهائي: عرض اسم القسم الفرعي في الهيدر
         title: Text(_sectionDisplayName,
             style:
                 GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 16)),
@@ -926,99 +935,124 @@ class _KnowClientArticlesScreenState extends State<KnowClientArticlesScreen> {
           ),
         ],
       ),
+      // ✅ Same layout structure as before (Sticky Footer)
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 40),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _infoBox(_hook.isEmpty ? "—" : _hook),
-                  const SizedBox(height: 14),
-                  if (_article.isNotEmpty)
-                    _premiumCard(
-                        title: 'الشرح ببساطة',
-                        body: _article,
-                        color: AppColors.primaryDeepTeal),
-                  if (_reset.isNotEmpty)
-                    _premiumCard(
-                        title: 'تصحيح زاوية النظر',
-                        body: _reset,
-                        color: AppColors.secondaryOrange),
-                  if (_core.isNotEmpty)
-                    _premiumCard(
-                        title: 'الخلاصة المفيدة',
-                        body: _core,
-                        color: AppColors.primaryDeepTeal),
-                  if (_example.isNotEmpty)
-                    _premiumCard(
-                        title: 'مثال من الواقع',
-                        body: _example,
-                        color: AppColors.secondaryOrange),
-                  if (_lock.isNotEmpty) _lockBox(_lock),
-
-                  const SizedBox(height: 30),
-
-                  // ✅ Triple Action Icon Row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _actionIconCircle(
-                        icon: Icons.ios_share_rounded,
-                        onTap: _shareTopic,
-                        color: AppColors.secondaryOrange,
-                      ),
-                      const SizedBox(width: 25),
-                      _actionIconCircle(
-                        icon: _isFavorite
-                            ? Icons.bookmark_rounded
-                            : Icons.bookmark_outline_rounded,
-                        onTap: _toggleFavorite,
-                        color: AppColors.primaryDeepTeal,
-                      ),
-                      const SizedBox(width: 25),
-                      _actionIconCircle(
-                        icon: Icons.grid_view_rounded,
-                        onTap: () => Navigator.pop(context),
-                        color: AppColors.primaryDeepTeal,
+          : Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _infoBox(_hook.isEmpty ? "—" : _hook),
+                        const SizedBox(height: 14),
+                        if (_article.isNotEmpty)
+                          _premiumCard(
+                              title: 'الشرح ببساطة',
+                              body: _article,
+                              color: AppColors.primaryDeepTeal),
+                        if (_reset.isNotEmpty)
+                          _premiumCard(
+                              title: 'تصحيح زاوية النظر',
+                              body: _reset,
+                              color: AppColors.secondaryOrange),
+                        if (_core.isNotEmpty)
+                          _premiumCard(
+                              title: 'الخلاصة المفيدة',
+                              body: _core,
+                              color: AppColors.primaryDeepTeal),
+                        if (_example.isNotEmpty)
+                          _premiumCard(
+                              title: 'مثال من الواقع',
+                              body: _example,
+                              color: AppColors.secondaryOrange),
+                        if (_lock.isNotEmpty) _lockBox(_lock),
+                        const SizedBox(height: 30),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _actionIconCircle(
+                              icon: Icons.ios_share_rounded,
+                              onTap: _shareTopic,
+                              color: AppColors.secondaryOrange,
+                            ),
+                            const SizedBox(width: 25),
+                            _actionIconCircle(
+                              icon: _isFavorite
+                                  ? Icons.bookmark_rounded
+                                  : Icons.bookmark_outline_rounded,
+                              onTap: _toggleFavorite,
+                              color: AppColors.primaryDeepTeal,
+                            ),
+                            const SizedBox(width: 25),
+                            _actionIconCircle(
+                              icon: Icons.grid_view_rounded,
+                              onTap: () => Navigator.pop(context),
+                              color: AppColors.primaryDeepTeal,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, -4),
                       ),
                     ],
                   ),
-
-                  const SizedBox(height: 35),
-
-                  // ✅ الأسهم تعمل وتنقلك داخل نفس القسم (Section) فقط
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _navCircle(
-                        enabled: _hasPrev,
-                        icon: Icons.arrow_back_ios_new,
-                        color: AppColors.primaryDeepTeal,
-                        onTap: _hasPrev
-                            ? () => _goToDoc(_nav[_navIndex - 1].id,
-                                _nav[_navIndex - 1].title)
-                            : null,
-                      ),
-                      _navCircle(
-                        enabled: _hasNext,
-                        icon: Icons.arrow_forward_ios,
-                        color: AppColors.secondaryOrange,
-                        onTap: _hasNext
-                            ? () => _goToDoc(_nav[_navIndex + 1].id,
-                                _nav[_navIndex + 1].title)
-                            : null,
-                      ),
-                    ],
+                  child: SafeArea(
+                    top: false,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _navCircle(
+                          enabled: _hasPrev,
+                          icon: Icons.arrow_back_ios_new,
+                          color: AppColors.primaryDeepTeal,
+                          onTap: _hasPrev
+                              ? () => _goToDoc(_nav[_navIndex - 1].id,
+                                  _nav[_navIndex - 1].title)
+                              : null,
+                        ),
+                        Text(
+                          "${_navIndex + 1} / ${_nav.length}",
+                          style: GoogleFonts.cairo(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[400],
+                            fontSize: 14,
+                          ),
+                        ),
+                        _navCircle(
+                          enabled: _hasNext,
+                          icon: Icons.arrow_forward_ios,
+                          color: AppColors.secondaryOrange,
+                          onTap: _hasNext
+                              ? () => _goToDoc(_nav[_navIndex + 1].id,
+                                  _nav[_navIndex + 1].title)
+                              : null,
+                        ),
+                      ],
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
     );
   }
 
-  // ✅ Helper Components
   Widget _actionIconCircle(
       {required IconData icon,
       required VoidCallback onTap,
