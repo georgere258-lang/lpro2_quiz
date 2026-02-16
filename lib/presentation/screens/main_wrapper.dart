@@ -11,7 +11,6 @@ import '../../core/services/app_config_service.dart';
 import 'home_screen.dart';
 import 'leaderboard_screen.dart';
 import 'chat_support_screen.dart';
-// ✅ تم إضافة الاستيراد المفقود لحل مشكلة الشاشة الحمراء
 import 'profile_screen.dart';
 import '../../features/news_ticker/presentation/news_ticker_widget.dart';
 import '../widgets/lpro_bottom_nav_bar.dart';
@@ -35,7 +34,6 @@ class _MainWrapperState extends State<MainWrapper> {
     if (widget.initialIndex != null) {
       _currentIndex = widget.initialIndex!.clamp(0, 2);
     }
-    // ✅ التأكد من استدعاء الصفحات بالمسارات الصحيحة
     _pages = [
       const HomeScreen(),
       const LeaderboardScreen(),
@@ -147,13 +145,18 @@ class _MainWrapperState extends State<MainWrapper> {
       ),
       title: Transform.translate(
         offset: const Offset(0, 8),
-        child: Image.asset('assets/top_brand.png',
-            height: 22, fit: BoxFit.contain),
+        child: Image.asset(
+          'assets/top_brand.png',
+          height: 22,
+          fit: BoxFit.contain,
+        ),
       ),
+
+      // ✅ FIX: Prevent clipping by making PreferredSize match actual content height.
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(42),
+        preferredSize: const Size.fromHeight(44),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
+          padding: const EdgeInsets.fromLTRB(0, 2, 0, 6),
           child: _user == null
               ? const _TickerBox(userName: "Pro")
               : StreamBuilder<DocumentSnapshot>(
@@ -194,16 +197,17 @@ class _MainWrapperState extends State<MainWrapper> {
       title: Text(
         title,
         style: GoogleFonts.cairo(
-            fontWeight: FontWeight.w900,
-            color: Colors.white,
-            fontSize: 18,
-            shadows: [
-              Shadow(
-                offset: const Offset(0, 2),
-                blurRadius: 4.0,
-                color: Colors.black.withValues(alpha: 0.3),
-              ),
-            ]),
+          fontWeight: FontWeight.w900,
+          color: Colors.white,
+          fontSize: 18,
+          shadows: [
+            Shadow(
+              offset: const Offset(0, 2),
+              blurRadius: 4.0,
+              color: Colors.black.withValues(alpha: 0.3),
+            ),
+          ],
+        ),
       ),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
@@ -215,14 +219,16 @@ class _MainWrapperState extends State<MainWrapper> {
 class _TickerBox extends StatelessWidget {
   final String userName;
   const _TickerBox({required this.userName});
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 34,
+    return SizedBox(
+      height: 36, // ✅ FIX: give safe vertical room for Arabic on iOS
       width: double.infinity,
-      color: Colors.transparent,
-      alignment: Alignment.center,
-      child: NewsTickerWidget(userName: userName),
+      child: Align(
+        alignment: Alignment.center,
+        child: NewsTickerWidget(userName: userName),
+      ),
     );
   }
 }
