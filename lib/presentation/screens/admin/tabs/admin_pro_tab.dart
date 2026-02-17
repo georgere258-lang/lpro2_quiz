@@ -3,6 +3,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/app_config_service.dart';
 import '../../../../features/pro_card/models/pro_card_banner.dart';
@@ -23,6 +25,49 @@ class AdminProTab extends StatelessWidget {
     required this.snack,
   });
 
+  static const String _homeProCardCollection = 'home_pro_card';
+  static const String _homeProCardDocId = 'current';
+
+  Future<Map<String, dynamic>> _loadPushMeta() async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection(_homeProCardCollection)
+          .doc(_homeProCardDocId)
+          .get();
+      final data = snap.data();
+      if (data == null) return <String, dynamic>{};
+      return data;
+    } catch (_) {
+      return <String, dynamic>{};
+    }
+  }
+
+  Future<void> _savePushMeta({
+    required bool notify,
+    required String pushTitle,
+    required String pushBody,
+  }) async {
+    await FirebaseFirestore.instance
+        .collection(_homeProCardCollection)
+        .doc(_homeProCardDocId)
+        .set(
+      {
+        'notify': notify,
+        if (pushTitle.trim().isNotEmpty) 'pushTitle': pushTitle.trim(),
+        if (pushBody.trim().isNotEmpty) 'pushBody': pushBody.trim(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  String _defaultPushTitle() => 'معلومة Pro';
+
+  String _defaultPushBodyForType(ProCardContentType type) {
+    if (type == ProCardContentType.image) return 'تم نشر صورة جديدة';
+    return 'تم نشر محتوى جديد';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Directionality(
@@ -36,7 +81,8 @@ class AdminProTab extends StatelessWidget {
               adminCenterBtn(
                 onPressed: () => _openProEditor(context),
                 bg: AppColors.primaryDeepTeal,
-                child: adminBtnText('تعديل / إنشاء الرسالة', size: 12),
+                // ✅ requested: slightly bigger
+                child: adminBtnText('تعديل / إنشاء الرسالة', size: 16),
               ),
               const SizedBox(height: 16),
               StreamBuilder<ProCardBanner?>(
@@ -70,10 +116,13 @@ class AdminProTab extends StatelessWidget {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Text('نوع المحتوى: صورة',
-                                  style: GoogleFonts.cairo(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w900)),
+                              Text(
+                                'نوع المحتوى: صورة',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
                               const SizedBox(height: 10),
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
@@ -85,9 +134,12 @@ class AdminProTab extends StatelessWidget {
                                     errorBuilder: (_, __, ___) => Container(
                                       color: Colors.grey[100],
                                       alignment: Alignment.center,
-                                      child: Text('فشل تحميل الصورة',
-                                          style: GoogleFonts.cairo(
-                                              fontWeight: FontWeight.w800)),
+                                      child: Text(
+                                        'فشل تحميل الصورة',
+                                        style: GoogleFonts.cairo(
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -98,14 +150,21 @@ class AdminProTab extends StatelessWidget {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Text('نوع المحتوى: نص',
-                                  style: GoogleFonts.cairo(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w900)),
+                              Text(
+                                'نوع المحتوى: نص',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
                               const SizedBox(height: 10),
-                              Text(banner.text,
-                                  style: GoogleFonts.cairo(
-                                      fontSize: 14, height: 1.6)),
+                              Text(
+                                banner.text,
+                                style: GoogleFonts.cairo(
+                                  fontSize: 14,
+                                  height: 1.6,
+                                ),
+                              ),
                             ],
                           ),
 
@@ -133,10 +192,10 @@ class AdminProTab extends StatelessWidget {
                             ),
                             const SizedBox(width: 10),
                             adminSmallBtn(
-                                'تعديل',
-                                Icons.edit,
-                                () =>
-                                    _openProEditorWithBanner(context, banner)),
+                              'تعديل',
+                              Icons.edit,
+                              () => _openProEditorWithBanner(context, banner),
+                            ),
                           ],
                         ),
                       ],
@@ -156,8 +215,19 @@ class AdminProTab extends StatelessWidget {
   Future<void> _openProEditor(BuildContext context) async {
     final textC = TextEditingController();
     final imageUrlC = TextEditingController();
+
+    // ✅ Push controls
+    bool notify = false; // ✅ ALWAYS start false (one-shot)
+    final pushTitleC = TextEditingController();
+    final pushBodyC = TextEditingController();
+
     bool isActive = true;
     ProCardContentType type = ProCardContentType.text;
+
+    // preload existing meta (best-effort) — WITHOUT notify (avoid sticky spam)
+    final meta = await _loadPushMeta();
+    pushTitleC.text = (meta['pushTitle'] ?? '').toString();
+    pushBodyC.text = (meta['pushBody'] ?? '').toString();
 
     await showModalBottomSheet(
       context: context,
@@ -176,8 +246,10 @@ class AdminProTab extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('رسالة Pro الحية',
-                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+              Text(
+                'رسالة Pro الحية',
+                style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 10),
               Row(
                 children: [
@@ -187,7 +259,15 @@ class AdminProTab extends StatelessWidget {
                       groupValue: type,
                       dense: true,
                       contentPadding: EdgeInsets.zero,
-                      onChanged: (v) => setLocal(() => type = v!),
+                      onChanged: (v) => setLocal(() {
+                        type = v!;
+                        if (pushBodyC.text.trim().isEmpty) {
+                          pushBodyC.text = _defaultPushBodyForType(type);
+                        }
+                        if (pushTitleC.text.trim().isEmpty) {
+                          pushTitleC.text = _defaultPushTitle();
+                        }
+                      }),
                       title: Text('نص', style: GoogleFonts.cairo(fontSize: 12)),
                     ),
                   ),
@@ -197,23 +277,47 @@ class AdminProTab extends StatelessWidget {
                       groupValue: type,
                       dense: true,
                       contentPadding: EdgeInsets.zero,
-                      onChanged: (v) => setLocal(() => type = v!),
+                      onChanged: (v) => setLocal(() {
+                        type = v!;
+                        if (pushBodyC.text.trim().isEmpty) {
+                          pushBodyC.text = _defaultPushBodyForType(type);
+                        }
+                        if (pushTitleC.text.trim().isEmpty) {
+                          pushTitleC.text = _defaultPushTitle();
+                        }
+                      }),
                       title:
                           Text('صورة', style: GoogleFonts.cairo(fontSize: 12)),
                     ),
                   ),
                 ],
               ),
+
               if (type == ProCardContentType.text)
                 adminTextField(textC, 'نص الرسالة...', maxLines: 4)
               else
                 adminTextField(imageUrlC, 'رابط الصورة (https://)...',
                     maxLines: 2),
+
               SwitchListTile(
                 value: isActive,
                 onChanged: (v) => setLocal(() => isActive = v),
                 title: Text('ظاهر', style: GoogleFonts.cairo(fontSize: 12)),
               ),
+
+              // ✅ Push controls (minimal)
+              const SizedBox(height: 6),
+              SwitchListTile(
+                value: notify,
+                onChanged: (v) => setLocal(() => notify = v),
+                title:
+                    Text('إرسال إشعار', style: GoogleFonts.cairo(fontSize: 12)),
+              ),
+              adminTextField(pushTitleC, 'عنوان الإشعار (اختياري)',
+                  maxLines: 1),
+              const SizedBox(height: 8),
+              adminTextField(pushBodyC, 'نص الإشعار (اختياري)', maxLines: 2),
+
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -232,6 +336,27 @@ class AdminProTab extends StatelessWidget {
                             imageUrl: imageUrlC.text.trim(),
                             isActive: isActive,
                           );
+
+                          final title = pushTitleC.text.trim().isNotEmpty
+                              ? pushTitleC.text.trim()
+                              : _defaultPushTitle();
+
+                          String body = pushBodyC.text.trim();
+                          if (body.isEmpty) {
+                            if (type == ProCardContentType.text &&
+                                textC.text.trim().isNotEmpty) {
+                              body = textC.text.trim();
+                            } else {
+                              body = _defaultPushBodyForType(type);
+                            }
+                          }
+
+                          await _savePushMeta(
+                            notify: notify,
+                            pushTitle: title,
+                            pushBody: body,
+                          );
+
                           snack('تم الحفظ ✅');
                           nav.pop();
                         } catch (_) {
@@ -251,14 +376,29 @@ class AdminProTab extends StatelessWidget {
         ),
       ),
     );
+
+    textC.dispose();
+    imageUrlC.dispose();
+    pushTitleC.dispose();
+    pushBodyC.dispose();
   }
 
   Future<void> _openProEditorWithBanner(
       BuildContext context, ProCardBanner banner) async {
     final textC = TextEditingController(text: banner.text);
     final imageUrlC = TextEditingController(text: banner.imageUrl);
+
+    // ✅ Push controls
+    bool notify = false; // ✅ ALWAYS start false (one-shot)
+    final pushTitleC = TextEditingController();
+    final pushBodyC = TextEditingController();
+
     bool isActive = banner.isActive;
     ProCardContentType type = banner.contentType;
+
+    final meta = await _loadPushMeta();
+    pushTitleC.text = (meta['pushTitle'] ?? '').toString();
+    pushBodyC.text = (meta['pushBody'] ?? '').toString();
 
     await showModalBottomSheet(
       context: context,
@@ -277,8 +417,10 @@ class AdminProTab extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('تعديل رسالة Pro',
-                  style: GoogleFonts.cairo(fontWeight: FontWeight.bold)),
+              Text(
+                'تعديل رسالة Pro',
+                style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 10),
               Row(
                 children: [
@@ -288,7 +430,15 @@ class AdminProTab extends StatelessWidget {
                       groupValue: type,
                       dense: true,
                       contentPadding: EdgeInsets.zero,
-                      onChanged: (v) => setLocal(() => type = v!),
+                      onChanged: (v) => setLocal(() {
+                        type = v!;
+                        if (pushBodyC.text.trim().isEmpty) {
+                          pushBodyC.text = _defaultPushBodyForType(type);
+                        }
+                        if (pushTitleC.text.trim().isEmpty) {
+                          pushTitleC.text = _defaultPushTitle();
+                        }
+                      }),
                       title: Text('نص', style: GoogleFonts.cairo(fontSize: 12)),
                     ),
                   ),
@@ -298,7 +448,15 @@ class AdminProTab extends StatelessWidget {
                       groupValue: type,
                       dense: true,
                       contentPadding: EdgeInsets.zero,
-                      onChanged: (v) => setLocal(() => type = v!),
+                      onChanged: (v) => setLocal(() {
+                        type = v!;
+                        if (pushBodyC.text.trim().isEmpty) {
+                          pushBodyC.text = _defaultPushBodyForType(type);
+                        }
+                        if (pushTitleC.text.trim().isEmpty) {
+                          pushTitleC.text = _defaultPushTitle();
+                        }
+                      }),
                       title:
                           Text('صورة', style: GoogleFonts.cairo(fontSize: 12)),
                     ),
@@ -310,11 +468,26 @@ class AdminProTab extends StatelessWidget {
               else
                 adminTextField(imageUrlC, 'رابط الصورة (https://)...',
                     maxLines: 2),
+
               SwitchListTile(
                 value: isActive,
                 onChanged: (v) => setLocal(() => isActive = v),
                 title: Text('ظاهر', style: GoogleFonts.cairo(fontSize: 12)),
               ),
+
+              // ✅ Push controls (minimal)
+              const SizedBox(height: 6),
+              SwitchListTile(
+                value: notify,
+                onChanged: (v) => setLocal(() => notify = v),
+                title:
+                    Text('إرسال إشعار', style: GoogleFonts.cairo(fontSize: 12)),
+              ),
+              adminTextField(pushTitleC, 'عنوان الإشعار (اختياري)',
+                  maxLines: 1),
+              const SizedBox(height: 8),
+              adminTextField(pushBodyC, 'نص الإشعار (اختياري)', maxLines: 2),
+
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -335,6 +508,27 @@ class AdminProTab extends StatelessWidget {
                             publishAt: banner.publishAt,
                             expireAt: banner.expireAt,
                           );
+
+                          final title = pushTitleC.text.trim().isNotEmpty
+                              ? pushTitleC.text.trim()
+                              : _defaultPushTitle();
+
+                          String body = pushBodyC.text.trim();
+                          if (body.isEmpty) {
+                            if (type == ProCardContentType.text &&
+                                textC.text.trim().isNotEmpty) {
+                              body = textC.text.trim();
+                            } else {
+                              body = _defaultPushBodyForType(type);
+                            }
+                          }
+
+                          await _savePushMeta(
+                            notify: notify,
+                            pushTitle: title,
+                            pushBody: body,
+                          );
+
                           snack('تم الحفظ ✅');
                           nav.pop();
                         } catch (_) {
@@ -354,6 +548,11 @@ class AdminProTab extends StatelessWidget {
         ),
       ),
     );
+
+    textC.dispose();
+    imageUrlC.dispose();
+    pushTitleC.dispose();
+    pushBodyC.dispose();
   }
 
   Widget _buildAppConfigSection(BuildContext context) {
@@ -375,29 +574,36 @@ class AdminProTab extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('App Controls',
-                  style: GoogleFonts.cairo(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 14,
-                      color: AppColors.primaryDeepTeal)),
+              Text(
+                'App Controls',
+                style: GoogleFonts.cairo(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 14,
+                  color: AppColors.primaryDeepTeal,
+                ),
+              ),
               const Divider(),
               _configSwitch(
-                  label: 'Push Notifications',
-                  value: features['pushNotificationsEnabled'] == true,
-                  onChanged: (v) =>
-                      _saveFeature('pushNotificationsEnabled', v)),
+                label: 'Push Notifications',
+                value: features['pushNotificationsEnabled'] == true,
+                onChanged: (v) => _saveFeature('pushNotificationsEnabled', v),
+              ),
               _configSwitch(
-                  label: 'Support Chat',
-                  value: features['supportChatEnabled'] == true,
-                  onChanged: (v) => _saveFeature('supportChatEnabled', v)),
+                label: 'Support Chat',
+                value: features['supportChatEnabled'] == true,
+                onChanged: (v) => _saveFeature('supportChatEnabled', v),
+              ),
               _configSwitch(
-                  label: 'Quiz Share',
-                  value: features['quizShareEnabled'] == true,
-                  onChanged: (v) => _saveFeature('quizShareEnabled', v)),
+                label: 'Quiz Share',
+                value: features['quizShareEnabled'] == true,
+                onChanged: (v) => _saveFeature('quizShareEnabled', v),
+              ),
               const SizedBox(height: 8),
-              Text('Limits',
-                  style: GoogleFonts.cairo(
-                      fontWeight: FontWeight.w800, fontSize: 12)),
+              Text(
+                'Limits',
+                style: GoogleFonts.cairo(
+                    fontWeight: FontWeight.w800, fontSize: 12),
+              ),
               _configLimitRow(
                 label: 'Max Fetch',
                 value: limits['maxFetchPerPage'] ?? 50,
@@ -435,8 +641,9 @@ class AdminProTab extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-              flex: 2,
-              child: Text(label, style: GoogleFonts.cairo(fontSize: 11))),
+            flex: 2,
+            child: Text(label, style: GoogleFonts.cairo(fontSize: 11)),
+          ),
           SizedBox(
             width: 70,
             child: TextField(

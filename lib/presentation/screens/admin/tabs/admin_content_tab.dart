@@ -3,6 +3,8 @@
 //         ✅ KYC: sectionKey enforced, tags removed
 //         ✅ Pro Insight: tags enforced, sectionKey removed
 //         ✅ Prevents “KYC items landing in Pro Insight” forever
+//         ✅ Push control (notify + pushTitle + pushBody) — default OFF
+//         ✅ FIX: Bulk Import push fields respect per-item overrides (JSON wins, UI = defaults)
 
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -84,6 +86,11 @@ class _AdminContentTabState extends State<AdminContentTab> {
   final _lockC = TextEditingController();
   final _bulkJsonC = TextEditingController();
 
+  // ✅ Push controls (default OFF)
+  bool _notify = false;
+  final _pushTitleC = TextEditingController();
+  final _pushBodyC = TextEditingController();
+
   // --- Fields ---
   bool _isActive = true;
   bool _isFeatured = false;
@@ -119,6 +126,10 @@ class _AdminContentTabState extends State<AdminContentTab> {
     _exampleC.dispose();
     _lockC.dispose();
     _bulkJsonC.dispose();
+
+    _pushTitleC.dispose();
+    _pushBodyC.dispose();
+
     super.dispose();
   }
 
@@ -151,6 +162,11 @@ class _AdminContentTabState extends State<AdminContentTab> {
             _selectedSection = _tagNormalization[firstTag] ?? firstTag;
           }
         }
+
+        // ✅ load push fields (safe defaults)
+        _notify = data['notify'] == true;
+        _pushTitleC.text = (data['pushTitle'] ?? '').toString();
+        _pushBodyC.text = (data['pushBody'] ?? '').toString();
       });
     } catch (_) {}
   }
@@ -185,6 +201,9 @@ class _AdminContentTabState extends State<AdminContentTab> {
     _lockC.clear();
     _bulkJsonC.clear();
 
+    _pushTitleC.clear();
+    _pushBodyC.clear();
+
     setState(() {
       _isActive = true;
       _isFeatured = false;
@@ -192,6 +211,8 @@ class _AdminContentTabState extends State<AdminContentTab> {
       _publishAt = null;
       _expireAt = null;
       _featuredUntil = null;
+
+      _notify = false;
 
       if (_selectedType == 'know_your_client') {
         _selectedSectionKey = _kycKeyMapping.keys.first;
@@ -255,6 +276,14 @@ class _AdminContentTabState extends State<AdminContentTab> {
         // DO NOT write sectionKey for Pro Insight
       }
 
+      // ✅ push control fields (safe + minimal)
+      data['notify'] = _notify == true;
+      final pushTitle = _pushTitleC.text.trim();
+      final pushBody = _pushBodyC.text.trim();
+      if (_notify == true && pushTitle.isNotEmpty)
+        data['pushTitle'] = pushTitle;
+      if (_notify == true && pushBody.isNotEmpty) data['pushBody'] = pushBody;
+
       if (docId.isNotEmpty) {
         await FirebaseFirestore.instance
             .collection(collection)
@@ -296,6 +325,11 @@ class _AdminContentTabState extends State<AdminContentTab> {
     final defaultProInsightTag = _selectedSection.trim().isNotEmpty
         ? _selectedSection.trim()
         : (_sectionsByType['pro_insight']?.first ?? 'البداية الصح');
+
+    // ✅ bulk push defaults from current UI toggle/fields
+    final bulkNotify = _notify == true;
+    final bulkPushTitle = _pushTitleC.text.trim();
+    final bulkPushBody = _pushBodyC.text.trim();
 
     try {
       final raw = json.decode(jsonText);
@@ -360,6 +394,29 @@ class _AdminContentTabState extends State<AdminContentTab> {
 
             // Remove sectionKey if mistakenly present
             data.remove('sectionKey');
+          }
+
+          // ✅ FIX: push control respects per-item overrides (JSON wins, UI = defaults)
+          final itemNotifyRaw = data['notify'];
+          final itemNotify = itemNotifyRaw == true;
+
+          final effectiveNotify =
+              (itemNotifyRaw is bool) ? itemNotify : bulkNotify;
+
+          data['notify'] = effectiveNotify;
+
+          if (effectiveNotify) {
+            final hasItemPushTitle =
+                (data['pushTitle']?.toString().trim().isNotEmpty ?? false);
+            final hasItemPushBody =
+                (data['pushBody']?.toString().trim().isNotEmpty ?? false);
+
+            if (!hasItemPushTitle && bulkPushTitle.isNotEmpty) {
+              data['pushTitle'] = bulkPushTitle;
+            }
+            if (!hasItemPushBody && bulkPushBody.isNotEmpty) {
+              data['pushBody'] = bulkPushBody;
+            }
           }
 
           final ref = FirebaseFirestore.instance
@@ -474,6 +531,24 @@ class _AdminContentTabState extends State<AdminContentTab> {
                 },
               ),
             ],
+
+            // ✅ Push control (minimal)
+            const SizedBox(height: 16),
+            _sectionHeader('إعدادات الإشعار (اختياري)'),
+            const SizedBox(height: 10),
+            _toggleRow(
+              label: 'إرسال إشعار عند النشر (notify)',
+              value: _notify,
+              onChanged: (v) => setState(() => _notify = v),
+            ),
+            if (_notify) ...[
+              const SizedBox(height: 10),
+              adminTextField(_pushTitleC, 'عنوان الإشعار (اختياري)...'),
+              const SizedBox(height: 10),
+              adminTextField(_pushBodyC, 'نص الإشعار (اختياري)...',
+                  maxLines: 2),
+            ],
+
             const SizedBox(height: 20),
             _sectionHeader('بيانات الموضوع'),
             const SizedBox(height: 10),
