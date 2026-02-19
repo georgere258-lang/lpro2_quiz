@@ -11,6 +11,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+// ✅ إضافة مكتبة الذاكرة المحلية (تأكد من وجودها في pubspec.yaml)
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:lpro2_quiz/firebase_options.dart';
 import 'package:lpro2_quiz/core/theme/app_theme.dart';
@@ -36,6 +38,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    // ✅ 1. اقتناص وحفظ الإشعار محلياً (والتطبيق مغلق أو في الخلفية)
+    await _saveNotificationLocally(message);
   } catch (_) {}
 }
 
@@ -170,6 +174,9 @@ void _attachForegroundNotificationListener() {
   _onMessageSub =
       FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
     try {
+      // ✅ 2. اقتناص وحفظ الإشعار محلياً (والتطبيق مفتوح في الواجهة)
+      await _saveNotificationLocally(message);
+
       final notif = message.notification;
       if (notif == null) return;
 
@@ -346,6 +353,60 @@ void _subscribeToNotificationTopics() {
   });
 }
 
+// =========================================================================
+// ✅ 3. العقل المدبر: حفظ الإشعارات ومسح ما تخطى 48 ساعة بصمت تام
+// =========================================================================
+Future<void> _saveNotificationLocally(RemoteMessage message) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final String? notifsString = prefs.getString('saved_notifications');
+    List<dynamic> notifs = notifsString != null ? jsonDecode(notifsString) : [];
+
+    // 1. تنظيف الإشعارات القديمة (أكثر من 48 ساعة)
+    final now = DateTime.now();
+    notifs.removeWhere((item) {
+      final timestamp = item['timestamp'] as int?;
+      if (timestamp == null) return true;
+      final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+      return now.difference(date).inHours > 48; // يمسح أي إشعار مر عليه يومين
+    });
+
+    // 2. استخراج بيانات الإشعار الجديد
+    final title = message.notification?.title?.trim() ??
+        message.data['title']?.toString().trim() ??
+        'LPro';
+    final body = message.notification?.body?.trim() ??
+        message.data['body']?.toString().trim() ??
+        '';
+
+    if (title.isEmpty && body.isEmpty)
+      return; // لا يحفظ الإشعارات الصامتة الفارغة
+
+    final newNotif = {
+      'id':
+          message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      'title': title,
+      'body': body,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+      'data':
+          message.data, // حفظ البيانات للـ Deep Linking عند الضغط من القائمة
+      'isNew': true, // لتشغيل النقطة الحمراء
+    };
+
+    // 3. منع التكرار والإضافة في أعلى القائمة (الأحدث أولاً)
+    if (!notifs.any((n) => n['id'] == newNotif['id'])) {
+      notifs.insert(0, newNotif);
+    }
+
+    // 4. الحفظ النهائي في ذاكرة الموبايل
+    await prefs.setString('saved_notifications', jsonEncode(notifs));
+  } catch (e) {
+    // صمت تام (لا نعطل التطبيق أبداً إذا حدث خطأ في الحفظ)
+    debugPrint('LPro Notification Save Error: $e');
+  }
+}
+// =========================================================================
+
 class LProApp extends StatefulWidget {
   const LProApp({super.key});
 
@@ -371,6 +432,19 @@ class _LProAppState extends State<LProApp> {
       title: 'L Pro Quiz',
       debugShowCheckedModeBanner: false,
       navigatorKey: _navKey,
+      // ✅ الحماية الهندسية الصارمة لحجم الخطوط (تمنع تشوه التصميم)
+      builder: (context, child) {
+        final mediaQueryData = MediaQuery.of(context);
+        return MediaQuery(
+          data: mediaQueryData.copyWith(
+            textScaler: mediaQueryData.textScaler.clamp(
+              minScaleFactor: 0.9,
+              maxScaleFactor: 1.1, // أقصى حد للتكبير 10%
+            ),
+          ),
+          child: child!,
+        );
+      },
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
