@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/market_radar_screen.dart
-// STATUS: ✅ سجلات الرادار + ترتيب آمن بدون Index + عناوين أصغر (B) + (🔥 مهم / ⭐ مميّز داخل الكارت)
+// STATUS: ✅ سجلات الرادار + ترتيب آمن + BottomNavBar ✅
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -9,6 +9,8 @@ import 'package:intl/intl.dart' as intl;
 
 import '../../core/constants/app_colors.dart';
 import '../widgets/admin_inline_controls.dart';
+import '../widgets/lpro_bottom_nav_bar.dart'; // ✅ استيراد الشريط السفلي
+import 'main_wrapper.dart'; // ✅ استيراد الواجهة الرئيسية للانتقال
 
 class MarketRadarScreen extends StatelessWidget {
   const MarketRadarScreen({super.key});
@@ -36,6 +38,19 @@ class MarketRadarScreen extends StatelessWidget {
             icon: const Icon(Icons.arrow_back_ios_new),
             onPressed: () => Navigator.pop(context),
           ),
+        ),
+        // ✅ إضافة الشريط السفلي الجديد
+        bottomNavigationBar: LProBottomNavBar(
+          activeIndex: 0,
+          onTap: (index) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (_) => MainWrapper(initialIndex: index),
+              ),
+              (route) => false,
+            );
+          },
         ),
         body: ListView(
           physics: const BouncingScrollPhysics(),
@@ -69,8 +84,6 @@ class MarketRadarScreen extends StatelessWidget {
               color: Colors.purple[800]!,
             ),
             const SizedBox(height: 35),
-
-            // ✅ بدل "المكتبة والمراجع" -> "سجلات الرادار"
             _sectionHeader('سجلات الرادار', Icons.history_edu),
             const SizedBox(height: 12),
             _buildArchiveList(),
@@ -289,7 +302,6 @@ class MarketRadarScreen extends StatelessWidget {
         final data =
             exists ? (snapshot.data!.data() as Map<String, dynamic>) : {};
 
-        // ✅ Badges flags (from AdminInlineControls)
         final bool isPinned = data['isPinned'] == true; // 🔥 مهم
         final bool isFeatured = data['isFeatured'] == true; // ⭐ مميّز
 
@@ -391,8 +403,6 @@ class MarketRadarScreen extends StatelessWidget {
                 ),
               ),
             ),
-
-            // ✅ Badge (Pinned/Featured)
             if (isPinned || isFeatured)
               Positioned(
                 top: 6,
@@ -430,7 +440,6 @@ class MarketRadarScreen extends StatelessWidget {
     );
   }
 
-  // ✅✅ سجلات الرادار: بدون orderBy (لتجنب Index) + ترتيب محلي + عناوين أصغر
   Widget _buildArchiveList() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -458,7 +467,6 @@ class MarketRadarScreen extends StatelessWidget {
           );
         }
 
-        // ✅ ترتيب محلي: createdAtMs ثم updatedAtMs
         docs.sort((a, b) {
           final ad = a.data() as Map<String, dynamic>;
           final bd = b.data() as Map<String, dynamic>;
@@ -468,7 +476,7 @@ class MarketRadarScreen extends StatelessWidget {
           final bMs = _safeInt(bd['createdAtMs']) != 0
               ? _safeInt(bd['createdAtMs'])
               : _safeInt(bd['updatedAtMs']);
-          return bMs.compareTo(aMs); // DESC
+          return bMs.compareTo(aMs);
         });
 
         return ListView.separated(
@@ -526,7 +534,7 @@ class MarketRadarScreen extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.cairo(
                     fontWeight: FontWeight.w800,
-                    fontSize: 12.5, // ✅ أصغر (B)
+                    fontSize: 12.5,
                     color: AppColors.primaryDeepTeal,
                     height: 1.2,
                   ),
