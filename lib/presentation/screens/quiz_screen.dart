@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/quiz_screen.dart
-// STATUS: Phase 4 Platinum - (Repo + FreePlay + Date Fix + Crash Guards + Timestamp Type Fix)
+// STATUS: SCROLL-LIBERATED ✅ (Flexible Intro & Game Flow)
 
 import 'dart:async';
 import 'dart:convert';
@@ -12,13 +12,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/firestore_paths.dart'; // ✅ Uses Constants
+import '../../core/constants/firestore_paths.dart';
 import '../../core/utils/sound_manager.dart';
 import '../home/widgets/section_identity_card.dart';
 import '../widgets/lpro_bottom_nav_bar.dart';
 import 'main_wrapper.dart';
 
-// ✅ Import the new Repository
 import '../../features/quiz/repositories/quiz_repository_impl.dart';
 
 class QuizScreen extends StatefulWidget {
@@ -31,11 +30,6 @@ class QuizScreen extends StatefulWidget {
 }
 
 class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Constants & Repos
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  // ✅ Inject Repository (The Maestro)
   final QuizRepositoryImpl _quizRepo = QuizRepositoryImpl();
 
   static const int _roundsPerDay = 4;
@@ -49,10 +43,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   bool get _isStars => widget.categoryTitle == "دوري النجوم";
   String get _enterButtonText => _isStars ? "انت نجم Pro ⭐" : "ملعبك يا Pro 🔥";
   int get _secondsPerQuestion => _isStars ? 25 : 15;
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // State Section
-  // ═══════════════════════════════════════════════════════════════════════════
 
   List<_QuizQuestion> _candidatePool = [];
   final List<_QuizQuestion> _runQuestions = [];
@@ -78,7 +68,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   Timer? _timer;
   int _timeLeft = 0;
   bool _isFreePlaySession = false;
-  bool _isSaving = false; // Prevent double submission
+  bool _isSaving = false;
 
   int get _roundsDoneToday => _isStars ? _starsRoundsToday : _prosRoundsToday;
   bool get _isCurrentLeagueLocked => _roundsDoneToday >= _roundsPerDay;
@@ -123,10 +113,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // PART A: Engine Logics
-  // ═══════════════════════════════════════════════════════════════════════════
-
   String get _recentlySeenPrefsKey =>
       'quiz_recent_seen_${widget.categoryTitle}';
 
@@ -170,7 +156,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
   Future<void> _loadCandidatePool() async {
     try {
-      // ✅ Fix 3: Use FirestorePaths
       final snap1 = await FirebaseFirestore.instance
           .collection(FirestorePaths.quizzes)
           .where('category', isEqualTo: widget.categoryTitle)
@@ -189,7 +174,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     }
 
     try {
-      // ✅ Fix 3: Use FirestorePaths
       final snap2 = await FirebaseFirestore.instance
           .collection(FirestorePaths.quizzes)
           .where('category', isEqualTo: widget.categoryTitle)
@@ -209,26 +193,27 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
   List<_QuizQuestion> _parseQuestionDocs(
       List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
-    return docs.map((d) {
-      final data = d.data();
-      final options = ((data['options'] as List?) ?? []).cast<String>();
-      int rawCorrect =
-          (data['correctAnswer'] ?? data['correctOptionIndex'] ?? 0) as int;
-      final difficulty = ((data['difficulty'] as int?) ?? 3).clamp(1, 5);
-      return _QuizQuestion(
-        docId: d.id,
-        question: (data['question'] ?? '').toString(),
-        options: options,
-        correctAnswer:
-            options.isNotEmpty ? rawCorrect.clamp(0, options.length - 1) : 0,
-        createdAtMs:
-            (data['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0,
-        difficulty: difficulty,
-      );
-    })
-    // ✅ Guard 3 (Pre-game): Filter invalid questions
-    .where((q) => q.options.length >= 2 && q.question.trim().isNotEmpty)
-    .toList();
+    return docs
+        .map((d) {
+          final data = d.data();
+          final options = ((data['options'] as List?) ?? []).cast<String>();
+          int rawCorrect =
+              (data['correctAnswer'] ?? data['correctOptionIndex'] ?? 0) as int;
+          final difficulty = ((data['difficulty'] as int?) ?? 3).clamp(1, 5);
+          return _QuizQuestion(
+            docId: d.id,
+            question: (data['question'] ?? '').toString(),
+            options: options,
+            correctAnswer: options.isNotEmpty
+                ? rawCorrect.clamp(0, options.length - 1)
+                : 0,
+            createdAtMs:
+                (data['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0,
+            difficulty: difficulty,
+          );
+        })
+        .where((q) => q.options.length >= 2 && q.question.trim().isNotEmpty)
+        .toList();
   }
 
   void _selectQuestionsForRound() {
@@ -287,12 +272,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     _displayCorrectIndex = pairs.indexWhere((e) => e.value);
   }
 
-  // ✅ IMPROVED: Loads progress and resets correctly based on Year/Month/Day
   Future<void> _loadUserDailyProgress() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
-      // ✅ Fix 3: Use FirestorePaths
       final doc = await FirebaseFirestore.instance
           .collection(FirestorePaths.users)
           .doc(user.uid)
@@ -301,15 +284,13 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         final data = doc.data()!;
         final Timestamp? lastTs = data['lastQuizDate'] as Timestamp?;
         final now = DateTime.now();
-        
-        // ✅ Corrected Date Logic (Include Year)
+
         bool isSameDay = lastTs != null &&
-            lastTs.toDate().year == now.year && 
+            lastTs.toDate().year == now.year &&
             lastTs.toDate().month == now.month &&
             lastTs.toDate().day == now.day;
 
         if (!isSameDay) {
-          // ✅ Fix 3: Use FirestorePaths
           await FirebaseFirestore.instance
               .collection(FirestorePaths.users)
               .doc(user.uid)
@@ -317,9 +298,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             'dailyStarsRounds': 0,
             'dailyProsRounds': 0,
             'dailyFreePlayRounds': 0,
-            // ✅ CRITICAL FIX: Use concrete Timestamp to pass Rules validation
-            // Prevents infinite reset loop if rule expects 'is timestamp'
-            'lastQuizDate': Timestamp.fromDate(now), 
+            'lastQuizDate': Timestamp.fromDate(now),
           });
           if (mounted) {
             setState(() {
@@ -359,10 +338,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   void _startRound({required bool freePlay}) {
     if (_candidatePool.length < _questionsPerRound) return;
     _selectQuestionsForRound();
-    
-    // ✅ Fix 3 (Stability): Ensure we have enough valid questions after filtering
     if (_runQuestions.isEmpty) return;
-    
+
     _shuffleAndSetDisplayForQuestion(_runQuestions[0]);
     setState(() {
       _isFreePlaySession = freePlay;
@@ -380,11 +357,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     if (_showFeedback) return;
     _timer?.cancel();
 
-    // ✅ Guard 1: Safety Check against crash (missing options)
-    if (_displayOptions.isEmpty || 
-        _displayCorrectIndex < 0 || 
+    if (_displayOptions.isEmpty ||
+        _displayCorrectIndex < 0 ||
         _displayCorrectIndex >= _displayOptions.length) {
-      // ✅ Safer flow: Check if we should finish or next
       if (_questionIndexInRound + 1 >= _questionsPerRound) {
         _finishRound();
       } else {
@@ -407,12 +382,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         SoundManager.playWrong();
       }
     });
-    
-    // ✅ ASYNC GUARD (Fix 1): Prevent race conditions after delay
+
     Future.delayed(const Duration(milliseconds: 900), () {
       if (!mounted) return;
-      // If user exited or saving started, do NOT continue flow
-      if (_isSaving || !_gameStarted) return; 
+      if (_isSaving || !_gameStarted) return;
 
       if (_questionIndexInRound + 1 >= _questionsPerRound) {
         _finishRound();
@@ -423,13 +396,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   void _nextQuestion() {
-    // ✅ GUARD (Fix 2): Prevent double navigation/saving
     if (_isSaving) return;
-
     _currentQuestionIndex++;
     _questionIndexInRound++;
 
-    // ✅ Guard: Safety Check against Index Out of Range
     if (_currentQuestionIndex >= _runQuestions.length) {
       _finishRound();
       return;
@@ -443,30 +413,21 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
     _startTimer();
   }
 
-  // ✅ MODIFIED: Uses Repository for Unified Source of Truth
   Future<void> _finishRound() async {
-    // ✅ Fix: Cancel timer immediately to prevent delayed callbacks
     _timer?.cancel();
-    
     if (_isSaving) return;
     setState(() => _isSaving = true);
-
     final user = FirebaseAuth.instance.currentUser;
-    
-    // Only save if user exists
     if (user != null) {
       try {
-        // ✅ Call Repo (Handles Users + UserStats + FreePlay)
         await _quizRepo.saveGameSession(
           uid: user.uid,
-          leagueKey: _isFreePlaySession ? 'freeplay' : (_isStars ? 'stars' : 'pros'),
+          leagueKey:
+              _isFreePlaySession ? 'freeplay' : (_isStars ? 'stars' : 'pros'),
           score: _roundScore,
           correctAnswers: _correctAnswersCount,
-          totalQuestions: _questionsPerRound, // Or _runQuestions.length
+          totalQuestions: _questionsPerRound,
         );
-
-        // Update local state manually for immediate UI feedback
-        // (Repo handles Firestore, we handle local state for responsiveness)
         if (mounted) {
           setState(() {
             if (_isFreePlaySession) {
@@ -482,16 +443,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         debugPrint("Error saving quiz result: $e");
       }
     }
-
     if (mounted) {
       setState(() => _isSaving = false);
       _showResultSheet();
     }
   }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // PART B: UI Implementation (Unchanged)
-  // ═══════════════════════════════════════════════════════════════════════════
 
   @override
   Widget build(BuildContext context) {
@@ -645,116 +601,121 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           Directionality(
             textDirection: TextDirection.rtl,
             child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 26, 16, 16),
-                child: Column(
-                  children: [
-                    Text("الدوريات",
-                        style: GoogleFonts.cairo(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            color: primaryColor)),
-                    const SizedBox(height: 14),
-                    SectionIdentityCard(
-                      sectionKey: widget.categoryTitle,
-                      icon: _isStars
-                          ? Icons.auto_awesome_rounded
-                          : Icons.workspace_premium,
-                      title: _isStars ? "✨ دوري النجوم" : "🔥 دوري المحترفين",
-                      description: _isStars
-                          ? ""
-                          : "الاحتراف مش إنك تعرف معلومة واحدة،\nالاحتراف إن كل خيوط المعلومة تبقى في إيدك.",
-                      benefits: const [],
-                    ),
-                    const SizedBox(height: 20),
-                    _glassCard(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.emoji_events_outlined,
-                                  color: primaryColor, size: 18),
-                              const SizedBox(width: 8),
-                              Text(
-                                  _isCurrentLeagueLocked
-                                      ? "أنهيت جولات هذا الدوري ✅"
-                                      : "تحدي اليوم: $_roundsDoneToday/$_roundsPerDay جولات",
-                                  style: GoogleFonts.cairo(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w900,
-                                      color: _isCurrentLeagueLocked
-                                          ? Colors.green
-                                          : primaryColor))
-                            ])),
-                    const SizedBox(height: 16),
-                    Builder(builder: (context) {
-                      final canStart = !_isLoading &&
-                          _candidatePool.length >= _questionsPerRound;
-                      final buttonLabel = _enterButtonText;
-
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: accentColor,
-                              foregroundColor: Colors.white,
-                              minimumSize: const Size(220, 48),
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 24),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(24)),
-                              elevation: 0,
-                            ),
-                            onPressed: () {
-                              SoundManager.playTap();
-                              if (!canStart) {
-                                _showLoadingSheet();
-                              } else {
-                                _openDailyChallengeSheet();
-                              }
-                            },
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+              // ✅ تم إضافة التمرير هنا لتحرير السكرول في شاشة المقدمة
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 26, 16, 16),
+                  child: Column(
+                    children: [
+                      Text("الدوريات",
+                          style: GoogleFonts.cairo(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: primaryColor)),
+                      const SizedBox(height: 14),
+                      SectionIdentityCard(
+                        sectionKey: widget.categoryTitle,
+                        icon: _isStars
+                            ? Icons.auto_awesome_rounded
+                            : Icons.workspace_premium,
+                        title: _isStars ? "✨ دوري النجوم" : "🔥 دوري المحترفين",
+                        description: _isStars
+                            ? ""
+                            : "الاحتراف مش إنك تعرف معلومة واحدة،\nالاحتراف إن كل خيوط المعلومة تبقى في إيدك.",
+                        benefits: const [],
+                      ),
+                      const SizedBox(height: 20),
+                      _glassCard(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                          child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                if (_isLoading)
-                                  const Padding(
-                                    padding: EdgeInsets.only(left: 12),
-                                    child: SizedBox(
-                                      width: 14,
-                                      height: 14,
-                                      child: CircularProgressIndicator(
-                                          color: Colors.white, strokeWidth: 2),
-                                    ),
-                                  ),
+                                Icon(Icons.emoji_events_outlined,
+                                    color: primaryColor, size: 18),
+                                const SizedBox(width: 8),
                                 Text(
-                                  buttonLabel,
-                                  style: GoogleFonts.cairo(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w900),
-                                ),
-                              ],
+                                    _isCurrentLeagueLocked
+                                        ? "أنهيت جولات هذا الدوري ✅"
+                                        : "تحدي اليوم: $_roundsDoneToday/$_roundsPerDay جولات",
+                                    style: GoogleFonts.cairo(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w900,
+                                        color: _isCurrentLeagueLocked
+                                            ? Colors.green
+                                            : primaryColor))
+                              ])),
+                      const SizedBox(height: 16),
+                      Builder(builder: (context) {
+                        final canStart = !_isLoading &&
+                            _candidatePool.length >= _questionsPerRound;
+                        final buttonLabel = _enterButtonText;
+
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: accentColor,
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size(220, 48),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 24),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(24)),
+                                elevation: 0,
+                              ),
+                              onPressed: () {
+                                SoundManager.playTap();
+                                if (!canStart) {
+                                  _showLoadingSheet();
+                                } else {
+                                  _openDailyChallengeSheet();
+                                }
+                              },
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (_isLoading)
+                                    const Padding(
+                                      padding: EdgeInsets.only(left: 12),
+                                      child: SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2),
+                                      ),
+                                    ),
+                                  Text(
+                                    buttonLabel,
+                                    style: GoogleFonts.cairo(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w900),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                      );
-                    }),
-                    const SizedBox(height: 10),
-                    TextButton(
-                        onPressed: () => Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(
-                                // ✅ Fix 3: Return to MainWrapper(Home) for safe flow
-                                builder: (_) => const MainWrapper(initialIndex: 0)),
-                            (route) => false),
-                        child: Text("رجوع",
-                            style: GoogleFonts.cairo(
-                                fontWeight: FontWeight.w800,
-                                color: Colors.blueGrey))),
-                    const SizedBox(height: 14),
-                  ],
+                          ],
+                        );
+                      }),
+                      const SizedBox(height: 10),
+                      TextButton(
+                          onPressed: () => Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const MainWrapper(initialIndex: 0)),
+                              (route) => false),
+                          child: Text("رجوع",
+                              style: GoogleFonts.cairo(
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.blueGrey))),
+                      const SizedBox(height: 14),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1047,7 +1008,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                       _gameStarted = false;
                                       _isFreePlaySession = false;
                                       _usedThisRun.clear();
-                                      _isLoading = false; // Ensure not stuck
+                                      _isLoading = false;
                                     });
                                   },
                                   style: ElevatedButton.styleFrom(
