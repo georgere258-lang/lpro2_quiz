@@ -1,17 +1,19 @@
 // PATH: lib/presentation/screens/main_wrapper.dart
-// STATUS: FIXED SEAMLESS INTEGRATION ✅
+// STATUS: FIXED SEAMLESS INTEGRATION ✅ (Real Local Storage Notifications)
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/services/app_config_service.dart';
 import 'home_screen.dart';
 import 'leaderboard_screen.dart';
 import 'chat_support_screen.dart';
-// ✅ تم إضافة الاستيراد المفقود لحل مشكلة الشاشة الحمراء
 import 'profile_screen.dart';
 import '../../features/news_ticker/presentation/news_ticker_widget.dart';
 import '../widgets/lpro_bottom_nav_bar.dart';
@@ -29,20 +31,94 @@ class _MainWrapperState extends State<MainWrapper> {
   late final List<Widget> _pages;
   final User? _user = FirebaseAuth.instance.currentUser;
 
+  // ✅ متغيرات الذاكرة المحلية للإشعارات
+  List<dynamic> _notifications = [];
+  bool _hasNewNotification = false;
+
   @override
   void initState() {
     super.initState();
     if (widget.initialIndex != null) {
       _currentIndex = widget.initialIndex!.clamp(0, 2);
     }
-    // ✅ التأكد من استدعاء الصفحات بالمسارات الصحيحة
+
     _pages = [
       const HomeScreen(),
       const LeaderboardScreen(),
       ProfileScreen(onSupportPressed: _handleSupportPressed),
       const ChatSupportScreen(),
     ];
+
+    // ✅ تحميل الإشعارات فور فتح التطبيق
+    _loadNotifications();
+
+    // ✅ الاستماع للإشعارات الجديدة والتطبيق مفتوح لتفعيل النقطة الحمراء فوراً
+    FirebaseMessaging.onMessage.listen((_) {
+      if (mounted) {
+        setState(() {
+          _hasNewNotification = true;
+        });
+      }
+    });
   }
+
+  // =========================================================
+  // ✅ دوال التعامل مع ذاكرة الإشعارات المحلية
+  // =========================================================
+  Future<void> _loadNotifications() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? notifsString = prefs.getString('saved_notifications');
+      if (notifsString != null) {
+        final List<dynamic> loaded = jsonDecode(notifsString);
+        if (mounted) {
+          setState(() {
+            _notifications = loaded;
+            // النقطة الحمراء تظهر لو فيه أي إشعار حالته isNew == true
+            _hasNewNotification = loaded.any((n) => n['isNew'] == true);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error loading notifications: $e");
+    }
+  }
+
+  Future<void> _markAllAsRead() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      bool changed = false;
+      for (var n in _notifications) {
+        if (n['isNew'] == true) {
+          n['isNew'] = false;
+          changed = true;
+        }
+      }
+      if (changed) {
+        await prefs.setString(
+            'saved_notifications', jsonEncode(_notifications));
+      }
+      if (mounted) {
+        setState(() {
+          _hasNewNotification = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error marking notifications as read: $e");
+    }
+  }
+
+  String _getTimeAgo(int timestamp) {
+    final now = DateTime.now();
+    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final diff = now.difference(date);
+
+    if (diff.inDays > 0) return "منذ ${diff.inDays} يوم";
+    if (diff.inHours > 0) return "منذ ${diff.inHours} ساعة";
+    if (diff.inMinutes > 0) return "منذ ${diff.inMinutes} دقيقة";
+    return "الآن";
+  }
+  // =========================================================
 
   void _handleSupportPressed() {
     if (AppConfigService().supportChatEnabled) {
@@ -133,6 +209,26 @@ class _MainWrapperState extends State<MainWrapper> {
       centerTitle: true,
       automaticallyImplyLeading: false,
       toolbarHeight: 60,
+      leading: IconButton(
+        icon: Badge(
+          isLabelVisible: _hasNewNotification,
+          backgroundColor: AppColors.secondaryOrange,
+          smallSize: 10,
+          child: const Icon(Icons.notifications_none_rounded,
+              color: Colors.white, size: 26),
+        ),
+        onPressed: () async {
+          // 1. تحديث القائمة قبل الفتح لضمان عرض أحدث الإشعارات
+          await _loadNotifications();
+          // 2. فتح الشاشة
+          _showNotificationSheet();
+          // 3. مسح النقطة الحمراء وتحديث حالة الإشعارات لـ "مقروءة"
+          _markAllAsRead();
+        },
+      ),
+      actions: const [
+        SizedBox(width: 48),
+      ],
       flexibleSpace: Container(
         decoration: const BoxDecoration(
           gradient: RadialGradient(
@@ -207,6 +303,175 @@ class _MainWrapperState extends State<MainWrapper> {
       ),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      ),
+    );
+  }
+
+  // ✅ النافذة المنبثقة المتصلة بالذاكرة الحقيقية
+  void _showNotificationSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.55,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 15, bottom: 10),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "الإشعارات",
+                      style: GoogleFonts.cairo(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.primaryDeepTeal,
+                      ),
+                    ),
+                    Icon(Icons.notifications_active_outlined,
+                        color: AppColors.secondaryOrange, size: 22),
+                  ],
+                ),
+              ),
+              const Divider(),
+              Expanded(
+                child: _notifications.isEmpty
+                    ? Center(
+                        child: Text(
+                          "لا توجد إشعارات حديثة",
+                          style: GoogleFonts.cairo(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        itemCount: _notifications.length,
+                        itemBuilder: (context, index) {
+                          final notif = _notifications[index];
+                          return _buildNotificationItem(
+                            title: notif['title'] ?? 'إشعار جديد',
+                            body: notif['body'] ?? '',
+                            time: _getTimeAgo(notif['timestamp'] ??
+                                DateTime.now().millisecondsSinceEpoch),
+                            isNew: notif['isNew'] ?? false,
+                            onTap: () {
+                              // إذا أردت مستقبلاً توجيه المستخدم لمكان معين عند ضغط الإشعار من القائمة
+                              // Navigator.pop(context);
+                            },
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotificationItem({
+    required String title,
+    required String body,
+    required String time,
+    required bool isNew,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isNew
+              ? AppColors.primaryDeepTeal.withValues(alpha: 0.05)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isNew
+                ? AppColors.primaryDeepTeal.withValues(alpha: 0.2)
+                : Colors.grey.shade200,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primaryDeepTeal.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.flash_on_rounded,
+                  color: AppColors.secondaryOrange, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.cairo(
+                      fontWeight: isNew ? FontWeight.w900 : FontWeight.w700,
+                      fontSize: 14,
+                      color: AppColors.primaryDeepTeal,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    body,
+                    style: GoogleFonts.cairo(
+                      fontSize: 12,
+                      color: Colors.black87,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    time,
+                    style: GoogleFonts.cairo(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isNew)
+              Container(
+                margin: const EdgeInsets.only(top: 5),
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: AppColors.secondaryOrange,
+                  shape: BoxShape.circle,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
