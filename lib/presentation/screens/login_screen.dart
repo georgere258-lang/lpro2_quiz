@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/login_screen.dart
-// STATUS: FIXED & OPTIMIZED (Deleted User Recovery + Slow Net Handling)
+// STATUS: FIXED & OPTIMIZED (Deleted User Recovery + Mandatory Firestore Creation)
 
 import 'dart:async'; // ✅ For Timeout handling
 import 'package:flutter/material.dart';
@@ -139,17 +139,18 @@ class _LoginScreenState extends State<LoginScreen> {
     if (user != null) {
       try {
         final usersRef = FirebaseFirestore.instance.collection('users');
+        final statsRef = FirebaseFirestore.instance.collection('user_stats');
         final userRef = usersRef.doc(user.uid);
 
         // ✅ 1. حماية ضد النت البطيء (Timeout 10s)
-        // إذا فشل الجلب، سنفترض وجود خطأ ونسمح بالدخول لكي لا يعلق المستخدم
         final userDoc =
             await userRef.get().timeout(const Duration(seconds: 10));
 
         final isBootAdmin = user.uid == _bootAdminUid;
 
-        // ✅ 2. إصلاح مشكلة المستخدم المحذوف (If not exists -> Create)
+        // ✅ 2. إصلاح مشكلة المستخدم المحذوف أو الجديد (If not exists -> Create)
         if (!userDoc.exists) {
+          // إنشاء مستند المستخدم الأساسي مع الحقول المطلوبة في الـ Rules
           await userRef.set({
             'uid': user.uid,
             'name': "عضو L Pro جديد",
@@ -157,9 +158,40 @@ class _LoginScreenState extends State<LoginScreen> {
             'points': 0,
             'starsPoints': 0,
             'proPoints': 0,
-            'role': isBootAdmin ? 'admin' : 'user',
+            'dailyStarsRounds': 0,
+            'dailyProsRounds': 0,
+            'dailyFreePlayRounds': 0,
+            'role': isBootAdmin ? 'admin' : 'user', // شرط الـ Rules
+            'isBlocked': false, // 🔥 حقل إلزامي حسب الـ Rules لنجاح الـ Create
+            'lastQuizDate': FieldValue.serverTimestamp(),
             'createdAt': FieldValue.serverTimestamp(),
             'updatedAt': FieldValue.serverTimestamp(),
+          });
+
+          // ✅ إنشاء مستند الإحصائيات فوراً لضمان عدم فشل الجولات لاحقاً
+          await statsRef.doc(user.uid).set({
+            'updatedAt': FieldValue.serverTimestamp(),
+            'stars': {
+              'roundsPlayed': 0,
+              'totalPoints': 0,
+              'correctAnswers': 0,
+              'totalQuestions': 0,
+              'wrongAnswers': 0
+            },
+            'pros': {
+              'roundsPlayed': 0,
+              'totalPoints': 0,
+              'correctAnswers': 0,
+              'totalQuestions': 0,
+              'wrongAnswers': 0
+            },
+            'freeplay': {
+              'roundsPlayed': 0,
+              'totalPoints': 0,
+              'correctAnswers': 0,
+              'totalQuestions': 0,
+              'wrongAnswers': 0
+            },
           });
         } else {
           // ✅ 3. تحديث البيانات للمستخدم الموجود
@@ -185,14 +217,11 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         }
       } catch (e) {
-        // ✅ في حالة الخطأ أو ضعف النت، لا نوقف المستخدم!
-        // نسمح له بالمرور، والشاشات الداخلية ستتعامل مع البيانات عبر StreamBuilder
         debugPrint("⚠️ Network/Firestore Error during navigation: $e");
       }
     }
 
     if (mounted) {
-      // ✅ إيقاف التحميل قبل الانتقال
       setState(() => isLoading = false);
 
       Navigator.pushReplacement(
@@ -247,14 +276,13 @@ class _LoginScreenState extends State<LoginScreen> {
             ? const Center(
                 child: CircularProgressIndicator(color: Colors.white))
             : Center(
-                // ✅ إضافة BouncingScrollPhysics لحل مشاكل التمرير والخطوط الكبيرة
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 30, vertical: 50),
                     child: Column(
-                      mainAxisSize: MainAxisSize.min, // لضمان التمركز الصحيح
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         SvgPicture.asset('assets/logo.svg',
                             height: 110,
