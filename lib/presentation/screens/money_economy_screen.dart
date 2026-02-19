@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/money_economy_screen.dart
-// STATUS: ✅ Align with Market Radar (Badges + Archive no-index + local sort + source slot label) — FIXED TYPES ✅
+// STATUS: ✅ Align with Market Radar + Added LProBottomNavBar ✅
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -9,6 +9,8 @@ import 'package:intl/intl.dart' as intl;
 
 import '../../core/constants/app_colors.dart';
 import '../widgets/admin_inline_controls.dart';
+import '../widgets/lpro_bottom_nav_bar.dart'; // ✅ استيراد الشريط السفلي
+import 'main_wrapper.dart'; // ✅ استيراد الواجهة الرئيسية للانتقال
 
 class MoneyEconomyScreen extends StatelessWidget {
   const MoneyEconomyScreen({super.key});
@@ -35,6 +37,19 @@ class MoneyEconomyScreen extends StatelessWidget {
             icon: const Icon(Icons.arrow_back_ios_new),
             onPressed: () => Navigator.pop(context),
           ),
+        ),
+        // ✅ إضافة الشريط السفلي الجديد
+        bottomNavigationBar: LProBottomNavBar(
+          activeIndex: 0,
+          onTap: (index) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (_) => MainWrapper(initialIndex: index),
+              ),
+              (route) => false,
+            );
+          },
         ),
         body: ListView(
           physics: const BouncingScrollPhysics(),
