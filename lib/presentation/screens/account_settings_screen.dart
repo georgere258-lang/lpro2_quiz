@@ -142,6 +142,10 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     const primaryTeal = Color(0xFF1E4D4D);
+    // جلب رقم الهاتف من FirebaseAuth
+    final user = FirebaseAuth.instance.currentUser;
+    final String userPhone = user?.phoneNumber ?? "غير متوفر";
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7F8),
       appBar: AppBar(
@@ -161,6 +165,19 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             child: ListView(
               padding: const EdgeInsets.all(22),
               children: [
+                Text("بيانات الحساب",
+                    style: GoogleFonts.cairo(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: primaryTeal)),
+                const SizedBox(height: 16),
+                _buildStaticTile(
+                  title: "رقم الهاتف المسجل",
+                  subtitle: userPhone,
+                  icon: Icons.phone_android_rounded,
+                  color: primaryTeal,
+                ),
+                const SizedBox(height: 32),
                 Text("الأمان والخصوصية",
                     style: GoogleFonts.cairo(
                         fontSize: 15,
@@ -184,6 +201,46 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                   child: CircularProgressIndicator(color: primaryTeal)),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStaticTile(
+      {required String title,
+      required String subtitle,
+      required IconData icon,
+      required Color color}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 4))
+        ],
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12)),
+          child: Icon(icon, color: color, size: 22),
+        ),
+        title: Text(title,
+            style: GoogleFonts.cairo(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                color: const Color(0xFF1E4D4D))),
+        subtitle: Text(subtitle,
+            textDirection: TextDirection.ltr,
+            textAlign: TextAlign.right,
+            style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[700])),
       ),
     );
   }
