@@ -49,7 +49,7 @@ function shouldSend({ beforeDoc, afterDoc }) {
 
 function defaultTitleFor(collectionId) {
   switch (collectionId) {
-    case "news_ticker_items": return "شريط الأخبار";
+    case "news_ticker_items": return "News";
     case "home_pro_card": return "معلومة Pro";
     case "pro_insight": return "المعلومة بتفرق";
     case "know_your_client": return "اعرف عميلك";
