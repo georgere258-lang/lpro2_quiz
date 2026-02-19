@@ -1,12 +1,8 @@
 // PATH: lib/features/quiz/repositories/quiz_repository_impl.dart
-// STATUS: Phase 6.1 - Transaction Ordering + Practical Stability
-//         ✅ Reads FIRST, Writes LAST (fixes ordering crash)
-//         ✅ LeagueKey normalization (Arabic/legacy -> stars/pros/freeplay)
-//         ✅ num/int safe reads
-//         ✅ Concrete timestamps for users + user_stats (avoid sentinel issues)
-//         ✅ FirebaseException logging (code/message) for definitive diagnosis
-//
-// NOTE: No UI changes. No field renames.
+// STATUS: Phase 6.3 - Production Final (Strict Rules Compliance & Data Integrity)
+// ✅ Fully compatible with Firestore Rules (gameKeys & hasOnly)
+// ✅ Map-Safe logic for all league categories
+// ✅ Atomicity: Reads first, then selective Writes
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
@@ -34,26 +30,29 @@ class QuizRepositoryImpl {
     return 0;
   }
 
+  /// يضمن استرجاع Map صالحة لتجنب أخطاء النوع (Type Casting) أو البيانات التالفة
+  Map<String, dynamic> _safeMap(Map<String, dynamic> root, String key) {
+    final v = root[key];
+    if (v is Map<String, dynamic>) return v;
+    if (v is Map) return v.map((k, v) => MapEntry(k.toString(), v));
+    return <String, dynamic>{};
+  }
+
+  /// توحيد مسميات الدوريات لتطابق المسارات المعتمدة في قاعدة البيانات
   String _normalizeLeagueKey(String raw) {
     final k = raw.trim();
-
-    // canonical
     if (k == 'stars' || k == 'pros' || k == 'freeplay') return k;
-
-    // Arabic / legacy
     if (k == 'دوري النجوم' || k.toLowerCase() == 'stars league') return 'stars';
-    if (k == 'دوري المحترفين' || k.toLowerCase() == 'pros league') {
+    if (k == 'دوري المحترفين' || k.toLowerCase() == 'pros league')
       return 'pros';
-    }
-
-    // Free play labels
-    if (k == 'لعب حر' || k == 'اللعب الحر' || k.toLowerCase() == 'free play') {
+    if (k == 'لعب حر' || k == 'اللعب الحر' || k.toLowerCase() == 'free play')
       return 'freeplay';
-    }
-
-    debugPrint('⚠️ [QuizRepo] Unknown leagueKey="$raw" -> fallback "freeplay"');
     return 'freeplay';
   }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Main Logic
+  // ────────────────────────────────────────────────────────────────────────────
 
   Future<void> saveGameSession({
     required String uid,
@@ -72,23 +71,17 @@ class QuizRepositoryImpl {
 
     try {
       debugPrint(
-          '🟦 [QuizRepo] ENTER saveGameSession uid=$uid league="$leagueKey" -> "$normalizedLeagueKey" score=$score');
+          '🟦 [QuizRepo] START saveGameSession: uid=$uid, league=$normalizedLeagueKey');
 
       await _firestore.runTransaction((transaction) async {
-        // ─────────────────────────────────────────────────────────────────────
-        // READ PHASE (ALL READS FIRST)
-        // ─────────────────────────────────────────────────────────────────────
+        // 1. READ PHASE (يجب أن تسبق أي عملية كتابة في الـ Transaction)
         final userSnap = await transaction.get(userRef);
         final statsSnap = await transaction.get(statsRef);
 
         final userData = userSnap.data() ?? <String, dynamic>{};
         final rootData = statsSnap.data() ?? <String, dynamic>{};
 
-        // ─────────────────────────────────────────────────────────────────────
-        // LOGIC PHASE (NO WRITES YET)
-        // ─────────────────────────────────────────────────────────────────────
-
-        // --- Users: fields based on league
+        // 2. LOGIC PHASE
         String pointsField = '';
         String dailyField = '';
         final bool isFreePlay = normalizedLeagueKey == 'freeplay';
@@ -100,11 +93,10 @@ class QuizRepositoryImpl {
           pointsField = 'proPoints';
           dailyField = 'dailyProsRounds';
         } else {
-          pointsField = '';
           dailyField = 'dailyFreePlayRounds';
         }
 
-        // Day check
+        // التحقق من التاريخ لتصفير العدادات اليومية إذا لزم الأمر
         final Timestamp? lastTs = userData['lastQuizDate'] as Timestamp?;
         bool isSameDay = false;
         if (lastTs != null) {
@@ -114,37 +106,33 @@ class QuizRepositoryImpl {
               lastDate.day == now.day;
         }
 
-        final int currentDaily = isSameDay ? _readInt(userData, dailyField) : 0;
-        final int newDaily = currentDaily + 1;
-
+        // --- بناء تحديثات جدول المستخدم (SELECTIVE UPDATE) ---
+        // نلتزم فقط بالحقول الموجودة في gameKeys في الرولز
         final userUpdates = <String, dynamic>{
-          dailyField: newDaily,
+          dailyField: _readInt(userData, dailyField) + 1,
+          'updatedAt': timestampNow,
         };
 
         if (!isSameDay) {
-          if (dailyField != 'dailyStarsRounds') {
+          if (dailyField != 'dailyStarsRounds')
             userUpdates['dailyStarsRounds'] = 0;
-          }
-          if (dailyField != 'dailyProsRounds') {
+          if (dailyField != 'dailyProsRounds')
             userUpdates['dailyProsRounds'] = 0;
-          }
-          if (dailyField != 'dailyFreePlayRounds') {
+          if (dailyField != 'dailyFreePlayRounds')
             userUpdates['dailyFreePlayRounds'] = 0;
-          }
         }
 
         if (!isFreePlay) {
           userUpdates['points'] = FieldValue.increment(score);
-          userUpdates[pointsField] = FieldValue.increment(score);
+          if (pointsField.isNotEmpty) {
+            userUpdates[pointsField] = FieldValue.increment(score);
+          }
           userUpdates['lastQuizDate'] = timestampNow;
-          userUpdates['updatedAt'] = timestampNow;
-        } else {
-          userUpdates['updatedAt'] = timestampNow;
         }
 
-        // --- user_stats: update league sub-map
+        // --- بناء وثيقة الإحصائيات (FULL REPLACE) ---
         final Map<String, dynamic> leagueMap = Map<String, dynamic>.from(
-          rootData[normalizedLeagueKey] as Map? ?? <String, dynamic>{},
+          _safeMap(rootData, normalizedLeagueKey),
         );
 
         leagueMap['roundsPlayed'] = _readMapInt(leagueMap, 'roundsPlayed') + 1;
@@ -157,40 +145,36 @@ class QuizRepositoryImpl {
         leagueMap['totalPoints'] =
             _readMapInt(leagueMap, 'totalPoints') + score;
 
+        // تجميع المستند النهائي ليتوافق مع قاعدة hasOnly(['stars', 'pros', 'freeplay', 'updatedAt'])
         final cleanRoot = <String, dynamic>{
-          // ✅ Practical stability: avoid serverTimestamp equality edge-cases
-          // If your rules currently require updatedAt == request.time, you'll need to relax that.
-          // If rules accept "is timestamp", this will pass reliably.
           'updatedAt': timestampNow,
+          'stars': normalizedLeagueKey == 'stars'
+              ? leagueMap
+              : _safeMap(rootData, 'stars'),
+          'pros': normalizedLeagueKey == 'pros'
+              ? leagueMap
+              : _safeMap(rootData, 'pros'),
+          'freeplay': normalizedLeagueKey == 'freeplay'
+              ? leagueMap
+              : _safeMap(rootData, 'freeplay'),
         };
 
-        // preserve other leagues if present
-        if (rootData.containsKey('stars')) {
-          cleanRoot['stars'] = rootData['stars'];
-        }
-        if (rootData.containsKey('pros')) cleanRoot['pros'] = rootData['pros'];
-        if (rootData.containsKey('freeplay')) {
-          cleanRoot['freeplay'] = rootData['freeplay'];
-        }
-
-        cleanRoot[normalizedLeagueKey] = leagueMap;
-
-        // ─────────────────────────────────────────────────────────────────────
-        // WRITE PHASE (ALL WRITES LAST)
-        // ─────────────────────────────────────────────────────────────────────
+        // 3. WRITE PHASE
+        // تحديث جدول المستخدم الأساسي
         transaction.set(userRef, userUpdates, SetOptions(merge: true));
+
+        // استبدال كامل لوثيقة الإحصائيات لضمان مطابقتها للرولز 100%
         transaction.set(statsRef, cleanRoot);
 
-        debugPrint('🟦 [QuizRepo] TXN prepared (writes queued)');
+        debugPrint('🟦 [QuizRepo] TRANSACTION PREPARED');
       });
 
-      debugPrint('✅ [QuizRepo] COMMIT OK');
+      debugPrint('✅ [QuizRepo] SAVE SUCCESS');
     } on FirebaseException catch (e) {
-      debugPrint('❌ [QuizRepo] FIREBASE EXCEPTION code=${e.code}');
-      debugPrint('❌ [QuizRepo] message=${e.message}');
+      debugPrint('❌ [QuizRepo] FIREBASE ERROR: ${e.code} - ${e.message}');
       rethrow;
     } catch (e) {
-      debugPrint('❌ [QuizRepo] ERROR: $e');
+      debugPrint('❌ [QuizRepo] UNEXPECTED ERROR: $e');
       rethrow;
     }
   }
