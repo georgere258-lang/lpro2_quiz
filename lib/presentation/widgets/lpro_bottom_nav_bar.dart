@@ -23,19 +23,24 @@ class LProBottomNavBar extends StatelessWidget {
     final int safeActive = _safeIndex(activeIndex);
 
     return Container(
+      // إضافة هوامش لجعل الشريط عائماً (Floating)
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       decoration: BoxDecoration(
         color: AppColors.primaryDeepTeal,
+        // زوايا دائرية بالكامل للشكل العائم
+        borderRadius: BorderRadius.circular(35),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 35,
-            spreadRadius: -12,
-            offset: const Offset(0, -10),
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 25,
+            spreadRadius: -5,
+            offset: const Offset(0, 10),
           )
         ],
       ),
       child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+        // ضمان قص محتوى الـ BottomNavigationBar ليناسب الزوايا الدائرية
+        borderRadius: BorderRadius.circular(35),
         child: BottomNavigationBar(
           currentIndex: safeActive,
           onTap: (i) {
@@ -49,6 +54,7 @@ class LProBottomNavBar extends StatelessWidget {
           unselectedItemColor: Colors.white.withValues(alpha: 0.5),
           showUnselectedLabels: true,
           type: BottomNavigationBarType.fixed,
+          // استخدام أحجام خطوط متزنة لضمان الاستقرار مع التكبير
           selectedLabelStyle:
               GoogleFonts.cairo(fontWeight: FontWeight.w900, fontSize: 12),
           unselectedLabelStyle:
