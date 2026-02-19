@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/profile_screen.dart
-// STATUS: ULTRA PREMIUM ELITE (Sleek Micro-Cards & Focal Glow)
+// STATUS: ULTRA PREMIUM ELITE (Clean UI, No Redundant Settings)
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -16,6 +16,7 @@ import 'login_screen.dart';
 import 'admin/admin_panel.dart';
 import 'stats_screen.dart';
 import 'chat_support_screen.dart';
+import 'account_settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final VoidCallback? onSupportPressed;
@@ -32,9 +33,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final Color deepTeal = AppColors.primaryDeepTeal;
   final Color safetyOrange = AppColors.secondaryOrange;
 
-  // ✅ ضع الروابط الحقيقية هنا (مهم جدًا)
-  // مثال أندرويد: https://play.google.com/store/apps/details?id=com.company.app
-  // مثال iOS: https://apps.apple.com/app/id1234567890
   static const String _androidStoreUrl = 'PUT_PLAY_STORE_LINK_HERE';
   static const String _iosStoreUrl = 'PUT_APP_STORE_LINK_HERE';
 
@@ -59,7 +57,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final ref =
         uid.isEmpty ? '' : uid.substring(0, uid.length < 8 ? uid.length : 8);
 
-    // ✅ لو لسه ماحطتش الروابط، هتطلع نص فقط (عشان ما نكسرش الشير)
     final hasAndroid = _androidStoreUrl.startsWith('http');
     final hasIos = _iosStoreUrl.startsWith('http');
 
@@ -127,6 +124,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       userModel.proPoints,
                     ),
                     const SizedBox(height: 35),
+
+                    // 1. زر الآدمن (إن وُجد)
                     if (userModel.role == 'admin' ||
                         userModel.role == 'moderator' ||
                         userModel.role == 'manager')
@@ -142,6 +141,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         },
                         iconColor: safetyOrange,
                       ),
+
+                    // 2. زر تغيير الاسم
                     _buildProfileBtn(
                       "تغيير الاسم",
                       Icons.edit_rounded,
@@ -150,6 +151,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _showRenameBottomSheet();
                       },
                     ),
+
+                    // 3. دعوة برو جديد
                     _buildProfileBtn(
                       "دعوة Pro جديد",
                       Icons.person_add_rounded,
@@ -158,6 +161,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _invitePro();
                       },
                     ),
+
+                    // 4. حول التطبيق
                     _buildProfileBtn(
                       "حول L Pro",
                       Icons.info_outline_rounded,
@@ -169,6 +174,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 builder: (_) => const AboutScreen()));
                       },
                     ),
+
+                    // 5. الدعم والمساعدة
                     _buildProfileBtn(
                       "الدعم والمساعدة",
                       Icons.support_agent_rounded,
@@ -183,6 +190,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       },
                       iconColor: deepTeal,
                     ),
+
+                    // 6. إعدادات الحساب والخصوصية
+                    _buildProfileBtn(
+                      "إعدادات الحساب والخصوصية",
+                      Icons.shield_outlined,
+                      () {
+                        SoundManager.playTap();
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const AccountSettingsScreen()),
+                        );
+                      },
+                      iconColor: deepTeal,
+                    ),
+
+                    // 7. تسجيل الخروج
                     _buildProfileBtn(
                       "تسجيل الخروج",
                       Icons.logout_rounded,
