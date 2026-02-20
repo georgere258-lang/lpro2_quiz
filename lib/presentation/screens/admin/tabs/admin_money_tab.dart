@@ -2,6 +2,8 @@
 // STATUS: ✅ SAFE UPGRADE — أرشفة Snapshot قبل تحديث Slots (مثل الرادار تماماً)
 // - قبل أي تحديث للـ slots (short_news/medium_analysis/deep_dive): بنعمل Snapshot محفوظ داخل نفس collection
 // - السجل الجديد: isArchived=true + sourceSlot + createdAtMs/updatedAtMs (int ms)
+// - ✅ Push control (notify + pushTitle + pushBody) — ONE-SHOT via Cloud Function (onDocumentWritten)
+//   => لا Pulse docs بعد الآن. بنكتب notify=true على نفس الـ slot مرة واحدة.
 // - لا تغيير في أسماء الـ collection ولا أي مسارات أخرى
 
 import 'dart:convert';
@@ -38,6 +40,13 @@ class _AdminMoneyTabState extends State<AdminMoneyTab> {
   CollectionReference<Map<String, dynamic>> get _col =>
       FirebaseFirestore.instance.collection(_collection);
 
+  // ─────────────────────────────────────────────
+  // ✅ JSON dialog push controls (state)
+  // ─────────────────────────────────────────────
+  bool _jsonNotify = false;
+  final TextEditingController _jsonPushTitleCtrl = TextEditingController();
+  final TextEditingController _jsonPushBodyCtrl = TextEditingController();
+
   Map<String, dynamic> _safeMap(dynamic raw) {
     if (raw is Map<String, dynamic>) return raw;
     if (raw is Map) return raw.map((k, v) => MapEntry(k.toString(), v));
@@ -54,6 +63,22 @@ class _AdminMoneyTabState extends State<AdminMoneyTab> {
     if (v is int) return v;
     if (v is num) return v.toInt();
     return 0;
+  }
+
+  String _defaultPushTitle() => 'اقتصاد عقاري';
+
+  String _bestFallbackBodyFromSlots({
+    required Map<String, dynamic> jsonData,
+    required List<String> targets,
+  }) {
+    for (final slotId in targets) {
+      final docData = _safeMap(jsonData[slotId]);
+      final t = (docData['title'] ?? '').toString().trim();
+      final b = (docData['body'] ?? '').toString().trim();
+      if (b.isNotEmpty) return b;
+      if (t.isNotEmpty) return t;
+    }
+    return 'تحديث جديد';
   }
 
   /// ✅ نفس فكرة الرادار: لو slot فيه محتوى فعلي ومش archived → اعمل Snapshot جديد محفوظ
@@ -152,6 +177,30 @@ class _AdminMoneyTabState extends State<AdminMoneyTab> {
         );
       }
 
+      // ✅ 3) ONE-SHOT notify (اختياري): نكتب notify=true على Slot واحد فقط
+      // Cloud Function (onDocumentWritten) هتبعث مرة واحدة ثم ترجع notify=false تلقائياً.
+      if (_jsonNotify == true) {
+        final slotToNotify = targets.first; // رسالة واحدة فقط للـ bulk
+        final pt = _jsonPushTitleCtrl.text.trim();
+        final pb = _jsonPushBodyCtrl.text.trim();
+
+        final fallbackBody = pb.isNotEmpty
+            ? pb
+            : _bestFallbackBodyFromSlots(jsonData: data, targets: targets);
+
+        batch.set(
+          _col.doc(slotToNotify),
+          {
+            'notify': true,
+            'isActive': true, // احترام gate لو موجود
+            'pushTitle': pt.isEmpty ? _defaultPushTitle() : pt,
+            'pushBody': fallbackBody,
+            'updatedAtMs': nowMs,
+          },
+          SetOptions(merge: true),
+        );
+      }
+
       await batch.commit();
       widget.snack('✅ تم تحديث الاقتصاد + حفظ نسخة في الأرشيف');
     } catch (e) {
@@ -176,17 +225,51 @@ class _AdminMoneyTabState extends State<AdminMoneyTab> {
           'رفع JSON (اقتصاد)',
           style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('الصق الكود هنا:'),
-            const SizedBox(height: 10),
-            TextField(
-              controller: jsonCtrl,
-              maxLines: 8,
-              decoration: const InputDecoration(border: OutlineInputBorder()),
-            ),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ✅ push toggle
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'إرسال إشعار (notify)',
+                      style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Switch(
+                    value: _jsonNotify,
+                    onChanged: (v) => setState(() => _jsonNotify = v),
+                  ),
+                ],
+              ),
+              if (_jsonNotify) ...[
+                TextField(
+                  controller: _jsonPushTitleCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'عنوان الإشعار (اختياري)',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _jsonPushBodyCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'نص الإشعار (اختياري)',
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              const Text('الصق الكود هنا:'),
+              const SizedBox(height: 10),
+              TextField(
+                controller: jsonCtrl,
+                maxLines: 8,
+                decoration: const InputDecoration(border: OutlineInputBorder()),
+              ),
+            ],
+          ),
         ),
         actions: [
           ElevatedButton(
@@ -206,6 +289,11 @@ class _AdminMoneyTabState extends State<AdminMoneyTab> {
     final titleCtrl = TextEditingController();
     final bodyCtrl = TextEditingController();
 
+    // ✅ push controls (per publish)
+    bool notify = false;
+    final pushTitleCtrl = TextEditingController();
+    final pushBodyCtrl = TextEditingController();
+
     ref.get().then((snap) {
       if (snap.exists && mounted) {
         final data = _safeMap(snap.data());
@@ -216,66 +304,123 @@ class _AdminMoneyTabState extends State<AdminMoneyTab> {
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          'تحديث: $slotTitle',
-          style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
-        ),
-        content: SingleChildScrollView(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(
-              controller: titleCtrl,
-              decoration: const InputDecoration(labelText: 'العنوان'),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: bodyCtrl,
-              decoration: const InputDecoration(labelText: 'المحتوى'),
-              maxLines: 6,
-            ),
-          ]),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              widget.setSaving(true);
-
-              final nowMs = DateTime.now().millisecondsSinceEpoch;
-
-              try {
-                // ✅ 1) Snapshot قبل الاستبدال
-                final existingCreatedAt = await _archiveIfNeeded(
-                  sourceSlotId: docId,
-                  nowMs: nowMs,
-                );
-
-                // ✅ 2) انشر الجديد على نفس الـ slot
-                await ref.set(
-                  {
-                    'title': titleCtrl.text,
-                    'body': bodyCtrl.text,
-                    'sectionKey': _sectionKey,
-                    'isArchived': false,
-                    'createdAtMs':
-                        existingCreatedAt > 0 ? existingCreatedAt : nowMs,
-                    'updatedAtMs': nowMs,
-                  },
-                  SetOptions(merge: true),
-                );
-
-                widget.snack('تم النشر ✅ (مع حفظ نسخة في الأرشيف)');
-              } catch (e) {
-                widget.snack('❌ فشل النشر: $e');
-              } finally {
-                widget.setSaving(false);
-              }
-            },
-            child: const Text('نشر'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(
+            'تحديث: $slotTitle',
+            style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
           ),
-        ],
+          content: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              // ✅ push toggle
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'إرسال إشعار (notify)',
+                      style: GoogleFonts.cairo(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Switch(
+                    value: notify,
+                    onChanged: (v) => setLocal(() => notify = v),
+                  ),
+                ],
+              ),
+              if (notify) ...[
+                TextField(
+                  controller: pushTitleCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'عنوان الإشعار (اختياري)',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: pushBodyCtrl,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'نص الإشعار (اختياري)',
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              TextField(
+                controller: titleCtrl,
+                decoration: const InputDecoration(labelText: 'العنوان'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: bodyCtrl,
+                decoration: const InputDecoration(labelText: 'المحتوى'),
+                maxLines: 6,
+              ),
+            ]),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                widget.setSaving(true);
+
+                final nowMs = DateTime.now().millisecondsSinceEpoch;
+
+                try {
+                  // ✅ 1) Snapshot قبل الاستبدال
+                  final existingCreatedAt = await _archiveIfNeeded(
+                    sourceSlotId: docId,
+                    nowMs: nowMs,
+                  );
+
+                  // ✅ 2) انشر الجديد على نفس الـ slot (+ notify optional ONE-SHOT)
+                  final pt = pushTitleCtrl.text.trim();
+                  final pb = pushBodyCtrl.text.trim();
+
+                  final fallbackBody = pb.isNotEmpty
+                      ? pb
+                      : bodyCtrl.text.trim().isNotEmpty
+                          ? bodyCtrl.text.trim()
+                          : titleCtrl.text.trim();
+
+                  await ref.set(
+                    {
+                      'title': titleCtrl.text,
+                      'body': bodyCtrl.text,
+                      'sectionKey': _sectionKey,
+                      'isArchived': false,
+                      'createdAtMs':
+                          existingCreatedAt > 0 ? existingCreatedAt : nowMs,
+                      'updatedAtMs': nowMs,
+
+                      // ✅ ONE-SHOT push (Cloud Function will reset notify=false)
+                      if (notify) 'notify': true,
+                      if (notify) 'isActive': true,
+                      if (notify)
+                        'pushTitle': pt.isEmpty ? _defaultPushTitle() : pt,
+                      if (notify) 'pushBody': fallbackBody,
+                    },
+                    SetOptions(merge: true),
+                  );
+
+                  widget.snack('تم النشر ✅ (مع حفظ نسخة في الأرشيف)');
+                } catch (e) {
+                  widget.snack('❌ فشل النشر: $e');
+                } finally {
+                  widget.setSaving(false);
+                }
+              },
+              child: const Text('نشر'),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _jsonPushTitleCtrl.dispose();
+    _jsonPushBodyCtrl.dispose();
+    super.dispose();
   }
 
   @override
