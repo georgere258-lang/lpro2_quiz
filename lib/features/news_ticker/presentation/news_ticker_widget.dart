@@ -143,6 +143,7 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
         style: GoogleFonts.cairo(
           fontSize: 12.5,
           fontWeight: FontWeight.w800,
+          height: 1.2,
           color: const Color(0xFFFDFBF7), // العاجي الفخم
           shadows: [
             Shadow(
