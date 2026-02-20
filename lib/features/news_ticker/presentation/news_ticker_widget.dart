@@ -2,7 +2,6 @@
 // STATUS: CLEAN SEAMLESS TEXT ✅ (FULL FILE)
 
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -112,9 +111,9 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
         final looped = [...messages, ...messages, ...messages, ...messages];
 
         return Container(
-          height: 36, // ✅ FIX: extra safe pixels to avoid iOS Arabic clipping
+          height: 34,
           width: double.infinity,
-          color: Colors.transparent,
+          color: Colors.transparent, // ✅ شفاف تماماً للاندماج مع الهيدر
           child: IgnorePointer(
             child: ListView.builder(
               controller: _scrollController,
@@ -141,33 +140,18 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
       padding: const EdgeInsets.symmetric(vertical: 7),
       child: Text(
         text,
-        style: Platform.isIOS
-            ? TextStyle(
-                fontFamily: null,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w800,
-                height: 1.5,
-                color: const Color(0xFFFDFBF7),
-                shadows: [
-                  Shadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    offset: const Offset(0, 1),
-                    blurRadius: 1,
-                  ),
-                ],
-              )
-            : GoogleFonts.cairo(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w800,
-                color: const Color(0xFFFDFBF7),
-                shadows: [
-                  Shadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    offset: const Offset(0, 1),
-                    blurRadius: 1,
-                  ),
-                ],
-              ),
+        style: GoogleFonts.cairo(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w800,
+          color: const Color(0xFFFDFBF7), // العاجي الفخم
+          shadows: [
+            Shadow(
+              color: Colors.black.withValues(alpha: 0.15),
+              offset: const Offset(0, 1),
+              blurRadius: 1,
+            ),
+          ],
+        ),
       ),
     );
   }
