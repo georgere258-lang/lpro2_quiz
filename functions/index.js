@@ -11,30 +11,52 @@ const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 
-// --- 1. Notification Helpers (Keep original logic) ---
+// --- 1. Notification Helpers ---
 
 function buildMessage({ topic, title, body, data = {}, imageUrl }) {
   const msg = {
     topic,
-    notification: { title, body },
+
+    // ❌ تم إزالة notification لتفادي التعارض مع aps.alert
+    // notification: { title, body },
+
     data: Object.fromEntries(
       Object.entries(data).map(([k, v]) => [String(k), String(v)])
     ),
+
     android: {
       priority: "high",
       notification: {
+        title,
+        body,
         channelId: "lpro_notifications",
         icon: "ic_stat_lpro",
       },
     },
+
     apns: {
-      headers: { "apns-priority": "10" },
-      payload: { aps: { sound: "default" } },
+      headers: {
+        "apns-priority": "10",
+        "apns-push-type": "alert",
+      },
+      payload: {
+        aps: {
+          alert: {
+            title,
+            body,
+          },
+          sound: "default",
+          badge: 1,
+          "mutable-content": 1,
+        },
+      },
     },
   };
+
   if (imageUrl && typeof imageUrl === "string" && imageUrl.startsWith("http")) {
-    msg.notification.imageUrl = imageUrl;
+    msg.apns.fcm_options = { image: imageUrl };
   }
+
   return msg;
 }
 
@@ -102,32 +124,53 @@ function makeCollectionNotifier(collectionId) {
       const afterSnap = event.data.after;
       const beforeSnap = event.data.before;
       if (!afterSnap.exists) return;
+
       const afterDoc = afterSnap.data();
       const beforeDoc = beforeSnap.exists ? beforeSnap.data() : null;
+
       if (!shouldSend({ beforeDoc, afterDoc })) return;
 
       const topic = pickTopic(afterDoc);
       const title = pickTitle(afterDoc, collectionId);
       const body = pickBody(afterDoc, collectionId);
-      const imageUrl = typeof afterDoc.imageUrl === "string" && afterDoc.imageUrl.trim().length > 0 ? afterDoc.imageUrl.trim() : undefined;
+      const imageUrl =
+        typeof afterDoc.imageUrl === "string" &&
+        afterDoc.imageUrl.trim().length > 0
+          ? afterDoc.imageUrl.trim()
+          : undefined;
+
       const deepTitle = pickDeepLinkTitle(afterDoc);
 
       const msg = buildMessage({
-        topic, title, body, imageUrl,
-        data: { collection: collectionId, docId: afterSnap.id, title: deepTitle },
+        topic,
+        title,
+        body,
+        imageUrl,
+        data: {
+          collection: collectionId,
+          docId: afterSnap.id,
+          title: deepTitle,
+        },
       });
 
       const res = await admin.messaging().send(msg);
-      logger.info(`Push sent: ${collectionId}/${afterSnap.id} -> topic:${topic}`, { messageId: res });
+      logger.info(
+        `Push sent: ${collectionId}/${afterSnap.id} -> topic:${topic}`,
+        { messageId: res }
+      );
 
-      await afterSnap.ref.set({ notify: false, notifiedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      await afterSnap.ref.set(
+        {
+          notify: false,
+          notifiedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
     } catch (e) {
       logger.error(`Push failed for ${collectionId}: ${e}`, e);
     }
   });
 }
-
-// --- 2. Export Notifiers ---
 
 exports.notifyNewsTicker = makeCollectionNotifier("news_ticker_items");
 exports.notifyHomeProCard = makeCollectionNotifier("home_pro_card");
@@ -136,23 +179,13 @@ exports.notifyKnowYourClient = makeCollectionNotifier("know_your_client");
 exports.notifyMarketRadar = makeCollectionNotifier("market_radar");
 exports.notifyMoney = makeCollectionNotifier("money");
 
-// --- 3. Account Deletion (Batched & Secure) ---
-
-/**
- * Helper to execute promises in small batches to avoid Firestore spikes and timeouts.
- */
+// Account deletion unchanged
 async function runInBatches(tasks, batchSize = 5) {
   for (let i = 0; i < tasks.length; i += batchSize) {
     await Promise.all(tasks.slice(i, i + batchSize));
   }
 }
 
-/**
- * ✅ Account Deletion (Hard Delete)
- * - Batched recursiveDelete for support tickets
- * - Idempotent cleanup for leaderboards and user docs
- * - Final Auth termination
- */
 exports.deleteMyAccount = onCall(async (request) => {
   const uid = request.auth ? request.auth.uid : null;
   if (!uid) {
@@ -164,28 +197,38 @@ exports.deleteMyAccount = onCall(async (request) => {
   try {
     logger.info(`Starting batched hard deletion for user: ${uid}`);
 
-    // A) Cleanup Support Tickets (Recursive Batching)
-    const ticketsSnap = await db.collection("support_tickets").where("userId", "==", uid).get();
-    const ticketDeletions = ticketsSnap.docs.map((t) => db.recursiveDelete(t.ref));
+    const ticketsSnap = await db
+      .collection("support_tickets")
+      .where("userId", "==", uid)
+      .get();
+
+    const ticketDeletions = ticketsSnap.docs.map((t) =>
+      db.recursiveDelete(t.ref)
+    );
+
     await runInBatches(ticketDeletions, 5);
 
-    // B) Cleanup Leaderboards & Main Docs in Parallel (Lightweight)
     await Promise.all([
       ...["general", "stars", "pros"].map((league) =>
-        db.collection("leaderboards").doc(league).collection("entries").doc(uid).delete().catch(() => null)
+        db.collection("leaderboards").doc(league)
+          .collection("entries").doc(uid)
+          .delete().catch(() => null)
       ),
       db.collection("user_stats").doc(uid).delete().catch(() => null),
-      db.collection("users").doc(uid).delete().catch(() => null)
+      db.collection("users").doc(uid).delete().catch(() => null),
     ]);
 
-    // C) Wipe from Auth
     await admin.auth().deleteUser(uid).catch(() => null);
 
     logger.info(`Deletion completed successfully for UID: ${uid}`);
     return { success: true };
   } catch (error) {
     logger.error(`Deletion failed for ${uid}: ${error}`, error);
-    // Returning error details for easier debugging
-    throw new HttpsError("internal", error instanceof Error ? error.message : "Error during account deletion.");
+    throw new HttpsError(
+      "internal",
+      error instanceof Error
+        ? error.message
+        : "Error during account deletion."
+    );
   }
 });
