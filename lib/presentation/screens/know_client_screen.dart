@@ -1,6 +1,5 @@
 // PATH: lib/presentation/screens/know_client_screen.dart
-// STATUS: Landing Page Gateway + Favorites BottomSheet
-// ✅ UPDATED: Unified sectionKey logic with Tag Fallback
+// STATUS: FIXED (New Pro Card Persistence) + SCROLL-LIBERATED ✅
 
 import 'dart:async';
 
@@ -27,8 +26,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
   static const String _collectionName = 'know_your_client';
   static const String _prefsFavKey = 'kyc_fav_titles';
   static const String _prefsLastSeenKey = 'kyc_last_seen_title';
-
-  static const int _recentDaysWindow = 7;
 
   String _lastSeenTitle = '';
   String _lastSeenDocId = '';
@@ -130,7 +127,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
   Future<void> _openSearch() async {
     final items = await _fetchOnceItems();
     if (!mounted) return;
-    if (!context.mounted) return;
     showSearch(
       context: context,
       delegate: _KnowClientSearchDelegate(
@@ -142,7 +138,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
 
   Future<void> _openFavoritesSheet() async {
     final allItems = await _fetchOnceItems();
-
     if (!mounted) return;
 
     await showModalBottomSheet(
@@ -156,7 +151,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
         return StatefulBuilder(
           builder: (context, setSheetState) {
             final favList = _favoriteTitles.toList();
-
             return SafeArea(
               child: Directionality(
                 textDirection: TextDirection.rtl,
@@ -282,7 +276,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                                     ),
                                   ),
                                   trailing: IconButton(
-                                    tooltip: "إزالة من المفضلة",
                                     icon: const Icon(
                                       Icons.bookmark_remove_rounded,
                                       color: AppColors.secondaryOrange,
@@ -360,8 +353,7 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
           FirebaseFirestore.instance.collection(_collectionName).snapshots(),
       builder: (context, snap) {
         if (snap.hasError) {
-          return _centerMsg(
-              "حصل خطأ في تحميل المواضيع.\nراجع Rules أو ترتيب الحقول.");
+          return _centerMsg("حصل خطأ في تحميل المواضيع.");
         }
         if (!snap.hasData) {
           return const Center(
@@ -380,16 +372,16 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
             docs.map((d) => _KycTopicItem.fromDoc(d.id, d.data())).where((e) {
           if (e.isActive != true) return false;
           if (e.title.trim().isEmpty) return false;
-
           final isScheduledFuture =
               (e.publishAtMs > 0 && e.publishAtMs > nowMs);
           if (!_isAdmin && isScheduledFuture) return false;
-
           return true;
         }).toList();
 
+        // ترتيب الكل حسب الأحدث
         allItems.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
 
+        // ترشيحات (Featured)
         final now = DateTime.now();
         final featured = allItems
             .where((e) => e.isFeatured == true && e.isFeaturedValid(now))
@@ -400,15 +392,9 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
           return b.createdAtMs.compareTo(a.createdAtMs);
         });
 
-        final recentCutoff =
-            now.subtract(const Duration(days: _recentDaysWindow));
-        final recent = allItems
-            .where((e) =>
-                e.createdAtMs > 0 &&
-                DateTime.fromMillisecondsSinceEpoch(e.createdAtMs)
-                    .isAfter(recentCutoff))
-            .take(5)
-            .toList();
+        // ✅ التعديل الجوهري: جديد L Pro (آخر 5 مواضيع مضافة دائماً)
+        // أزلنا شرط الـ 7 أيام لضمان ظهور الكارت دائماً بأحدث المحتويات
+        final latestAdded = allItems.take(5).toList();
 
         return SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
@@ -445,14 +431,17 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
                 onTap: _openFavoritesSheet,
               ),
               const SizedBox(height: 16),
-              if (recent.isNotEmpty) ...[
+
+              // ✅ كارت "جديد L Pro" أصبح يظهر دائماً بآخر 5 مواضيع
+              if (latestAdded.isNotEmpty) ...[
                 _topicsCard(
                   title: 'جديد L Pro',
                   icon: Icons.new_releases_rounded,
-                  items: recent.take(5).toList(),
+                  items: latestAdded,
                 ),
                 const SizedBox(height: 12),
               ],
+
               if (featured.isNotEmpty) ...[
                 _topicsCard(
                   title: 'ترشيحات L Pro',
@@ -537,7 +526,6 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
     bool isPrimary = false,
     required VoidCallback onTap,
   }) {
-    // ✅ ONLY CHANGE: make primary button match Fact (Orange solid + white text/icons)
     final bgColor = isPrimary ? AppColors.secondaryOrange : Colors.white;
     final borderColor = isPrimary
         ? AppColors.secondaryOrange.withValues(alpha: 0.0)
@@ -735,21 +723,15 @@ class _KnowClientScreenState extends State<KnowClientScreen> {
           .where('isActive', isEqualTo: true)
           .limit(900)
           .get();
-
       final nowMs = DateTime.now().millisecondsSinceEpoch;
-
       final items = snap.docs
           .map((d) => _KycTopicItem.fromDoc(d.id, d.data()))
           .where((e) {
         if (e.title.trim().isEmpty) return false;
-
         final isScheduledFuture = (e.publishAtMs > 0 && e.publishAtMs > nowMs);
-
         if (!_isAdmin && isScheduledFuture) return false;
-
         return true;
       }).toList();
-
       items.sort((a, b) => b.createdAtMs.compareTo(a.createdAtMs));
       return items;
     } catch (_) {
@@ -852,8 +834,7 @@ class _KycTopicItem {
   final int publishAtMs;
   final List<String> tags;
   final bool isActive;
-  final String sectionKey; // ✅ Standardized Partition Key
-
+  final String sectionKey;
   final bool isFeatured;
   final int featuredOrder;
   final DateTime? featuredUntil;
@@ -865,7 +846,7 @@ class _KycTopicItem {
     required this.publishAtMs,
     required this.tags,
     required this.isActive,
-    required this.sectionKey, // ✅ Added
+    required this.sectionKey,
     required this.isFeatured,
     required this.featuredOrder,
     required this.featuredUntil,
@@ -886,27 +867,20 @@ class _KycTopicItem {
         if (s.isNotEmpty) tags.add(s);
       }
     }
-
-    // ✅ Logic: Unified sectionKey with Tag Fallback (Backward Compatibility)
     String sectionKey = (data['sectionKey'] ?? '').toString().trim();
     if (sectionKey.isEmpty && tags.isNotEmpty) {
       sectionKey = _inferSectionKeyFromTag(tags.first);
     }
-
     int createdAtMs = 0;
     final ts = data['createdAt'];
     if (ts is Timestamp) createdAtMs = ts.millisecondsSinceEpoch;
-
     int publishAtMs = 0;
     final pub = data['publishAt'];
     if (pub is Timestamp) publishAtMs = pub.millisecondsSinceEpoch;
-
     final isFeatured = data['isFeatured'] == true;
-
     final foRaw = data['featuredOrder'];
     final featuredOrder =
         (foRaw is int) ? foRaw : int.tryParse((foRaw ?? '0').toString()) ?? 0;
-
     DateTime? featuredUntil;
     final fu = data['featuredUntil'];
     if (fu is Timestamp) featuredUntil = fu.toDate();
@@ -918,14 +892,13 @@ class _KycTopicItem {
       publishAtMs: publishAtMs,
       tags: tags,
       isActive: data['isActive'] == true,
-      sectionKey: sectionKey, // ✅ Final Standardized Key
+      sectionKey: sectionKey,
       isFeatured: isFeatured,
       featuredOrder: featuredOrder,
       featuredUntil: featuredUntil,
     );
   }
 
-  // ✅ Local Helper for Backward Compatibility
   static String _inferSectionKeyFromTag(String tag) {
     switch (tag) {
       case "أساسيات العميل":
