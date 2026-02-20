@@ -1,1 +1,32 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"lpro2-quiz","appId":"1:905243871570:android:d884ea928cedb56b66928b","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"lpro2-quiz","configurations":{"android":"1:905243871570:android:d884ea928cedb56b66928b"}}}}}}
+{
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log"
+      ]
+    }
+  ],
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "lpro2-quiz",
+          "appId": "1:905243871570:android:d884ea928cedb56b66928b",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "lpro2-quiz",
+          "configurations": {
+            "android": "1:905243871570:android:d884ea928cedb56b66928b"
+          }
+        }
+      }
+    }
+  }
+}
