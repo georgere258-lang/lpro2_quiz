@@ -1,3 +1,7 @@
+// PATH: lib/presentation/screens/login_screen.dart
+// STATUS: FIXED & OPTIMIZED (Deleted User Recovery + Mandatory Firestore Creation)
+
+import 'dart:async'; // ✅ For Timeout handling
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -89,12 +93,15 @@ class _LoginScreenState extends State<LoginScreen> {
           });
           // تركيز تلقائي على أول حقل OTP
           Future.delayed(const Duration(milliseconds: 300), () {
-            otpFocusNodes[0].requestFocus();
+            if (otpFocusNodes.isNotEmpty) {
+              otpFocusNodes[0].requestFocus();
+            }
           });
         },
         codeAutoRetrievalTimeout: (String verId) {
-          verificationId = verId;
+          if (mounted) verificationId = verId;
         },
+        timeout: const Duration(seconds: 60),
       );
     } catch (e) {
       setState(() => isLoading = false);
@@ -124,6 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // ✅ الدالة المعدلة والمحمية (Self-Healing Logic)
   void _navigateUser() async {
     final user = FirebaseAuth.instance.currentUser;
     final String? uid = user?.uid;
@@ -131,13 +139,18 @@ class _LoginScreenState extends State<LoginScreen> {
     if (user != null) {
       try {
         final usersRef = FirebaseFirestore.instance.collection('users');
+        final statsRef = FirebaseFirestore.instance.collection('user_stats');
         final userRef = usersRef.doc(user.uid);
 
-        final userDoc = await userRef.get();
+        // ✅ 1. حماية ضد النت البطيء (Timeout 10s)
+        final userDoc =
+            await userRef.get().timeout(const Duration(seconds: 10));
+
         final isBootAdmin = user.uid == _bootAdminUid;
 
+        // ✅ 2. إصلاح مشكلة المستخدم المحذوف أو الجديد (If not exists -> Create)
         if (!userDoc.exists) {
-          // ✅ إنشاء أول مرة
+          // إنشاء مستند المستخدم الأساسي مع الحقول المطلوبة في الـ Rules
           await userRef.set({
             'uid': user.uid,
             'name': "عضو L Pro جديد",
@@ -145,12 +158,43 @@ class _LoginScreenState extends State<LoginScreen> {
             'points': 0,
             'starsPoints': 0,
             'proPoints': 0,
-            'role': isBootAdmin ? 'admin' : 'user',
+            'dailyStarsRounds': 0,
+            'dailyProsRounds': 0,
+            'dailyFreePlayRounds': 0,
+            'role': isBootAdmin ? 'admin' : 'user', // شرط الـ Rules
+            'isBlocked': false, // 🔥 حقل إلزامي حسب الـ Rules لنجاح الـ Create
+            'lastQuizDate': FieldValue.serverTimestamp(),
             'createdAt': FieldValue.serverTimestamp(),
             'updatedAt': FieldValue.serverTimestamp(),
           });
+
+          // ✅ إنشاء مستند الإحصائيات فوراً لضمان عدم فشل الجولات لاحقاً
+          await statsRef.doc(user.uid).set({
+            'updatedAt': FieldValue.serverTimestamp(),
+            'stars': {
+              'roundsPlayed': 0,
+              'totalPoints': 0,
+              'correctAnswers': 0,
+              'totalQuestions': 0,
+              'wrongAnswers': 0
+            },
+            'pros': {
+              'roundsPlayed': 0,
+              'totalPoints': 0,
+              'correctAnswers': 0,
+              'totalQuestions': 0,
+              'wrongAnswers': 0
+            },
+            'freeplay': {
+              'roundsPlayed': 0,
+              'totalPoints': 0,
+              'correctAnswers': 0,
+              'totalQuestions': 0,
+              'wrongAnswers': 0
+            },
+          });
         } else {
-          // ✅ موجود قبل كده: نثبت Role للأدمن الأساسي بدون مسح أي بيانات
+          // ✅ 3. تحديث البيانات للمستخدم الموجود
           final data = userDoc.data() ?? {};
           final currentRole = (data['role'] ?? '').toString();
 
@@ -162,7 +206,6 @@ class _LoginScreenState extends State<LoginScreen> {
             patch['role'] = 'admin';
           }
 
-          // كمان نضمن وجود uid/phone لو ناقصين (بدون override للقيم الموجودة)
           if (data['uid'] == null) patch['uid'] = user.uid;
           if (data['phone'] == null) {
             patch['phone'] = user.phoneNumber ?? phoneController.text;
@@ -174,15 +217,17 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         }
       } catch (e) {
-        debugPrint("Error saving user data: $e");
+        debugPrint("⚠️ Network/Firestore Error during navigation: $e");
       }
     }
 
     if (mounted) {
+      setState(() => isLoading = false);
+
       Navigator.pushReplacement(
           context, MaterialPageRoute(builder: (c) => const MainWrapper()));
 
-      // ✅ طلب إذن الإشعارات بعد دخول المستخدم للتطبيق (بعد نجاح OTP)
+      // ✅ تفعيل الإشعارات بعد الدخول
       if (uid != null) {
         Future.delayed(const Duration(milliseconds: 600), () {
           _activateNotifications(uid);
@@ -214,7 +259,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // التعديل: استبدال اللون الثابت بتدرج شعاعي بريميوم
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -223,7 +267,7 @@ class _LoginScreenState extends State<LoginScreen> {
             center: Alignment(0, -0.3),
             radius: 1.3,
             colors: [
-              Color(0xFF136161), // درجة إضاءة مركزية
+              Color(0xFF136161),
               AppColors.primaryDeepTeal,
             ],
           ),
@@ -233,10 +277,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: CircularProgressIndicator(color: Colors.white))
             : Center(
                 child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 30, vertical: 50),
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         SvgPicture.asset('assets/logo.svg',
                             height: 110,
@@ -250,7 +296,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: AppColors.secondaryOrange,
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                // إضافة ظلال ناعمة للنص
                                 shadows: [
                                   Shadow(
                                     offset: const Offset(0, 2),
@@ -290,7 +335,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: Container(
                             width: 150,
                             height: 50,
-                            // إضافة ظل متوهج للزر لتحسين المظهر البريميوم
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(15),
                               boxShadow: [
@@ -401,7 +445,6 @@ class _LoginScreenState extends State<LoginScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(10),
-            // إضافة ظل بسيط لحقول الـ OTP لزيادة البروز
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.1),
