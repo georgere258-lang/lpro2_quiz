@@ -79,14 +79,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       right: -100 + (30 * v),
                       child: _blob(
                           size: 400,
-                          color: const Color(0xFFFF8C00).withValues(alpha: 0.06)),
+                          color:
+                              const Color(0xFFFF8C00).withValues(alpha: 0.06)),
                     ),
                     Positioned(
                       bottom: -100 + (40 * v),
                       left: -50 + (20 * v),
                       child: _blob(
                           size: 450,
-                          color: AppColors.primaryDeepTeal.withValues(alpha: 0.07)),
+                          color: AppColors.primaryDeepTeal
+                              .withValues(alpha: 0.07)),
                     ),
                   ],
                 );
@@ -118,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
                 const SliverToBoxAdapter(child: SizedBox(height: 16)),
 
-                // 3. شبكة الكروت الأربعة (Grid) - تم تكبير الـ mainAxisExtent
+                // 3. شبكة الكروت الأربعة (Grid)
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   sliver: SliverGrid(
@@ -127,7 +129,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       crossAxisCount: 2,
                       mainAxisSpacing: 14,
                       crossAxisSpacing: 14,
-                      // ✅ تم التكبير من 110 إلى 135 ليعطي حجماً أكبر وأفخم
                       mainAxisExtent: 135,
                     ),
                     delegate: SliverChildListDelegate([
@@ -213,10 +214,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     SoundManager.playTap();
     Navigator.push(context, MaterialPageRoute(builder: (_) => target));
   }
-
-  // ignore: unused_element
-  Widget _buildAnimatedBackground() =>
-      const SizedBox.shrink(); // Placeholder for unified logic
 }
 
 class _WelcomeCard extends StatelessWidget {
@@ -261,7 +258,7 @@ class _WelcomeCard extends StatelessWidget {
                       TextSpan(
                           text: name,
                           style: GoogleFonts.cairo(
-                              fontSize: 16,
+                              fontSize: 15,
                               fontWeight: FontWeight.w900,
                               color: const Color(0xFF1B4D57))),
                     ],
@@ -310,9 +307,9 @@ class _PointsBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text("$points ",
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.cairo(
                   fontSize: 12,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w900,
                   color: Colors.white)),
           Text("نقطة",
               style: GoogleFonts.cairo(
@@ -358,7 +355,8 @@ class _SectionCard extends StatelessWidget {
             Positioned(
               bottom: -12,
               left: -12,
-              child: Icon(icon, size: 85, color: accent.withValues(alpha: 0.06)),
+              child:
+                  Icon(icon, size: 85, color: accent.withValues(alpha: 0.06)),
             ),
             Padding(
               padding: const EdgeInsets.all(14),
@@ -376,20 +374,22 @@ class _SectionCard extends StatelessWidget {
                           padding: const EdgeInsets.all(11),
                           decoration: BoxDecoration(
                             color: isHighFocus
-                                ? accent.withValues(alpha: 0.05 + (0.05 * floatValue))
+                                ? accent.withValues(
+                                    alpha: 0.05 + (0.05 * floatValue))
                                 : Colors.white,
                             shape: BoxShape.circle,
                             border: isHighFocus
                                 ? Border.all(
-                                    color: accent
-                                        .withValues(alpha: 0.15 + (0.1 * floatValue)),
+                                    color: accent.withValues(
+                                        alpha: 0.15 + (0.1 * floatValue)),
                                     width: 1.5)
                                 : null,
                             boxShadow: [
                               BoxShadow(
-                                  color: accent.withValues(alpha: isHighFocus
-                                      ? 0.3 + (0.2 * floatValue)
-                                      : 0.3),
+                                  color: accent.withValues(
+                                      alpha: isHighFocus
+                                          ? 0.3 + (0.2 * floatValue)
+                                          : 0.3),
                                   blurRadius:
                                       isHighFocus ? 12 + (8 * floatValue) : 8,
                                   spreadRadius:
@@ -442,16 +442,17 @@ class _SecondarySectionCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
           border: Border(
-              right: BorderSide(color: accent.withValues(alpha: 0.4), width: 4.5)),
+              right:
+                  BorderSide(color: accent.withValues(alpha: 0.4), width: 4.5)),
           boxShadow: AppColors.eliteShadowL1,
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                      color: accent.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10)),
               child: Icon(icon, color: accent, size: 22),
             ),
             const SizedBox(width: 12),
