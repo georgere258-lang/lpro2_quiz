@@ -1,3 +1,6 @@
+// PATH: lib/presentation/screens/leaderboard_screen.dart
+// STATUS: SCROLL-LIBERATED ✅ (Flexible for Big Fonts & Small Screens)
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -103,9 +106,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         textDirection: TextDirection.rtl,
         child: TabBarView(
           controller: _tabController,
-          children: _leagues
-              .map((league) => _buildLeaderboardList(league))
-              .toList(),
+          children:
+              _leagues.map((league) => _buildLeaderboardList(league)).toList(),
         ),
       ),
     );
@@ -117,18 +119,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     return StreamBuilder<List<LeaderboardEntry>>(
       stream: _repo.streamTop10(league),
       builder: (context, snapshot) {
-        // Error state with debug logging
         if (snapshot.hasError) {
           final error = snapshot.error;
-          if (kDebugMode) {
-            debugPrint('LEADERBOARD_STREAM_ERROR league=$league');
-            if (error is FirebaseException) {
-              debugPrint('  code=${error.code}');
-              debugPrint('  message=${error.message}');
-              debugPrint('  plugin=${error.plugin}');
-            }
-            debugPrint('  error=$error');
-          }
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(24),
@@ -142,24 +134,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: Colors.red[700])),
-                  if (kDebugMode) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.red[50],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        error is FirebaseException
-                            ? 'FirebaseError: ${error.code} - ${error.message}'
-                            : 'Error: $error',
-                        style: GoogleFonts.robotoMono(
-                            fontSize: 10, color: Colors.red[900]),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -174,7 +148,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
         final entries = snapshot.data ?? [];
 
-        // Empty state with admin hint
         if (entries.isEmpty) {
           return Center(
             child: Padding(
@@ -190,10 +163,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Colors.grey[600])),
-                  const SizedBox(height: 8),
-                  Text("يتم تحديث الترتيب من لوحة التحكم",
-                      style: GoogleFonts.cairo(
-                          fontSize: 13, color: Colors.grey[500])),
                 ],
               ),
             ),
@@ -201,13 +170,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
         }
 
         final topThree = entries.take(3).toList();
-        final others =
-            entries.length > 3 ? entries.skip(3).toList() : <LeaderboardEntry>[];
-
-        // Get rank 10 points (or last entry if less than 10)
+        final others = entries.length > 3
+            ? entries.skip(3).toList()
+            : <LeaderboardEntry>[];
         final rank10Points = entries.isNotEmpty ? entries.last.points : 0;
 
-        // Check if current user is in top 10
         LeaderboardEntry? currentUserEntry;
         if (currentUid != null) {
           final idx = entries.indexWhere((e) => e.uid == currentUid);
@@ -216,49 +183,52 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           }
         }
 
-        return Column(
-          children: [
-            _buildPodiumHeader(topThree),
-            // Show motivational "My Status" card ONLY if logged in
-            if (currentUid != null)
-              _buildMyStatusCard(
-                currentUserEntry,
-                league,
-                currentUid,
-                rank10Points,
-              ),
-            // If not logged in, show hint
-            if (currentUid == null)
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(12),
+        // ✅ تم تغليف المحتوى بـ SingleChildScrollView لتحرير السكرول تماماً
+        return SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            children: [
+              _buildPodiumHeader(topThree),
+              if (currentUid != null)
+                _buildMyStatusCard(
+                  currentUserEntry,
+                  league,
+                  currentUid,
+                  rank10Points,
                 ),
-                child: Text(
-                  "سجل دخولك لمعرفة ترتيبك",
-                  style: GoogleFonts.cairo(fontSize: 13, color: Colors.grey[600]),
-                  textAlign: TextAlign.center,
+              if (currentUid == null)
+                Container(
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    "سجل دخولك لمعرفة ترتيبك",
+                    style: GoogleFonts.cairo(
+                        fontSize: 13, color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
-              ),
-            Expanded(
-              child: ListView.builder(
+              // ✅ تحويل القائمة لتعمل بذكاء داخل السكرول الخارجي
+              ListView.builder(
+                shrinkWrap: true, // يضمن أن القائمة تأخذ حجم محتواها فقط
+                physics:
+                    const NeverScrollableScrollPhysics(), // يعتمد على سكرول الصفحة الرئيسي
                 padding:
                     const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
                 itemCount: others.length,
-                itemBuilder: (context, index) =>
-                    _buildUserTile(others[index]),
+                itemBuilder: (context, index) => _buildUserTile(others[index]),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );
   }
 
-  /// Motivational "My Status" card with gap computation
-  /// Hardened: fails gracefully if /users/{uid} read fails
   Widget _buildMyStatusCard(
     LeaderboardEntry? entry,
     String league,
@@ -268,10 +238,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     final pointsField = _leaguePointsField[league] ?? 'points';
 
     return FutureBuilder<DocumentSnapshot>(
-      // Read current user's points from /users/{uid} (self-read allowed)
       future: FirebaseFirestore.instance.collection('users').doc(uid).get(),
       builder: (context, userSnap) {
-        // Loading state
         if (userSnap.connectionState == ConnectionState.waiting) {
           return Container(
             margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
@@ -293,18 +261,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           );
         }
 
-        // Error state: show graceful message but don't crash
         if (userSnap.hasError) {
-          final error = userSnap.error;
-          if (kDebugMode) {
-            debugPrint('LEADERBOARD_USER_FETCH_ERROR uid=$uid');
-            if (error is FirebaseException) {
-              debugPrint('  code=${error.code}');
-              debugPrint('  message=${error.message}');
-              debugPrint('  plugin=${error.plugin}');
-            }
-            debugPrint('  error=$error');
-          }
           return Container(
             margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -331,18 +288,13 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           );
         }
 
-        // Get user's points for this league
         final userData = userSnap.data?.data() as Map<String, dynamic>? ?? {};
         final myPoints = (userData[pointsField] as int?) ?? 0;
-
-        // Determine rank status
         final bool isInTop10 = entry != null;
-        final String rankText = isInTop10
-            ? "ترتيبك: #${entry.rank}"
-            : "ترتيبك: خارج أفضل 10";
-
-        // Compute gap to enter top 10
-        final int gap = isInTop10 ? 0 : (rank10Points - myPoints + 1).clamp(0, 999999);
+        final String rankText =
+            isInTop10 ? "ترتيبك: #${entry.rank}" : "ترتيبك: خارج أفضل 10";
+        final int gap =
+            isInTop10 ? 0 : (rank10Points - myPoints + 1).clamp(0, 999999);
 
         return InkWell(
           onTap: () {
@@ -364,7 +316,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
             ),
             child: Column(
               children: [
-                // Rank row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -385,7 +336,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                   ],
                 ),
                 const SizedBox(height: 8),
-                // Points info row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -393,7 +343,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                     _statChip("أقل ترتيب", rank10Points),
                   ],
                 ),
-                // Gap motivation (only if not in top 10)
                 if (!isInTop10 && gap > 0) ...[
                   const SizedBox(height: 8),
                   Container(
@@ -410,18 +359,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                         fontSize: 12,
                         color: AppColors.primaryDeepTeal,
                       ),
-                    ),
-                  ),
-                ],
-                // Already in top 10 celebration
-                if (isInTop10) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    "أنت من الأفضل! استمر 🔥",
-                    style: GoogleFonts.cairo(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                      color: Colors.green[700],
                     ),
                   ),
                 ],
@@ -548,8 +485,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                 blurRadius: 10,
                 offset: const Offset(0, 4))
           ],
-          border:
-              Border.all(color: AppColors.primaryDeepTeal.withValues(alpha: 0.05))),
+          border: Border.all(
+              color: AppColors.primaryDeepTeal.withValues(alpha: 0.05))),
       child: Row(
         children: [
           SizedBox(
@@ -561,10 +498,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                       fontSize: 15))),
           CircleAvatar(
               radius: 22,
-              backgroundColor: AppColors.primaryDeepTeal.withValues(alpha: 0.05),
+              backgroundColor:
+                  AppColors.primaryDeepTeal.withValues(alpha: 0.05),
               child: Icon(
-                  avatars[
-                      entry.avatarIndex < avatars.length ? entry.avatarIndex : 0],
+                  avatars[entry.avatarIndex < avatars.length
+                      ? entry.avatarIndex
+                      : 0],
                   color: entry.avatarIndex == 0
                       ? AppColors.secondaryOrange
                       : AppColors.primaryDeepTeal,
