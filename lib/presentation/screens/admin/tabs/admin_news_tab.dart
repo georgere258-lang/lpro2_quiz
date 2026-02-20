@@ -1,5 +1,13 @@
 // PATH: lib/presentation/screens/admin/tabs/admin_news_tab.dart
 // News Ticker tab for admin panel
+//
+// ✅ Notifications review:
+// - Writes `notify: true` ONLY when toggle is ON (per-item).
+// - Adds `pushTitle/pushBody` ONLY when notify is ON + non-empty.
+// - Works perfectly with your Cloud Function (onDocumentWritten ONE-SHOT):
+//   * CREATE with notify=true => sends once, then function resets notify=false.
+//   * CREATE with notify=false => no push.
+// - No other behavior touched.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -26,12 +34,20 @@ class AdminNewsTab extends StatefulWidget {
 
 class _AdminNewsTabState extends State<AdminNewsTab> {
   final TextEditingController _tickerText = TextEditingController();
+
+  // ✅ Push controls (default OFF)
+  final ValueNotifier<bool> _tickerNotify = ValueNotifier<bool>(false);
+  final TextEditingController _pushTitleCtrl = TextEditingController();
+  final TextEditingController _pushBodyCtrl = TextEditingController();
+
   final int _tickerPriority = 0;
-  final bool _tickerNotify = false;
 
   @override
   void dispose() {
     _tickerText.dispose();
+    _pushTitleCtrl.dispose();
+    _pushBodyCtrl.dispose();
+    _tickerNotify.dispose();
     super.dispose();
   }
 
@@ -45,15 +61,66 @@ class _AdminNewsTabState extends State<AdminNewsTab> {
           children: [
             adminTextField(_tickerText, 'نص الخبر...', maxLines: 2),
             const SizedBox(height: 8),
-            adminCenterBtn(onPressed: _addTickerItem, bg: AppColors.primaryDeepTeal, child: adminBtnText('إضافة', size: 12)),
+
+            // ✅ notify toggle + optional push text (minimal)
+            ValueListenableBuilder<bool>(
+              valueListenable: _tickerNotify,
+              builder: (_, notify, __) {
+                return Column(
+                  children: [
+                    Row(
+                      children: [
+                        Switch(
+                          value: notify,
+                          onChanged: (v) => _tickerNotify.value = v,
+                          activeColor: AppColors.secondaryOrange,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'إرسال إشعار لهذا الخبر',
+                          style: GoogleFonts.cairo(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                    if (notify) ...[
+                      const SizedBox(height: 6),
+                      adminTextField(
+                        _pushTitleCtrl,
+                        'عنوان الإشعار (اختياري)...',
+                        maxLines: 1,
+                      ),
+                      const SizedBox(height: 6),
+                      adminTextField(
+                        _pushBodyCtrl,
+                        'نص الإشعار (اختياري)...',
+                        maxLines: 2,
+                      ),
+                      const SizedBox(height: 6),
+                    ],
+                  ],
+                );
+              },
+            ),
+
+            adminCenterBtn(
+              onPressed: _addTickerItem,
+              bg: AppColors.primaryDeepTeal,
+              child: adminBtnText('إضافة', size: 12),
+            ),
             const SizedBox(height: 12),
             Expanded(
               child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: widget.tickerRepo.watchAllForAdmin(),
                 builder: (ctx, snap) {
-                  if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+                  if (!snap.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
                   final docs = snap.data!.docs;
-                  if (docs.isEmpty) return Center(child: Text('لا توجد أخبار', style: GoogleFonts.cairo()));
+                  if (docs.isEmpty) {
+                    return Center(
+                      child: Text('لا توجد أخبار', style: GoogleFonts.cairo()),
+                    );
+                  }
                   return ListView.separated(
                     itemCount: docs.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
@@ -63,19 +130,35 @@ class _AdminNewsTabState extends State<AdminNewsTab> {
                       final isActive = d['isActive'] == true;
                       return Container(
                         padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.black.withValues(alpha: 0.08))),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: Colors.black.withValues(alpha: 0.08),
+                          ),
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(children: [adminStatusBadge(isActive), const Spacer()]),
+                            Row(children: [
+                              adminStatusBadge(isActive),
+                              const Spacer(),
+                            ]),
                             const SizedBox(height: 8),
                             Text(text, style: GoogleFonts.cairo(fontSize: 13)),
                             const SizedBox(height: 8),
                             Wrap(
                               spacing: 8,
                               children: [
-                                adminTinyBtn(isActive ? 'إخفاء' : 'إظهار', () => _toggleTickerActive(docs[i].id, isActive)),
-                                adminTinyBtn('حذف', () => _deleteTicker(docs[i].id)),
+                                adminTinyBtn(
+                                  isActive ? 'إخفاء' : 'إظهار',
+                                  () =>
+                                      _toggleTickerActive(docs[i].id, isActive),
+                                ),
+                                adminTinyBtn(
+                                  'حذف',
+                                  () => _deleteTicker(docs[i].id),
+                                ),
                               ],
                             ),
                           ],
@@ -94,22 +177,68 @@ class _AdminNewsTabState extends State<AdminNewsTab> {
 
   Future<void> _addTickerItem() async {
     final text = _tickerText.text.trim();
-    if (text.isEmpty) { widget.snack('اكتب نص الخبر'); return; }
+    if (text.isEmpty) {
+      widget.snack('اكتب نص الخبر');
+      return;
+    }
+
     widget.setSaving(true);
     try {
-      await widget.tickerRepo.addItem({'text_ar': text, 'priority': _tickerPriority, 'isActive': true, 'notify': _tickerNotify, 'createdAt': FieldValue.serverTimestamp(), 'updatedAt': FieldValue.serverTimestamp(), 'source': 'admin'});
+      final notify = _tickerNotify.value == true;
+      final pushTitle = _pushTitleCtrl.text.trim();
+      final pushBody = _pushBodyCtrl.text.trim();
+
+      final payload = <String, dynamic>{
+        'text_ar': text,
+        'priority': _tickerPriority,
+        'isActive': true,
+        'notify': notify, // ✅ ONE-SHOT gate for Cloud Function
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'source': 'admin',
+      };
+
+      // ✅ Only add these fields if notify is ON and value is not empty
+      if (notify && pushTitle.isNotEmpty) payload['pushTitle'] = pushTitle;
+      if (notify && pushBody.isNotEmpty) payload['pushBody'] = pushBody;
+
+      await widget.tickerRepo.addItem(payload);
+
       widget.snack('✅');
       _tickerText.clear();
-    } catch (_) { widget.snack('فشل'); } finally { widget.setSaving(false); }
+
+      // reset optional fields after publish
+      _tickerNotify.value = false;
+      _pushTitleCtrl.clear();
+      _pushBodyCtrl.clear();
+    } catch (_) {
+      widget.snack('فشل');
+    } finally {
+      widget.setSaving(false);
+    }
   }
 
   Future<void> _toggleTickerActive(String id, bool current) async {
     widget.setSaving(true);
-    try { await widget.tickerRepo.toggleActive(id, current); widget.snack('✅'); } catch (_) { widget.snack('فشل'); } finally { widget.setSaving(false); }
+    try {
+      await widget.tickerRepo.toggleActive(id, current);
+      widget.snack('✅');
+    } catch (_) {
+      widget.snack('فشل');
+    } finally {
+      widget.setSaving(false);
+    }
   }
 
   Future<void> _deleteTicker(String id) async {
     widget.setSaving(true);
-    try { await widget.tickerRepo.deleteItem(id); widget.snack('✅'); } catch (_) { widget.snack('فشل'); } finally { widget.setSaving(false); }
+    try {
+      await widget.tickerRepo.deleteItem(id);
+      widget.snack('✅');
+    } catch (_) {
+      widget.snack('فشل');
+    } finally {
+      widget.setSaving(false);
+    }
   }
 }
