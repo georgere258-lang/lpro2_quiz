@@ -56,8 +56,8 @@ class SectionIdentityCard extends StatelessWidget {
   }
   
   String get _footerLine {
-    if (_isStars) return "تعلم مستمر . تطور كبير . نجاح أكيد 💪";
-    if (_isPro) return "تطوير مستمر . نجاحات أكتر . إنت قائد Pro ";
+    if (_isStars) return "تعلم مستمر ◀️ تطور كبير ◀️ نجاح أكيد 💪";
+    if (_isPro) return "تطوير مستمر ◀️ نجاحات أكتر ◀️ إنت قائد Pro 👑";
     return "هدفنا: تثبيت فهمك… قبل ما نحسب نقاطك.";
   }
 
