@@ -11,7 +11,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-// ✅ إضافة مكتبة الذاكرة المحلية (تأكد من وجودها في pubspec.yaml)
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:lpro2_quiz/firebase_options.dart';
@@ -25,7 +24,6 @@ import 'package:lpro2_quiz/presentation/screens/about_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/admin/admin_panel.dart';
 import 'package:lpro2_quiz/presentation/screens/know_client_screen.dart';
 
-// ✅ Deep-link targets (open the exact article)
 import 'package:lpro2_quiz/presentation/screens/fact_articles_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/know_client_articles_screen.dart';
 
@@ -33,17 +31,14 @@ import 'core/curriculum/unit_repository.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Background isolate: safe init (do not assume initialized).
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    // ✅ 1. اقتناص وحفظ الإشعار محلياً (والتطبيق مغلق أو في الخلفية)
     await _saveNotificationLocally(message);
   } catch (_) {}
 }
 
-// ✅ Global Navigator key (for push-open deep links safely from anywhere)
 final GlobalKey<NavigatorState> _navKey = GlobalKey<NavigatorState>();
 
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
@@ -57,17 +52,14 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 
 bool _postBootstrapStarted = false;
 
-// Foreground listener guards
 StreamSubscription<RemoteMessage>? _onMessageSub;
 StreamSubscription<RemoteMessage>? _onOpenedSub;
 
-// ✅ NEW: Auth listener guard (prevents duplicate subscriptions)
 StreamSubscription<User?>? _authSub;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ✅ UI overlays (safe + sync)
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarDividerColor: Colors.transparent,
@@ -75,13 +67,10 @@ Future<void> main() async {
     statusBarColor: Colors.transparent,
   ));
 
-  // ✅ Register background handler early
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // ✅ CRITICAL: Firebase MUST be initialized BEFORE any screen uses FirebaseAuth/FirebaseMessaging
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // ✅ Render UI
   runApp(
     RepositoryProvider<UnitRepository>(
       create: (_) => LocalUnitRepository(),
@@ -89,7 +78,6 @@ Future<void> main() async {
     ),
   );
 
-  // ✅ Post-boot (non-blocking)
   WidgetsBinding.instance.addPostFrameCallback((_) {
     if (_postBootstrapStarted) return;
     _postBootstrapStarted = true;
@@ -99,16 +87,13 @@ Future<void> main() async {
 
 Future<void> _postBootstrap() async {
   try {
-    // 1) Orientation
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
 
-    // 2) Sounds
     SoundManager.init();
 
-    // 3) Local notifications init (Android + iOS)
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings(
       requestAlertPermission: false,
@@ -124,7 +109,6 @@ Future<void> _postBootstrap() async {
     await flutterLocalNotificationsPlugin.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
-        // ✅ Tap on local notification (foreground push rendered locally)
         final payload = response.payload;
         if (payload == null || payload.trim().isEmpty) return;
 
@@ -137,7 +121,6 @@ Future<void> _postBootstrap() async {
       },
     );
 
-    // 4) Android: channel (بدون طلب إذن هنا)
     if (Platform.isAndroid) {
       await flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<
@@ -145,36 +128,44 @@ Future<void> _postBootstrap() async {
           ?.createNotificationChannel(channel);
     }
 
-    // 5) iOS: (بدون طلب إذن هنا)
-    // ⚠️ طلب الإذن تم نقله لمرحلة ما بعد OTP داخل LoginScreen._activateNotifications()
-
-    // ✅ Foreground notifications (when app is open)
     _attachForegroundNotificationListener();
-
-    // ✅ When user taps push notification (app in background)
     _attachOnMessageOpenedListener();
-
-    // ✅ When user taps push notification (app was terminated)
     await _handleInitialMessageIfAny();
 
-    // 6) Topics (non-fatal)
+    // 1. طلب الإذن
     final messaging = FirebaseMessaging.instance;
+    await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    // 2. التحقق من APNs (خاص بـ iOS)
+    if (Platform.isIOS) {
+      final apnsToken = await messaging.getAPNSToken();
+      print(
+          "🍏 APNS TOKEN STATUS: ${apnsToken != null ? 'SUCCESS ✅' : 'FAILED ❌'}");
+      if (apnsToken != null) {
+        print("🍏 APNS TOKEN VALUE: $apnsToken");
+      }
+    }
+
+    // 3. التحقق من FCM Token
+    final token = await messaging.getToken();
+    print("🔥 FCM TOKEN: $token");
+
     unawaited(messaging.subscribeToTopic('all_users'));
 
     _subscribeToNotificationTopics();
-  } catch (_) {
-    // لا نكسر الإقلاع لأي سبب هنا
-  }
+  } catch (_) {}
 }
 
 void _attachForegroundNotificationListener() {
-  // prevent double-listener if postBootstrap called twice لأي سبب
   _onMessageSub?.cancel();
 
   _onMessageSub =
       FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
     try {
-      // ✅ 2. اقتناص وحفظ الإشعار محلياً (والتطبيق مفتوح في الواجهة)
       await _saveNotificationLocally(message);
 
       final notif = message.notification;
@@ -192,8 +183,6 @@ void _attachForegroundNotificationListener() {
         channel.name,
         importance: Importance.max,
         priority: Priority.high,
-        // uses your WHITE drawable icon if present:
-        // android/app/src/main/res/drawable/ic_stat_lpro.png
         icon: 'ic_stat_lpro',
       );
 
@@ -209,8 +198,6 @@ void _attachForegroundNotificationListener() {
       );
 
       final id = DateTime.now().millisecondsSinceEpoch.remainder(100000);
-
-      // ✅ payload carries data for deep-linking on tap
       final payload = message.data.isEmpty ? null : jsonEncode(message.data);
 
       await flutterLocalNotificationsPlugin.show(
@@ -220,9 +207,7 @@ void _attachForegroundNotificationListener() {
         details,
         payload: payload,
       );
-    } catch (_) {
-      // silent fail (no crash)
-    }
+    } catch (_) {}
   });
 }
 
@@ -247,16 +232,13 @@ Future<void> _handleInitialMessageIfAny() async {
 
     final data = msg.data;
     if (data.isNotEmpty) {
-      // Delay a tick to ensure Navigator is ready
       Future.delayed(const Duration(milliseconds: 200), () {
         _handleNotificationTap(data);
       });
     } else {
       _openHome();
     }
-  } catch (_) {
-    // ignore
-  }
+  } catch (_) {}
 }
 
 Map<String, dynamic>? _safeDecodePayload(String payload) {
@@ -272,8 +254,6 @@ Map<String, dynamic>? _safeDecodePayload(String payload) {
 void _openHome() {
   final nav = _navKey.currentState;
   if (nav == null) return;
-
-  // Ensure we land on MainWrapper (Home)
   nav.pushNamedAndRemoveUntil('/home', (route) => false);
 }
 
@@ -281,12 +261,9 @@ void _handleNotificationTap(Map<String, dynamic> data) {
   final nav = _navKey.currentState;
   if (nav == null) return;
 
-  // Expected from Functions:
-  // data: { collection: "...", docId: "...", title: "..." }
   final collection = (data['collection'] ?? '').toString().trim();
   final docId = (data['docId'] ?? '').toString().trim();
 
-  // Optional direct route override (safe allowlist)
   final route = (data['route'] ?? '').toString().trim();
   const allowedRoutes = {
     '/',
@@ -304,7 +281,6 @@ void _handleNotificationTap(Map<String, dynamic> data) {
     return;
   }
 
-  // Deep-link by collection (safe defaults)
   if (collection == 'pro_insight') {
     final title = (data['title'] ?? '').toString().trim();
     final resolved =
@@ -331,19 +307,16 @@ void _handleNotificationTap(Map<String, dynamic> data) {
     return;
   }
 
-  // For other collections (money / radar / home_pro_card / ticker) open home for now
   _openHome();
 }
 
 void _subscribeToNotificationTopics() {
-  // ✅ prevent duplicate auth listener (hot-restart / edge)
   _authSub?.cancel();
 
   _authSub = FirebaseAuth.instance.authStateChanges().listen((User? user) {
     if (user != null) {
       unawaited(FirebaseMessaging.instance.subscribeToTopic(user.uid));
 
-      // admin topic (optional)
       if (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
         unawaited(
           FirebaseMessaging.instance.subscribeToTopic('admin_notifications'),
@@ -353,25 +326,20 @@ void _subscribeToNotificationTopics() {
   });
 }
 
-// =========================================================================
-// ✅ 3. العقل المدبر: حفظ الإشعارات ومسح ما تخطى 48 ساعة بصمت تام
-// =========================================================================
 Future<void> _saveNotificationLocally(RemoteMessage message) async {
   try {
     final prefs = await SharedPreferences.getInstance();
     final String? notifsString = prefs.getString('saved_notifications');
     List<dynamic> notifs = notifsString != null ? jsonDecode(notifsString) : [];
 
-    // 1. تنظيف الإشعارات القديمة (أكثر من 48 ساعة)
     final now = DateTime.now();
     notifs.removeWhere((item) {
       final timestamp = item['timestamp'] as int?;
       if (timestamp == null) return true;
       final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-      return now.difference(date).inHours > 48; // يمسح أي إشعار مر عليه يومين
+      return now.difference(date).inHours > 48;
     });
 
-    // 2. استخراج بيانات الإشعار الجديد
     final title = message.notification?.title?.trim() ??
         message.data['title']?.toString().trim() ??
         'LPro';
@@ -379,8 +347,7 @@ Future<void> _saveNotificationLocally(RemoteMessage message) async {
         message.data['body']?.toString().trim() ??
         '';
 
-    if (title.isEmpty && body.isEmpty)
-      return; // لا يحفظ الإشعارات الصامتة الفارغة
+    if (title.isEmpty && body.isEmpty) return;
 
     final newNotif = {
       'id':
@@ -388,24 +355,19 @@ Future<void> _saveNotificationLocally(RemoteMessage message) async {
       'title': title,
       'body': body,
       'timestamp': DateTime.now().millisecondsSinceEpoch,
-      'data':
-          message.data, // حفظ البيانات للـ Deep Linking عند الضغط من القائمة
-      'isNew': true, // لتشغيل النقطة الحمراء
+      'data': message.data,
+      'isNew': true,
     };
 
-    // 3. منع التكرار والإضافة في أعلى القائمة (الأحدث أولاً)
     if (!notifs.any((n) => n['id'] == newNotif['id'])) {
       notifs.insert(0, newNotif);
     }
 
-    // 4. الحفظ النهائي في ذاكرة الموبايل
     await prefs.setString('saved_notifications', jsonEncode(notifs));
   } catch (e) {
-    // صمت تام (لا نعطل التطبيق أبداً إذا حدث خطأ في الحفظ)
     debugPrint('LPro Notification Save Error: $e');
   }
 }
-// =========================================================================
 
 class LProApp extends StatefulWidget {
   const LProApp({super.key});
@@ -432,14 +394,13 @@ class _LProAppState extends State<LProApp> {
       title: 'L Pro Quiz',
       debugShowCheckedModeBanner: false,
       navigatorKey: _navKey,
-      // ✅ الحماية الهندسية الصارمة لحجم الخطوط (تمنع تشوه التصميم)
       builder: (context, child) {
         final mediaQueryData = MediaQuery.of(context);
         return MediaQuery(
           data: mediaQueryData.copyWith(
             textScaler: mediaQueryData.textScaler.clamp(
               minScaleFactor: 0.9,
-              maxScaleFactor: 1.1, // أقصى حد للتكبير 10%
+              maxScaleFactor: 1.1,
             ),
           ),
           child: child!,
