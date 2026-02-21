@@ -12,9 +12,8 @@ import UserNotifications
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     
-    // 1️⃣ تهيئة فايربيز برمجياً (بدون الاعتماد على ملف Plist المفقود)
+    // 1️⃣ تهيئة فايربيز برمجياً
     if FirebaseApp.app() == nil {
-        // إنشاء الإعدادات يدوياً باستخدام بياناتك الخاصة
         let options = FirebaseOptions(
             googleAppID: "1:905243871570:ios:7dd006b803e36a4c66928b",
             gcmSenderID: "905243871570"
@@ -25,14 +24,16 @@ import UserNotifications
         options.clientID = "905243871570-1e1rl17ir696ml70u9ejvdev651t81f6.apps.googleusercontent.com"
         options.storageBucket = "lpro2-quiz.firebasestorage.app"
         
-        // تشغيل فايربيز بالإعدادات اليدوية
         FirebaseApp.configure(options: options)
     }
     
-    // 2️⃣ ضبط مفوض الإشعارات
+    // 2️⃣ ضبط مفوض الإشعارات (للـ Foreground)
     if #available(iOS 10.0, *) {
-      UNUserNotificationCenter.current().delegate = self
+      UNUserNotificationCenter.current().delegate = self as? UNUserNotificationCenterDelegate
     }
+    
+    // ✅ إضافة مفوض الرسائل لضمان عمل الـ Method Swizzling
+    Messaging.messaging().delegate = self as? MessagingDelegate
     
     // 3️⃣ تسجيل إضافات فلوتر
     GeneratedPluginRegistrant.register(with: self)
@@ -40,7 +41,7 @@ import UserNotifications
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
   
-  // 4️⃣ استلام توكن Apple وتمريره لـ Firebase
+  // 4️⃣ استلام توكن Apple وتمريره لـ Firebase يدوياً (Double Check)
   override func application(
     _ application: UIApplication,
     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
@@ -49,7 +50,6 @@ import UserNotifications
     super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
   }
   
-  // 5️⃣ تسجيل أخطاء الوصول للإشعارات
   override func application(
     _ application: UIApplication,
     didFailToRegisterForRemoteNotificationsWithError error: Error
