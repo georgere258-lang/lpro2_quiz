@@ -12,18 +12,29 @@ import UserNotifications
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     
-    // 1️⃣ تهيئة Firebase
+    // 1️⃣ تهيئة Firebase بالكود البرمجي (لا يعتمد على ملف)
     if FirebaseApp.app() == nil {
-      FirebaseApp.configure()  // ✅ استخدم GoogleService-Info.plist (أبسط وأأمن)
+      let options = FirebaseOptions(
+        googleAppID: "1:905243871570:ios:7dd006b803e36a4c66928b",
+        gcmSenderID: "905243871570"
+      )
+      options.apiKey = "AIzaSyBWYT8L88sd9Vz1tvnKRg1TJZmaEi_HMZw"
+      options.projectID = "lpro2-quiz"
+      options.bundleID = "com.george.lpro"
+      options.clientID = "905243871570-1e1rl17ir696ml70u9ejvdev651t81f6.apps.googleusercontent.com"
+      options.storageBucket = "lpro2-quiz.firebasestorage.app"
+      
+      FirebaseApp.configure(options: options)
+      print("✅ [Firebase] Configured programmatically")
     }
     
     // 2️⃣ ضبط مفوض الإشعارات (بدون casting)
     if #available(iOS 10.0, *) {
-      UNUserNotificationCenter.current().delegate = self  // ✅ بدون as?
+      UNUserNotificationCenter.current().delegate = self
     }
     
     // 3️⃣ ضبط مفوض Firebase Messaging (بدون casting)
-    Messaging.messaging().delegate = self  // ✅ بدون as?
+    Messaging.messaging().delegate = self
     
     // 4️⃣ تسجيل إضافات Flutter
     GeneratedPluginRegistrant.register(with: self)
@@ -36,7 +47,7 @@ import UserNotifications
     _ application: UIApplication,
     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
   ) {
-    print("✅ [APNs] Token received successfully")
+    print("✅ [APNs] Token received")
     Messaging.messaging().apnsToken = deviceToken
     super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
   }
@@ -61,7 +72,7 @@ import UserNotifications
     print("🔔 [FCM] Notification received in FOREGROUND:")
     print(userInfo)
     
-    // ✅ Show notification even when app is open:
+    // ✅ Show notification even when app is open
     if #available(iOS 14.0, *) {
       completionHandler([[.banner, .sound, .badge]])
     } else {
@@ -78,7 +89,7 @@ import UserNotifications
   ) {
     let userInfo = response.notification.request.content.userInfo
     
-    print("🔔 [FCM] Notification tapped (Background/Closed):")
+    print("🔔 [FCM] Notification tapped:")
     print(userInfo)
     
     completionHandler()
@@ -88,7 +99,7 @@ import UserNotifications
 // ✅ CRITICAL: Messaging Delegate Extension
 extension AppDelegate: MessagingDelegate {
   func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-    print("🔥 [FCM] Token refreshed: \(fcmToken ?? "nil")")
+    print("🔥 [FCM] Token: \(fcmToken ?? "nil")")
     
     // Optional: Send to your backend
     let dataDict: [String: String] = ["token": fcmToken ?? ""]
