@@ -140,7 +140,31 @@ Future<void> _postBootstrap() async {
       sound: true,
     );
 
-    // التحقق من APNs ومزامنة التوكنات تبدأ من هنا
+    // 🔥 المزامنة القسرية الآمنة: تعمل في الخلفية بعد 5 ثوانٍ لضمان استقرار التطبيق
+    Future.delayed(const Duration(seconds: 5), () async {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        try {
+          print('🚀 [FORCE SYNC] Starting background sync for ${user.uid}');
+          String? token = await FirebaseMessaging.instance.getToken();
+          if (token != null) {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .set({
+              'fcmToken': token,
+              'platform': Platform.isIOS ? 'ios' : 'android',
+              'lastTokenUpdate': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+            print('✅ [FORCE SYNC] Token updated successfully in Firestore');
+          }
+        } catch (e) {
+          print('⚠️ [FORCE SYNC] Deferred: $e');
+        }
+      }
+    });
+
+    // مراقبة حالة المستخدم المعتادة
     _subscribeToNotificationTopics();
   } catch (_) {}
 }
@@ -159,7 +183,6 @@ void _subscribeToNotificationTopics() {
       unawaited(FirebaseMessaging.instance.subscribeToTopic(user.uid));
 
       try {
-        // 🔥 خاص بـ iOS: الانتظار لضمان استلام APNs Token
         if (Platform.isIOS) {
           String? apnsToken = await FirebaseMessaging.instance.getAPNSToken();
           if (apnsToken == null) {
@@ -170,12 +193,10 @@ void _subscribeToNotificationTopics() {
           print('🔑 [APNs] الحالة: ${apnsToken != null ? "جاهز ✅" : "فارغ ❌"}');
         }
 
-        // الحصول على الـ FCM Token
         String? token = await FirebaseMessaging.instance.getToken();
         print('🔥 [FCM] التوكن: ${token != null ? "OBTAINED ✅" : "NULL ❌"}');
 
         if (token != null) {
-          // الحفظ في Firestore
           await FirebaseFirestore.instance
               .collection('users')
               .doc(user.uid)
