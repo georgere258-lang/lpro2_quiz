@@ -9,6 +9,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // ✅ تم إضافة Firestore
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -132,7 +133,6 @@ Future<void> _postBootstrap() async {
     _attachOnMessageOpenedListener();
     await _handleInitialMessageIfAny();
 
-    // 1. طلب الإذن
     final messaging = FirebaseMessaging.instance;
     await messaging.requestPermission(
       alert: true,
@@ -140,17 +140,12 @@ Future<void> _postBootstrap() async {
       sound: true,
     );
 
-    // 2. التحقق من APNs (خاص بـ iOS)
     if (Platform.isIOS) {
       final apnsToken = await messaging.getAPNSToken();
       print(
           "🍏 APNS TOKEN STATUS: ${apnsToken != null ? 'SUCCESS ✅' : 'FAILED ❌'}");
-      if (apnsToken != null) {
-        print("🍏 APNS TOKEN VALUE: $apnsToken");
-      }
     }
 
-    // 3. التحقق من FCM Token
     final token = await messaging.getToken();
     print("🔥 FCM TOKEN: $token");
 
@@ -158,6 +153,43 @@ Future<void> _postBootstrap() async {
 
     _subscribeToNotificationTopics();
   } catch (_) {}
+}
+
+// ✅ تم تعديل هذه الدالة لحفظ التوكن في Firestore فور تسجيل الدخول
+void _subscribeToNotificationTopics() {
+  _authSub?.cancel();
+
+  _authSub =
+      FirebaseAuth.instance.authStateChanges().listen((User? user) async {
+    if (user != null) {
+      // 1. الاشتراك في توبيك المستخدم
+      unawaited(FirebaseMessaging.instance.subscribeToTopic(user.uid));
+
+      // 2. 🔥 تحديث FCM Token في Firestore لضمان وصول الإشعارات
+      try {
+        String? token = await FirebaseMessaging.instance.getToken();
+        if (token != null) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .set({
+            'fcmToken': token,
+            'platform': Platform.isIOS ? 'ios' : 'android',
+            'lastTokenUpdate': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+          print("✅ FCM Token Synced to Firestore for user: ${user.uid}");
+        }
+      } catch (e) {
+        print("🔴 Error updating FCM token in Firestore: $e");
+      }
+
+      if (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
+        unawaited(
+          FirebaseMessaging.instance.subscribeToTopic('admin_notifications'),
+        );
+      }
+    }
+  });
 }
 
 void _attachForegroundNotificationListener() {
@@ -308,22 +340,6 @@ void _handleNotificationTap(Map<String, dynamic> data) {
   }
 
   _openHome();
-}
-
-void _subscribeToNotificationTopics() {
-  _authSub?.cancel();
-
-  _authSub = FirebaseAuth.instance.authStateChanges().listen((User? user) {
-    if (user != null) {
-      unawaited(FirebaseMessaging.instance.subscribeToTopic(user.uid));
-
-      if (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
-        unawaited(
-          FirebaseMessaging.instance.subscribeToTopic('admin_notifications'),
-        );
-      }
-    }
-  });
 }
 
 Future<void> _saveNotificationLocally(RemoteMessage message) async {
