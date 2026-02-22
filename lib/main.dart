@@ -9,7 +9,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // ✅ تم إضافة Firestore
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -140,53 +140,63 @@ Future<void> _postBootstrap() async {
       sound: true,
     );
 
-    if (Platform.isIOS) {
-      final apnsToken = await messaging.getAPNSToken();
-      print(
-          "🍏 APNS TOKEN STATUS: ${apnsToken != null ? 'SUCCESS ✅' : 'FAILED ❌'}");
-    }
-
-    final token = await messaging.getToken();
-    print("🔥 FCM TOKEN: $token");
-
-    unawaited(messaging.subscribeToTopic('all_users'));
-
+    // التحقق من APNs ومزامنة التوكنات تبدأ من هنا
     _subscribeToNotificationTopics();
   } catch (_) {}
 }
 
-// ✅ تم تعديل هذه الدالة لحفظ التوكن في Firestore فور تسجيل الدخول
 void _subscribeToNotificationTopics() {
   _authSub?.cancel();
 
   _authSub =
       FirebaseAuth.instance.authStateChanges().listen((User? user) async {
+    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    print('🔔 [AUTH] حالة المستخدم تغيرت: ${user?.uid ?? "لا يوجد مستخدم"}');
+
     if (user != null) {
-      // 1. الاشتراك في توبيك المستخدم
+      print('🚀 [FCM] جاري بدء عملية مزامنة التوكن...');
+
       unawaited(FirebaseMessaging.instance.subscribeToTopic(user.uid));
 
-      // 2. 🔥 تحديث FCM Token في Firestore لضمان وصول الإشعارات
       try {
+        // 🔥 خاص بـ iOS: الانتظار لضمان استلام APNs Token
+        if (Platform.isIOS) {
+          String? apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+          if (apnsToken == null) {
+            print('⏳ [APNs] التوكن غير جاهز، سأنتظر 3 ثوانٍ...');
+            await Future.delayed(const Duration(seconds: 3));
+            apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+          }
+          print('🔑 [APNs] الحالة: ${apnsToken != null ? "جاهز ✅" : "فارغ ❌"}');
+        }
+
+        // الحصول على الـ FCM Token
         String? token = await FirebaseMessaging.instance.getToken();
+        print('🔥 [FCM] التوكن: ${token != null ? "OBTAINED ✅" : "NULL ❌"}');
+
         if (token != null) {
+          // الحفظ في Firestore
           await FirebaseFirestore.instance
               .collection('users')
               .doc(user.uid)
               .set({
             'fcmToken': token,
+            'fcmTokens': FieldValue.arrayUnion([token]),
             'platform': Platform.isIOS ? 'ios' : 'android',
             'lastTokenUpdate': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
-          print("✅ FCM Token Synced to Firestore for user: ${user.uid}");
+
+          print('✅ [SUCCESS] تم مزامنة التوكن في Firestore');
+          print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         }
       } catch (e) {
-        print("🔴 Error updating FCM token in Firestore: $e");
+        print('🔴 [ERROR] فشل في مزامنة التوكن: $e');
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       }
 
       if (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
         unawaited(
-          FirebaseMessaging.instance.subscribeToTopic('admin_notifications'),
-        );
+            FirebaseMessaging.instance.subscribeToTopic('admin_notifications'));
       }
     }
   });
