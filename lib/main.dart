@@ -97,9 +97,10 @@ Future<void> _postBootstrap() async {
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings(
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
+      requestAlertPermission: true,
+      requestBadgePermission:
+          true, // تم التعديل لـ Apple لظهور النقطة على الجرس
+      requestSoundPermission: true,
     );
 
     final initSettings = InitializationSettings(
@@ -134,11 +135,23 @@ Future<void> _postBootstrap() async {
     await _handleInitialMessageIfAny();
 
     final messaging = FirebaseMessaging.instance;
+
+    // طلب الصلاحيات مع تفعيل الـ Badge للأيفون
     await messaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
     );
+
+    // 🔥 خاص بـ Apple: إظهار التنبيه والنقطة حتى والتطبيق مفتوح
+    if (Platform.isIOS) {
+      await FirebaseMessaging.instance
+          .setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+    }
 
     // 🔥 المزامنة القسرية الآمنة: تعمل في الخلفية بعد 5 ثوانٍ لضمان استقرار التطبيق
     Future.delayed(const Duration(seconds: 5), () async {
@@ -164,7 +177,6 @@ Future<void> _postBootstrap() async {
       }
     });
 
-    // مراقبة حالة المستخدم المعتادة
     _subscribeToNotificationTopics();
   } catch (_) {}
 }
@@ -251,7 +263,7 @@ void _attachForegroundNotificationListener() {
 
       const iosDetails = DarwinNotificationDetails(
         presentAlert: true,
-        presentBadge: true,
+        presentBadge: true, // تفعيل تحديث البدج للأيفون
         presentSound: true,
       );
 
