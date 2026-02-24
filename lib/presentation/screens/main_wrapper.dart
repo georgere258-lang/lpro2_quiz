@@ -1,8 +1,6 @@
 // PATH: lib/presentation/screens/main_wrapper.dart
-// STATUS: OPTIMIZED FOR iOS NOTIFICATIONS ✅
-
 import 'dart:convert';
-import 'dart:io'; // أضفنا هذا للتحقق من نوع المنصة
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -51,11 +49,11 @@ class _MainWrapperState extends State<MainWrapper> {
 
     _loadNotifications();
 
-    // ✅ تعديل الاستماع للإشعارات ليتوافق مع آيفون
+    // الاستماع للإشعارات وتحديث الواجهة فوراً عند الاستلام والتطبيق مفتوح
     FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
       if (mounted) {
-        // في الأيفون، نحتاج للتأكد من حفظ الإشعار أولاً ثم إعادة تحميل القائمة
-        // لضمان ظهور الإشعار الجديد في الـ Sheet فور وصوله والتطبيق مفتوح
+        // 🔥 التأخير الذكي (600ms) لضمان كتابة البيانات في الذاكرة أولاً في الآيفون
+        await Future.delayed(const Duration(milliseconds: 600));
         await _loadNotifications();
         setState(() {
           _hasNewNotification = true;
@@ -64,11 +62,11 @@ class _MainWrapperState extends State<MainWrapper> {
     });
   }
 
-  // ✅ دالة تحميل الإشعارات - تم تحسينها
+  // دالة تحميل الإشعارات المحسنة للأيفون
   Future<void> _loadNotifications() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      // تأكد من عمل reload للـ prefs في حالة الأيفون لضمان قراءة أحدث القيم المكتوبة من main.dart
+      // 🔥 إعادة تحميل ملف الإعدادات لضمان قراءة البيانات الجديدة من القرص (iOS)
       if (Platform.isIOS) await prefs.reload();
 
       final String? notifsString = prefs.getString('saved_notifications');
@@ -114,7 +112,6 @@ class _MainWrapperState extends State<MainWrapper> {
     final now = DateTime.now();
     final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
     final diff = now.difference(date);
-
     if (diff.inDays > 0) return "منذ ${diff.inDays} يوم";
     if (diff.inHours > 0) return "منذ ${diff.inHours} ساعة";
     if (diff.inMinutes > 0) return "منذ ${diff.inMinutes} دقيقة";
