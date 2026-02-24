@@ -1,6 +1,7 @@
 // PATH: lib/presentation/screens/main_wrapper.dart
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async'; // ✅ أضفنا هذا لتنظيم الاستماع
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -18,6 +19,9 @@ import 'profile_screen.dart';
 import '../../features/news_ticker/presentation/news_ticker_widget.dart';
 import '../widgets/lpro_bottom_nav_bar.dart';
 
+// ✅ ربط مع NotificationCenter الموجود في main.dart
+import '../../main.dart';
+
 class MainWrapper extends StatefulWidget {
   final int? initialIndex;
   const MainWrapper({super.key, this.initialIndex});
@@ -33,6 +37,9 @@ class _MainWrapperState extends State<MainWrapper> {
 
   List<dynamic> _notifications = [];
   bool _hasNewNotification = false;
+
+  // ✅ تعريف متغير لإدارة الاستماع فور وصول إشعار
+  StreamSubscription? _refreshSub;
 
   @override
   void initState() {
@@ -50,6 +57,13 @@ class _MainWrapperState extends State<MainWrapper> {
 
     _loadNotifications();
 
+    // ✅ الاستماع لإشارة "تحديث الجرس" القادمة من main.dart لضمان التحديث اللحظي
+    _refreshSub = NotificationCenter().stream.listen((name) {
+      if (name == "refresh_notifications" && mounted) {
+        _loadNotifications();
+      }
+    });
+
     FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
       if (mounted) {
         await Future.delayed(const Duration(milliseconds: 1000));
@@ -59,6 +73,13 @@ class _MainWrapperState extends State<MainWrapper> {
         });
       }
     });
+  }
+
+  // ✅ تنظيف الاستماع عند إغلاق الشاشة لضمان استقرار أداء الهاتف
+  @override
+  void dispose() {
+    _refreshSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadNotifications() async {
@@ -81,7 +102,6 @@ class _MainWrapperState extends State<MainWrapper> {
     }
   }
 
-  // ✅ الدالة المعدلة بإضافة سجلات المراقبة (Logs) لضمان تصفير العداد في أبل
   Future<void> _markAllAsRead() async {
     debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     debugPrint('🔔 [NOTIFICATION] _markAllAsRead started...');
