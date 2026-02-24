@@ -50,6 +50,7 @@ function buildMessage({ topic, title, body, data = {}, imageUrl }) {
           },
           sound: "default",
           badge: 1,
+          "content-available": 1, // ✅ تفعيل تحديث الجرس والقائمة في الآيفون تلقائياً
         },
       },
     },
@@ -186,6 +187,7 @@ function makeCollectionNotifier(collectionId) {
           collection: collectionId,
           docId: afterSnap.id,
           title: deepTitle,
+          click_action: "FLUTTER_NOTIFICATION_CLICK", // ✅ لضمان فتح الشاشة عند الضغط في الآيفون
         },
       });
 
