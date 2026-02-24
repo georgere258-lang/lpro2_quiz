@@ -15,19 +15,8 @@ subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
-
 subprojects {
     project.evaluationDependsOn(":app")
-
-    // ✅ الحل الاحترافي: استخدام التفعيل التلقائي عند تحميل إضافة الأندرويد
-    plugins.withType<com.android.build.gradle.api.AndroidBasePlugin> {
-        val android = project.extensions.getByName("android") as com.android.build.gradle.BaseExtension
-        
-        // تعيين Namespace تلقائي إذا كان مفقوداً في أي مكتبة قديمة
-        if (android.namespace == null) {
-            android.namespace = "fix.${project.name.replace("-", ".")}"
-        }
-    }
 }
 
 tasks.register<Delete>("clean") {
