@@ -2,6 +2,7 @@
 // STATUS: FIXED & OPTIMIZED (iOS Critical Alert Audio Support Added)
 
 import 'dart:async'; // ✅ For Timeout handling
+import 'dart:io'; // ✅ إضافة مكتبة الـ IO للتحقق من نظام آيفون
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -46,10 +47,17 @@ class _LoginScreenState extends State<LoginScreen> {
         sound: true,
         criticalAlert:
             true, // ✅ الإضافة المطلوبة لضمان عمل الصوت القوي في الأيفون
+        announcement: true, // ✅ مطلوب لضمان تفعيل قنوات الصوت في iOS الحديث
       );
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
         FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+        // 🔥 الخطوة الجوهرية للأيفون: ربط التوكن مع APNS لتفعيل الصوت والتنبيهات
+        if (Platform.isIOS) {
+          await messaging.getAPNSToken();
+        }
+
         await messaging.subscribeToTopic('all_users');
         await messaging.subscribeToTopic(uid);
 
