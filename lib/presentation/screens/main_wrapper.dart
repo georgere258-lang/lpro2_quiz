@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_app_badger/flutter_app_badger.dart'; // ✅ الاستيراد الجديد
 
 import '../../core/constants/app_colors.dart';
 import '../../core/services/app_config_service.dart';
@@ -52,8 +53,8 @@ class _MainWrapperState extends State<MainWrapper> {
     // الاستماع للإشعارات وتحديث الواجهة فوراً عند الاستلام والتطبيق مفتوح
     FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
       if (mounted) {
-        // 🔥 التأخير الذكي (600ms) لضمان كتابة البيانات في الذاكرة أولاً في الآيفون
-        await Future.delayed(const Duration(milliseconds: 600));
+        // 🔥 التأخير الذكي (1000ms) لضمان كتابة البيانات في الذاكرة أولاً في الآيفون
+        await Future.delayed(const Duration(milliseconds: 1000));
         await _loadNotifications();
         setState(() {
           _hasNewNotification = true;
@@ -303,6 +304,20 @@ class _MainWrapperState extends State<MainWrapper> {
   }
 
   void _showNotificationSheet() {
+    // ✅ الطريقة النهائية لمسح الرقم (Badge) باستخدام المكتبة الجديدة
+    try {
+      FlutterAppBadger.removeBadge();
+    } catch (e) {
+      debugPrint("Badge remove error: $e");
+    }
+
+    // ✅ مسح التنبيه البصري في iOS
+    if (Platform.isIOS) {
+      FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+        badge: false,
+      );
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
