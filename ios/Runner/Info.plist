@@ -37,6 +37,8 @@
         <true/>
         <key>GoogleUtilities_AppDelegateProxyEnabled</key>
         <true/>
+        <key>FirebaseMessagingAutoInitEnabled</key>
+        <true/>
 
         <key>NSPhotoLibraryUsageDescription</key>
         <string>نحتاج للوصول للمكتبة لاختيار صورة الملف الشخصي</string>
@@ -50,7 +52,8 @@
         <key>UIBackgroundModes</key>
         <array>
             <string>remote-notification</string>
-            <string>fetch</string> </array>
+            <string>fetch</string>
+        </array>
         
         <key>CFBundleURLTypes</key>
         <array>
