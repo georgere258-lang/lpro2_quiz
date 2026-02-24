@@ -134,7 +134,6 @@ Future<void> _postBootstrap() async {
     _attachOnMessageOpenedListener();
     await _handleInitialMessageIfAny();
 
-    // 🔥 خاص بـ Apple: إظهار التنبيه والصوت ومنع تعليق الرقم والتطبيق مفتوح (نفس نسخة 45)
     if (Platform.isIOS) {
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
@@ -204,7 +203,9 @@ void _subscribeToNotificationTopics() {
               .doc(user.uid)
               .set({
             'fcmToken': token,
-            'fcmTokens': FieldValue.arrayUnion([token]),
+            'fcmTokens': [
+              token
+            ], // ✅ تم التعديل: استبدال القائمة بالتوكن الجديد فقط لمنع التراكم
             'platform': Platform.isIOS ? 'ios' : 'android',
             'lastTokenUpdate': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
@@ -251,7 +252,6 @@ void _attachForegroundNotificationListener() {
         icon: 'ic_stat_lpro',
       );
 
-      // ✅ بقاء إعدادات النسخة 45 لضمان الصوت القوي
       const iosDetails = DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
@@ -416,14 +416,12 @@ Future<void> _saveNotificationLocally(RemoteMessage message) async {
 
     await prefs.setString('saved_notifications', jsonEncode(notifs));
 
-    // ✅ التعديل الوحيد: إرسال إشارة تحديث داخلية لشاشة MainWrapper (آمن 100%)
     NotificationCenter().post(name: "refresh_notifications");
   } catch (e) {
     debugPrint('LPro Notification Save Error: $e');
   }
 }
 
-// ✅ فئة مساعدة للإشعارات الداخلية (تُضاف لمرة واحدة)
 class NotificationCenter {
   static final NotificationCenter _instance = NotificationCenter._internal();
   factory NotificationCenter() => _instance;
