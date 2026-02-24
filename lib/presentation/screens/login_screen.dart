@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/login_screen.dart
-// STATUS: FIXED & OPTIMIZED (Deleted User Recovery + Mandatory Firestore Creation)
+// STATUS: FIXED & OPTIMIZED (iOS Critical Alert Audio Support Added)
 
 import 'dart:async'; // ✅ For Timeout handling
 import 'package:flutter/material.dart';
@@ -38,12 +38,14 @@ class _LoginScreenState extends State<LoginScreen> {
   // دالة تفعيل الإشعارات مع طلب الإذن الرسمي
   void _activateNotifications(String uid) async {
     try {
-      // طلب الإذن لأجهزة أندرويد الحديثة و iOS
+      // طلب الإذن لأجهزة أندرويد الحديثة و iOS مع تفعيل التنبيهات الحرجة للصوت
       NotificationSettings settings =
           await FirebaseMessaging.instance.requestPermission(
         alert: true,
         badge: true,
         sound: true,
+        criticalAlert:
+            true, // ✅ الإضافة المطلوبة لضمان عمل الصوت القوي في الأيفون
       );
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
@@ -404,6 +406,7 @@ class _LoginScreenState extends State<LoginScreen> {
           initialValue: selectedCountry,
           onSelected: (val) => setState(() => selectedCountry = val),
           itemBuilder: (context) => [
+            const PopupMenuItem(value: "🇪🇬 +20", child: Text("مصر 🇪🇬")),
             const PopupMenuItem(value: "🇪🇬 +20", child: Text("مصر 🇪🇬")),
             const PopupMenuItem(
                 value: "🇦🇪 +971", child: Text("الإمارات 🇦🇪")),

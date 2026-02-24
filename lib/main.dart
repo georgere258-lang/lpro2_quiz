@@ -97,10 +97,10 @@ Future<void> _postBootstrap() async {
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission:
-          true, // تم التعديل لـ Apple لظهور النقطة على الجرس
-      requestSoundPermission: true,
+      requestAlertPermission: false, // ✅ تم التعديل ليكون الطلب من اللوجن
+      requestBadgePermission: false, // ✅ تم التعديل ليكون الطلب من اللوجن
+      requestSoundPermission: false, // ✅ تم التعديل ليكون الطلب من اللوجن
+      requestCriticalPermission: true, // مهم جداً لأصوات الأيفون
     );
 
     final initSettings = InitializationSettings(
@@ -134,16 +134,9 @@ Future<void> _postBootstrap() async {
     _attachOnMessageOpenedListener();
     await _handleInitialMessageIfAny();
 
-    final messaging = FirebaseMessaging.instance;
+    // 🔥 تم حذف كود messaging.requestPermission من هنا تماماً لضمان عدم الطلب المبكر
 
-    // طلب الصلاحيات مع تفعيل الـ Badge للأيفون
-    await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-
-    // 🔥 خاص بـ Apple: إظهار التنبيه والنقطة حتى والتطبيق مفتوح
+    // 🔥 خاص بـ Apple: إظهار التنبيه والنقطة والصوت حتى والتطبيق مفتوح
     if (Platform.isIOS) {
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
@@ -263,8 +256,9 @@ void _attachForegroundNotificationListener() {
 
       const iosDetails = DarwinNotificationDetails(
         presentAlert: true,
-        presentBadge: true, // تفعيل تحديث البدج للأيفون
+        presentBadge: true,
         presentSound: true,
+        interruptionLevel: InterruptionLevel.critical, // يضمن سماع الصوت بقوة
       );
 
       final details = NotificationDetails(
