@@ -31,7 +31,6 @@ dependencies:
   
   # الإشعارات
   flutter_local_notifications: ^17.2.1
-  flutter_app_badger: ^1.5.0  # ✅ إضافة مكتبة مسح رقم الإشعارات
   permission_handler: ^11.3.1
   googleapis_auth: ^2.0.0
 
