@@ -81,22 +81,28 @@ class _MainWrapperState extends State<MainWrapper> {
     }
   }
 
+  // ✅ الدالة المعدلة بإضافة سجلات المراقبة (Logs) لضمان تصفير العداد في أبل
   Future<void> _markAllAsRead() async {
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    debugPrint('🔔 [NOTIFICATION] _markAllAsRead started...');
+
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // ✅ الحل النهائي: مسح الرقم من أيقونة الأبل (iOS) بأمان وبدون أخطاء
       if (Platform.isIOS) {
         final FlutterLocalNotificationsPlugin notificationsPlugin =
             FlutterLocalNotificationsPlugin();
 
-        // استخدمنا dynamic لتجاوز تعليق المحرر وضمان تنفيذ الأمر برمجياً
         final dynamic iosImplementation =
             notificationsPlugin.resolvePlatformSpecificImplementation<
                 IOSFlutterLocalNotificationsPlugin>();
 
         if (iosImplementation != null) {
           await iosImplementation.setApplicationIconBadgeNumber(0);
+          debugPrint(
+              '✅ [iOS BADGE] setApplicationIconBadgeNumber(0) executed successfully');
+        } else {
+          debugPrint('⚠️ [iOS BADGE] IOSImplementation is NULL');
         }
       }
 
@@ -107,18 +113,24 @@ class _MainWrapperState extends State<MainWrapper> {
           changed = true;
         }
       }
+
       if (changed) {
         await prefs.setString(
             'saved_notifications', jsonEncode(_notifications));
+        debugPrint(
+            '✅ [LOCAL STORE] saved_notifications updated (marks as read)');
       }
+
       if (mounted) {
         setState(() {
           _hasNewNotification = false;
         });
       }
+      debugPrint('🔔 [NOTIFICATION] _markAllAsRead completed.');
     } catch (e) {
-      debugPrint("Error marking notifications as read: $e");
+      debugPrint("🔴 [ERROR] in _markAllAsRead: $e");
     }
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   }
 
   String _getTimeAgo(int timestamp) {
