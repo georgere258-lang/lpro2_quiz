@@ -19,14 +19,13 @@ subprojects {
 subprojects {
     project.evaluationDependsOn(":app")
 
-    // ✅ الجزء المضاف لحل مشكلة الـ Namespace للمكتبات القديمة
-    afterEvaluate {
-        val android = project.extensions.findByName("android") as? com.android.build.gradle.BaseExtension
-        if (android != null) {
-            if (android.namespace == null) {
-                // يعطي namespace تلقائي بناءً على اسم المشروع لمنع الخطأ
-                android.namespace = "fix.${project.name.replace("-", ".")}"
-            }
+    // ✅ الحل الاحترافي: استخدام التفعيل التلقائي عند تحميل إضافة الأندرويد
+    plugins.withType<com.android.build.gradle.api.AndroidBasePlugin> {
+        val android = project.extensions.getByName("android") as com.android.build.gradle.BaseExtension
+        
+        // تعيين Namespace تلقائي إذا كان مفقوداً في أي مكتبة قديمة
+        if (android.namespace == null) {
+            android.namespace = "fix.${project.name.replace("-", ".")}"
         }
     }
 }
