@@ -252,11 +252,12 @@ void _attachForegroundNotificationListener() {
         icon: 'ic_stat_lpro',
       );
 
+      // ✅ تم التعديل: رفع مستوى التنبيه لضمان صوت قوي وظهور في القائمة
       const iosDetails = DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
-        interruptionLevel: InterruptionLevel.critical,
+        interruptionLevel: InterruptionLevel.timeSensitive,
       );
 
       final details = NotificationDetails(
