@@ -28,16 +28,24 @@ import UserNotifications
       print("✅ [Firebase] Configured programmatically")
     }
     
-    // 2️⃣ ضبط مفوض الإشعارات (بدون casting)
+    // 2️⃣ ضبط مفوض الإشعارات
     if #available(iOS 10.0, *) {
       UNUserNotificationCenter.current().delegate = self
     }
     
-    // 3️⃣ ضبط مفوض Firebase Messaging (بدون casting)
+    // 3️⃣ ضبط مفوض Firebase Messaging
     Messaging.messaging().delegate = self
     
     // 4️⃣ تسجيل إضافات Flutter
     GeneratedPluginRegistrant.register(with: self)
+
+    // ✅ [تعديل النسخة 44]: تصفير عداد الإشعارات فور تشغيل التطبيق
+    // هذا يضمن اختفاء الرقم من الأيقونة بمجرد دخول المستخدم للتطبيق
+    if #available(iOS 10.0, *) {
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+    }
+    UIApplication.shared.applicationIconBadgeNumber = 0
+    print("🧹 [Badge] Icon badge and notification center cleared on launch")
     
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
@@ -72,7 +80,7 @@ import UserNotifications
     print("🔔 [FCM] Notification received in FOREGROUND:")
     print(userInfo)
     
-    // ✅ Show notification even when app is open
+    // ✅ السماح بظهور الصوت والراية والرقم أثناء فتح التطبيق
     if #available(iOS 14.0, *) {
       completionHandler([[.banner, .sound, .badge]])
     } else {
@@ -92,6 +100,9 @@ import UserNotifications
     print("🔔 [FCM] Notification tapped:")
     print(userInfo)
     
+    // تصفير العداد عند النقر على الإشعار أيضاً
+    UIApplication.shared.applicationIconBadgeNumber = 0
+    
     completionHandler()
   }
 }
@@ -101,7 +112,6 @@ extension AppDelegate: MessagingDelegate {
   func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
     print("🔥 [FCM] Token: \(fcmToken ?? "nil")")
     
-    // Optional: Send to your backend
     let dataDict: [String: String] = ["token": fcmToken ?? ""]
     NotificationCenter.default.post(
       name: Notification.Name("FCMToken"),
