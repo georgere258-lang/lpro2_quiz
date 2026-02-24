@@ -7,7 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_app_badger/flutter_app_badger.dart'; // ✅ الاستيراد الجديد
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/services/app_config_service.dart';
@@ -50,10 +50,8 @@ class _MainWrapperState extends State<MainWrapper> {
 
     _loadNotifications();
 
-    // الاستماع للإشعارات وتحديث الواجهة فوراً عند الاستلام والتطبيق مفتوح
     FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
       if (mounted) {
-        // 🔥 التأخير الذكي (1000ms) لضمان كتابة البيانات في الذاكرة أولاً في الآيفون
         await Future.delayed(const Duration(milliseconds: 1000));
         await _loadNotifications();
         setState(() {
@@ -63,11 +61,9 @@ class _MainWrapperState extends State<MainWrapper> {
     });
   }
 
-  // دالة تحميل الإشعارات المحسنة للأيفون
   Future<void> _loadNotifications() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      // 🔥 إعادة تحميل ملف الإعدادات لضمان قراءة البيانات الجديدة من القرص (iOS)
       if (Platform.isIOS) await prefs.reload();
 
       final String? notifsString = prefs.getString('saved_notifications');
@@ -88,6 +84,22 @@ class _MainWrapperState extends State<MainWrapper> {
   Future<void> _markAllAsRead() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+
+      // ✅ الحل النهائي: مسح الرقم من أيقونة الأبل (iOS) بأمان وبدون أخطاء
+      if (Platform.isIOS) {
+        final FlutterLocalNotificationsPlugin notificationsPlugin =
+            FlutterLocalNotificationsPlugin();
+
+        // استخدمنا dynamic لتجاوز تعليق المحرر وضمان تنفيذ الأمر برمجياً
+        final dynamic iosImplementation =
+            notificationsPlugin.resolvePlatformSpecificImplementation<
+                IOSFlutterLocalNotificationsPlugin>();
+
+        if (iosImplementation != null) {
+          await iosImplementation.setApplicationIconBadgeNumber(0);
+        }
+      }
+
       bool changed = false;
       for (var n in _notifications) {
         if (n['isNew'] == true) {
@@ -304,20 +316,6 @@ class _MainWrapperState extends State<MainWrapper> {
   }
 
   void _showNotificationSheet() {
-    // ✅ الطريقة النهائية لمسح الرقم (Badge) باستخدام المكتبة الجديدة
-    try {
-      FlutterAppBadger.removeBadge();
-    } catch (e) {
-      debugPrint("Badge remove error: $e");
-    }
-
-    // ✅ مسح التنبيه البصري في iOS
-    if (Platform.isIOS) {
-      FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
-        badge: false,
-      );
-    }
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
