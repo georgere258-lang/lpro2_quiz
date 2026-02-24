@@ -97,10 +97,10 @@ Future<void> _postBootstrap() async {
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings(
-      requestAlertPermission: false, // ✅ تم التعديل ليكون الطلب من اللوجن
-      requestBadgePermission: false, // ✅ تم التعديل ليكون الطلب من اللوجن
-      requestSoundPermission: false, // ✅ تم التعديل ليكون الطلب من اللوجن
-      requestCriticalPermission: true, // مهم جداً لأصوات الأيفون
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+      requestCriticalPermission: true,
     );
 
     final initSettings = InitializationSettings(
@@ -134,19 +134,17 @@ Future<void> _postBootstrap() async {
     _attachOnMessageOpenedListener();
     await _handleInitialMessageIfAny();
 
-    // 🔥 تم حذف كود messaging.requestPermission من هنا تماماً لضمان عدم الطلب المبكر
-
-    // 🔥 خاص بـ Apple: إظهار التنبيه والنقطة والصوت حتى والتطبيق مفتوح
+    // 🔥 خاص بـ Apple: إظهار التنبيه والصوت ومنع تعليق الرقم والتطبيق مفتوح
     if (Platform.isIOS) {
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
         alert: true,
-        badge: true,
+        badge:
+            false, // ✅ تم التعديل لضمان اختفاء الرقم فوراً عند استخدام كود المسح في الـ Wrapper
         sound: true,
       );
     }
 
-    // 🔥 المزامنة القسرية الآمنة: تعمل في الخلفية بعد 5 ثوانٍ لضمان استقرار التطبيق
     Future.delayed(const Duration(seconds: 5), () async {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
@@ -258,7 +256,7 @@ void _attachForegroundNotificationListener() {
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
-        interruptionLevel: InterruptionLevel.critical, // يضمن سماع الصوت بقوة
+        interruptionLevel: InterruptionLevel.critical,
       );
 
       final details = NotificationDetails(
