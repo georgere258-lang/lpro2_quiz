@@ -134,13 +134,12 @@ Future<void> _postBootstrap() async {
     _attachOnMessageOpenedListener();
     await _handleInitialMessageIfAny();
 
-    // 🔥 خاص بـ Apple: إظهار التنبيه والصوت ومنع تعليق الرقم والتطبيق مفتوح
+    // 🔥 خاص بـ Apple: إظهار التنبيه والصوت ومنع تعليق الرقم والتطبيق مفتوح (نفس نسخة 45)
     if (Platform.isIOS) {
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
         alert: true,
-        badge:
-            false, // ✅ تم التعديل لضمان اختفاء الرقم فوراً عند استخدام كود المسح في الـ Wrapper
+        badge: false,
         sound: true,
       );
     }
@@ -252,12 +251,12 @@ void _attachForegroundNotificationListener() {
         icon: 'ic_stat_lpro',
       );
 
-      // ✅ تم التعديل: رفع مستوى التنبيه لضمان صوت قوي وظهور في القائمة
+      // ✅ بقاء إعدادات النسخة 45 لضمان الصوت القوي
       const iosDetails = DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
-        interruptionLevel: InterruptionLevel.timeSensitive,
+        interruptionLevel: InterruptionLevel.critical,
       );
 
       final details = NotificationDetails(
@@ -416,9 +415,23 @@ Future<void> _saveNotificationLocally(RemoteMessage message) async {
     }
 
     await prefs.setString('saved_notifications', jsonEncode(notifs));
+
+    // ✅ التعديل الوحيد: إرسال إشارة تحديث داخلية لشاشة MainWrapper (آمن 100%)
+    NotificationCenter().post(name: "refresh_notifications");
   } catch (e) {
     debugPrint('LPro Notification Save Error: $e');
   }
+}
+
+// ✅ فئة مساعدة للإشعارات الداخلية (تُضاف لمرة واحدة)
+class NotificationCenter {
+  static final NotificationCenter _instance = NotificationCenter._internal();
+  factory NotificationCenter() => _instance;
+  NotificationCenter._internal();
+
+  final _controller = StreamController<String>.broadcast();
+  Stream<String> get stream => _controller.stream;
+  void post({required String name}) => _controller.add(name);
 }
 
 class LProApp extends StatefulWidget {
