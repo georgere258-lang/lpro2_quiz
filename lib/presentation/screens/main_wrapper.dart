@@ -1,7 +1,8 @@
 // PATH: lib/presentation/screens/main_wrapper.dart
-// STATUS: FIXED SEAMLESS INTEGRATION ✅ (Real Local Storage Notifications)
+// STATUS: OPTIMIZED FOR iOS NOTIFICATIONS ✅
 
 import 'dart:convert';
+import 'dart:io'; // أضفنا هذا للتحقق من نوع المنصة
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -31,7 +32,6 @@ class _MainWrapperState extends State<MainWrapper> {
   late final List<Widget> _pages;
   final User? _user = FirebaseAuth.instance.currentUser;
 
-  // ✅ متغيرات الذاكرة المحلية للإشعارات
   List<dynamic> _notifications = [];
   bool _hasNewNotification = false;
 
@@ -49,12 +49,14 @@ class _MainWrapperState extends State<MainWrapper> {
       const ChatSupportScreen(),
     ];
 
-    // ✅ تحميل الإشعارات فور فتح التطبيق
     _loadNotifications();
 
-    // ✅ الاستماع للإشعارات الجديدة والتطبيق مفتوح لتفعيل النقطة الحمراء فوراً
-    FirebaseMessaging.onMessage.listen((_) {
+    // ✅ تعديل الاستماع للإشعارات ليتوافق مع آيفون
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
       if (mounted) {
+        // في الأيفون، نحتاج للتأكد من حفظ الإشعار أولاً ثم إعادة تحميل القائمة
+        // لضمان ظهور الإشعار الجديد في الـ Sheet فور وصوله والتطبيق مفتوح
+        await _loadNotifications();
         setState(() {
           _hasNewNotification = true;
         });
@@ -62,19 +64,19 @@ class _MainWrapperState extends State<MainWrapper> {
     });
   }
 
-  // =========================================================
-  // ✅ دوال التعامل مع ذاكرة الإشعارات المحلية
-  // =========================================================
+  // ✅ دالة تحميل الإشعارات - تم تحسينها
   Future<void> _loadNotifications() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      // تأكد من عمل reload للـ prefs في حالة الأيفون لضمان قراءة أحدث القيم المكتوبة من main.dart
+      if (Platform.isIOS) await prefs.reload();
+
       final String? notifsString = prefs.getString('saved_notifications');
       if (notifsString != null) {
         final List<dynamic> loaded = jsonDecode(notifsString);
         if (mounted) {
           setState(() {
             _notifications = loaded;
-            // النقطة الحمراء تظهر لو فيه أي إشعار حالته isNew == true
             _hasNewNotification = loaded.any((n) => n['isNew'] == true);
           });
         }
@@ -118,7 +120,6 @@ class _MainWrapperState extends State<MainWrapper> {
     if (diff.inMinutes > 0) return "منذ ${diff.inMinutes} دقيقة";
     return "الآن";
   }
-  // =========================================================
 
   void _handleSupportPressed() {
     if (AppConfigService().supportChatEnabled) {
@@ -218,11 +219,8 @@ class _MainWrapperState extends State<MainWrapper> {
               color: Colors.white, size: 26),
         ),
         onPressed: () async {
-          // 1. تحديث القائمة قبل الفتح لضمان عرض أحدث الإشعارات
           await _loadNotifications();
-          // 2. فتح الشاشة
           _showNotificationSheet();
-          // 3. مسح النقطة الحمراء وتحديث حالة الإشعارات لـ "مقروءة"
           _markAllAsRead();
         },
       ),
@@ -307,7 +305,6 @@ class _MainWrapperState extends State<MainWrapper> {
     );
   }
 
-  // ✅ النافذة المنبثقة المتصلة بالذاكرة الحقيقية
   void _showNotificationSheet() {
     showModalBottomSheet(
       context: context,
@@ -376,10 +373,7 @@ class _MainWrapperState extends State<MainWrapper> {
                             time: _getTimeAgo(notif['timestamp'] ??
                                 DateTime.now().millisecondsSinceEpoch),
                             isNew: notif['isNew'] ?? false,
-                            onTap: () {
-                              // إذا أردت مستقبلاً توجيه المستخدم لمكان معين عند ضغط الإشعار من القائمة
-                              // Navigator.pop(context);
-                            },
+                            onTap: () {},
                           );
                         },
                       ),
