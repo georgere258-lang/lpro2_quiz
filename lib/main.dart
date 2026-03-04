@@ -142,14 +142,8 @@ Future<void> _postBootstrap() async {
     _attachOnMessageOpenedListener();
     await _handleInitialMessageIfAny();
 
-    if (Platform.isIOS) {
-      await FirebaseMessaging.instance
-          .setForegroundNotificationPresentationOptions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-    }
+    // ❌ تم حذف كتلة setForegroundNotificationPresentationOptions هنا للـ iOS
+    // لترك الصلاحية الكاملة لملف AppDelegate.swift لضمان تخطي صفحة الروبوت
 
     Future.delayed(const Duration(seconds: 5), () async {
       final user = FirebaseAuth.instance.currentUser;
