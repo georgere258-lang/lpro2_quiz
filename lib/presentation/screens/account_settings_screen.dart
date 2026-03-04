@@ -2,10 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:cloud_functions/cloud_functions.dart'; // تأكد من وجودها في pubspec.yaml
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/utils/sound_manager.dart';
 import 'login_screen.dart';
 
 class AccountSettingsScreen extends StatefulWidget {
@@ -22,7 +21,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // ✅ التصحيح: استخدام FirebaseFunctions.instance
       final HttpsCallable callable =
           FirebaseFunctions.instance.httpsCallable('deleteMyAccount');
       final result = await callable.call();
@@ -63,6 +61,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
             canPop: !_isLoading,
             child: AlertDialog(
               backgroundColor: Colors.white,
+              surfaceTintColor: Colors.white,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20)),
               title: Row(
@@ -118,6 +117,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor:
                         isTextCorrect ? Colors.redAccent : Colors.grey.shade300,
+                    elevation: 0,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
                   ),
@@ -142,12 +142,15 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     const primaryTeal = Color(0xFF1E4D4D);
-    // جلب رقم الهاتف من FirebaseAuth
     final user = FirebaseAuth.instance.currentUser;
     final String userPhone = user?.phoneNumber ?? "غير متوفر";
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7F8),
+
+      // ✅ [FIX] Apple Jitter Protection: Fixed background for stability
+      resizeToAvoidBottomInset: false,
+
       appBar: AppBar(
         title: Text("إعدادات الحساب",
             style: GoogleFonts.cairo(
@@ -158,49 +161,54 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         elevation: 0,
         centerTitle: true,
       ),
-      body: Stack(
-        children: [
-          Directionality(
-            textDirection: TextDirection.rtl,
-            child: ListView(
-              padding: const EdgeInsets.all(22),
-              children: [
-                Text("بيانات الحساب",
-                    style: GoogleFonts.cairo(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: primaryTeal)),
-                const SizedBox(height: 16),
-                _buildStaticTile(
-                  title: "رقم الهاتف المسجل",
-                  subtitle: userPhone,
-                  icon: Icons.phone_android_rounded,
-                  color: primaryTeal,
-                ),
-                const SizedBox(height: 32),
-                Text("الأمان والخصوصية",
-                    style: GoogleFonts.cairo(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: primaryTeal)),
-                const SizedBox(height: 16),
-                _buildSettingTile(
-                  title: "حذف الحساب نهائياً",
-                  subtitle: "مسح بياناتك وفقاً لسياسة آبل",
-                  icon: Icons.delete_outline_rounded,
-                  color: Colors.redAccent,
-                  onTap: _showPermanentDeleteDialog,
-                ),
-              ],
+      body: MediaQuery(
+        // ✅ [FIX] Red Screen Protection: Ensure layout consistency
+        data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
+        child: Stack(
+          children: [
+            Directionality(
+              textDirection: TextDirection.rtl,
+              child: ListView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.all(22),
+                children: [
+                  Text("بيانات الحساب",
+                      style: GoogleFonts.cairo(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: primaryTeal)),
+                  const SizedBox(height: 16),
+                  _buildStaticTile(
+                    title: "رقم الهاتف المسجل",
+                    subtitle: userPhone,
+                    icon: Icons.phone_android_rounded,
+                    color: primaryTeal,
+                  ),
+                  const SizedBox(height: 32),
+                  Text("الأمان والخصوصية",
+                      style: GoogleFonts.cairo(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: primaryTeal)),
+                  const SizedBox(height: 16),
+                  _buildSettingTile(
+                    title: "حذف الحساب نهائياً",
+                    subtitle: "مسح بياناتك وفقاً لسياسة آبل",
+                    icon: Icons.delete_outline_rounded,
+                    color: Colors.redAccent,
+                    onTap: _showPermanentDeleteDialog,
+                  ),
+                ],
+              ),
             ),
-          ),
-          if (_isLoading)
-            Container(
-              color: Colors.black.withOpacity(0.3),
-              child: const Center(
-                  child: CircularProgressIndicator(color: primaryTeal)),
-            ),
-        ],
+            if (_isLoading)
+              Container(
+                color: Colors.black.withValues(alpha: 0.3),
+                child: const Center(
+                    child: CircularProgressIndicator(color: primaryTeal)),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -216,7 +224,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 10,
               offset: const Offset(0, 4))
         ],
@@ -225,7 +233,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12)),
           child: Icon(icon, color: color, size: 22),
         ),
@@ -257,7 +265,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 10,
               offset: const Offset(0, 4))
         ],
@@ -267,7 +275,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12)),
           child: Icon(icon, color: color, size: 22),
         ),
@@ -291,6 +299,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
       builder: (context) => Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
+          surfaceTintColor: Colors.white,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text("تم حذف الحساب",
