@@ -1,7 +1,7 @@
 // PATH: lib/presentation/screens/main_wrapper.dart
 import 'dart:convert';
 import 'dart:io';
-import 'dart:async'; // ✅ أضفنا هذا لتنظيم الاستماع
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -38,14 +38,13 @@ class _MainWrapperState extends State<MainWrapper> {
   List<dynamic> _notifications = [];
   bool _hasNewNotification = false;
 
-  // ✅ تعريف متغير لإدارة الاستماع فور وصول إشعار
   StreamSubscription? _refreshSub;
 
   @override
   void initState() {
     super.initState();
     if (widget.initialIndex != null) {
-      _currentIndex = widget.initialIndex!.clamp(0, 2);
+      _currentIndex = widget.initialIndex!.clamp(0, 3); // تعديل للتأكد من المدى
     }
 
     _pages = [
@@ -57,7 +56,6 @@ class _MainWrapperState extends State<MainWrapper> {
 
     _loadNotifications();
 
-    // ✅ الاستماع لإشارة "تحديث الجرس" القادمة من main.dart لضمان التحديث اللحظي
     _refreshSub = NotificationCenter().stream.listen((name) {
       if (name == "refresh_notifications" && mounted) {
         _loadNotifications();
@@ -75,7 +73,6 @@ class _MainWrapperState extends State<MainWrapper> {
     });
   }
 
-  // ✅ تنظيف الاستماع عند إغلاق الشاشة لضمان استقرار أداء الهاتف
   @override
   void dispose() {
     _refreshSub?.cancel();
@@ -103,26 +100,17 @@ class _MainWrapperState extends State<MainWrapper> {
   }
 
   Future<void> _markAllAsRead() async {
-    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    debugPrint('🔔 [NOTIFICATION] _markAllAsRead started...');
-
     try {
       final prefs = await SharedPreferences.getInstance();
 
       if (Platform.isIOS) {
         final FlutterLocalNotificationsPlugin notificationsPlugin =
             FlutterLocalNotificationsPlugin();
-
         final dynamic iosImplementation =
             notificationsPlugin.resolvePlatformSpecificImplementation<
                 IOSFlutterLocalNotificationsPlugin>();
-
         if (iosImplementation != null) {
           await iosImplementation.setApplicationIconBadgeNumber(0);
-          debugPrint(
-              '✅ [iOS BADGE] setApplicationIconBadgeNumber(0) executed successfully');
-        } else {
-          debugPrint('⚠️ [iOS BADGE] IOSImplementation is NULL');
         }
       }
 
@@ -137,8 +125,6 @@ class _MainWrapperState extends State<MainWrapper> {
       if (changed) {
         await prefs.setString(
             'saved_notifications', jsonEncode(_notifications));
-        debugPrint(
-            '✅ [LOCAL STORE] saved_notifications updated (marks as read)');
       }
 
       if (mounted) {
@@ -146,11 +132,9 @@ class _MainWrapperState extends State<MainWrapper> {
           _hasNewNotification = false;
         });
       }
-      debugPrint('🔔 [NOTIFICATION] _markAllAsRead completed.');
     } catch (e) {
-      debugPrint("🔴 [ERROR] in _markAllAsRead: $e");
+      debugPrint("Error in _markAllAsRead: $e");
     }
-    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   }
 
   String _getTimeAgo(int timestamp) {
@@ -186,6 +170,10 @@ class _MainWrapperState extends State<MainWrapper> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.scaffoldBackground,
+
+      // ✅ [FIX] Apple Jitter Protection: Prevent UI resizing when keyboard appears
+      resizeToAvoidBottomInset: false,
+
       appBar: _buildDynamicAppBar(),
       body: Stack(
         children: [
@@ -240,8 +228,10 @@ class _MainWrapperState extends State<MainWrapper> {
       return _buildHomeAppBar();
     } else if (_currentIndex == 1) {
       return _buildCustomTitleAppBar("ترتيب L Pro");
-    } else {
+    } else if (_currentIndex == 2) {
       return _buildCustomTitleAppBar("ملفي الشخصي");
+    } else {
+      return _buildCustomTitleAppBar("الدعم الفني");
     }
   }
 
