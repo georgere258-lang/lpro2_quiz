@@ -138,9 +138,6 @@ Future<void> _postBootstrap() async {
           ?.createNotificationChannel(channel);
     }
 
-    // ✅ تصفير الـ Badge عند فتح التطبيق
-    await NotificationCenter().clearBadge();
-
     _attachForegroundNotificationListener();
     _attachOnMessageOpenedListener();
     await _handleInitialMessageIfAny();
