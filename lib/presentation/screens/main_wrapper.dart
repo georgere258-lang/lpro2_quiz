@@ -43,6 +43,10 @@ class _MainWrapperState extends State<MainWrapper> {
   @override
   void initState() {
     super.initState();
+
+    // ✅ [تعديل النسخة 51] تصفير الأيقونة الخارجية بأمان فور الدخول للتطبيق
+    NotificationCenter().clearBadge();
+
     if (widget.initialIndex != null) {
       _currentIndex = widget.initialIndex!.clamp(0, 3);
     }
@@ -104,7 +108,7 @@ class _MainWrapperState extends State<MainWrapper> {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // ✅ تصفير الـ Badge الخارجي فوراً
+      // ✅ تصفير الـ Badge الخارجي فوراً عند فتح القائمة
       await NotificationCenter().clearBadge();
 
       bool changed = false;
