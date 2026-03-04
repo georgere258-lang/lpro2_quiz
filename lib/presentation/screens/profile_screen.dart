@@ -76,10 +76,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.scaffoldBackground,
-
-      // ✅ [FIX] Apple Jitter Protection: Prevent background UI resizing
       resizeToAvoidBottomInset: false,
-
       body: Directionality(
         textDirection: TextDirection.rtl,
         child: StreamBuilder<DocumentSnapshot>(
@@ -128,8 +125,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       userModel.proPoints,
                     ),
                     const SizedBox(height: 35),
-
-                    // 1. زر الآدمن (إن وُجد)
                     if (userModel.role == 'admin' ||
                         userModel.role == 'moderator' ||
                         userModel.role == 'manager')
@@ -145,8 +140,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         },
                         iconColor: safetyOrange,
                       ),
-
-                    // 2. زر تغيير الاسم
                     _buildProfileBtn(
                       "تغيير الاسم",
                       Icons.edit_rounded,
@@ -155,8 +148,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _showRenameBottomSheet();
                       },
                     ),
-
-                    // 3. دعوة برو جديد
                     _buildProfileBtn(
                       "دعوة Pro جديد",
                       Icons.person_add_rounded,
@@ -165,8 +156,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         _invitePro();
                       },
                     ),
-
-                    // 4. حول التطبيق
                     _buildProfileBtn(
                       "حول L Pro",
                       Icons.info_outline_rounded,
@@ -178,8 +167,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 builder: (_) => const AboutScreen()));
                       },
                     ),
-
-                    // 5. الدعم والمساعدة
                     _buildProfileBtn(
                       "الدعم والمساعدة",
                       Icons.support_agent_rounded,
@@ -194,8 +181,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       },
                       iconColor: deepTeal,
                     ),
-
-                    // 6. إعدادات الحساب والخصوصية
                     _buildProfileBtn(
                       "إعدادات الحساب والخصوصية",
                       Icons.shield_outlined,
@@ -209,8 +194,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       },
                       iconColor: deepTeal,
                     ),
-
-                    // 7. تسجيل الخروج
                     _buildProfileBtn(
                       "تسجيل الخروج",
                       Icons.logout_rounded,
@@ -460,13 +443,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (!mounted) return;
 
-    showModalBottomSheet(
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Scaffold(
         backgroundColor: Colors.transparent,
-        // ✅ [FIX] Allow the sheet to lift with the keyboard while keeping background fixed
         resizeToAvoidBottomInset: true,
         body: GestureDetector(
           onTap: () => Navigator.pop(context),
@@ -474,7 +456,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             color: Colors.transparent,
             alignment: Alignment.bottomCenter,
             child: GestureDetector(
-              onTap: () {}, // Prevent closing when tapping inside the container
+              onTap: () {},
               child: Container(
                 padding: EdgeInsets.only(
                   bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -524,7 +506,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () => _handleRename(nameController.text),
+                        onPressed: () {
+                          // ✅ إغلاق الكيبورد فوراً
+                          FocusScope.of(context).unfocus();
+                          _handleRename(nameController.text);
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: deepTeal,
                           padding: const EdgeInsets.symmetric(vertical: 14),
@@ -547,6 +533,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
+
+    // ✅ التعديل الجوهري: تنظيف الذاكرة بعد إغلاق النافذة بـ 500ms لمنع الشاشة البيضاء
+    Future.delayed(const Duration(milliseconds: 500), () {
+      nameController.dispose();
+    });
   }
 
   Future<void> _handleRename(String newName) async {
