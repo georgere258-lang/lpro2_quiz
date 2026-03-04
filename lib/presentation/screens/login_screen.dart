@@ -468,11 +468,11 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ✅ [تعديل النسخة 52] إجبار الأرقام اللاتينية (English) ومنع تعريب iOS
+  // ✅ [تعديل النسخة 54] استخدام خط Poppins اللاتيني حصرياً لمنع الكيبورد من الانقلاب لعربي
   Widget _buildOtpInput() {
     return Localizations.override(
       context: context,
-      locale: const Locale('en', 'US'), // ← فرض البيئة الإنجليزية على Autofill
+      locale: const Locale('en', 'US'), // فرض البيئة الإنجليزية على Autofill
       child: Builder(
         builder: (localizedContext) {
           return SizedBox(
@@ -490,16 +490,17 @@ class _LoginScreenState extends State<LoginScreen> {
               inputFormatters: [
                 FilteringTextInputFormatter.digitsOnly,
                 LengthLimitingTextInputFormatter(6),
-                _LatinDigitsFormatter(), // ← مُحول الأرقام الاحترافي لضمان 123
+                _LatinDigitsFormatter(), // مُحول الأرقام لضمان 123
               ],
               showCursor: true,
               style: GoogleFonts.poppins(
+                // ← استخدام خط Poppins يثبّت الكيبورد الإنجليزي
                 color: Colors.black,
                 fontSize: 22,
                 height: 1.0,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 6,
-                locale: const Locale('en', 'US'), // ← فرض رسم الخط اللاتيني
+                locale: const Locale('en', 'US'),
               ),
               decoration: InputDecoration(
                 hintText: "••••••",
@@ -518,7 +519,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               ),
-              onChanged: (_) {},
               onEditingComplete: () {
                 FocusScope.of(context).unfocus();
               },
@@ -530,7 +530,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// ✅ [مُلحق النسخة 52] كلاس احترافي لتحويل الأرقام العربية/الهندية إلى لاتينية فوراً
+// ✅ كلاس احترافي لتحويل الأرقام العربية/الهندية إلى لاتينية فوراً
 class _LatinDigitsFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
