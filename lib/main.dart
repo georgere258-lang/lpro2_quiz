@@ -102,11 +102,13 @@ Future<void> _postBootstrap() async {
     SoundManager.init();
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    // ✅ تم إيقاف طلب الأذونات التلقائي لنظام iOS هنا
     const iosInit = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-      requestCriticalPermission: true,
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+      requestCriticalPermission: false,
     );
 
     final initSettings = InitializationSettings(
