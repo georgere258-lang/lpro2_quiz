@@ -1,16 +1,16 @@
 // PATH: lib/presentation/screens/login_screen.dart
-// STATUS: FIXED & OPTIMIZED (iOS Critical Alert Audio Support Added)
+// STATUS: iOS-SAFE OTP (Single Field + Stable Keyboard + Apple-friendly)
 
-import 'dart:async'; // ✅ For Timeout handling
-import 'dart:io'; // ✅ إضافة مكتبة الـ IO للتحقق من نظام آيفون
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
-// استيراد الثوابت والصفحات حسب الهيكل المعتمد
 import '../../core/constants/app_colors.dart';
 import 'main_wrapper.dart';
 
@@ -28,32 +28,27 @@ class _LoginScreenState extends State<LoginScreen> {
   String verificationId = "";
 
   final TextEditingController phoneController = TextEditingController();
-  final List<TextEditingController> otpControllers =
-      List.generate(6, (index) => TextEditingController());
-  final List<FocusNode> otpFocusNodes =
-      List.generate(6, (index) => FocusNode());
 
-  // ✅ UID الأدمن الأساسي (نفس اللي مستخدمه في تفعيل إشعارات الإدارة)
+  // ✅ iOS-safe: OTP in ONE field
+  final TextEditingController otpController = TextEditingController();
+  final FocusNode otpFocusNode = FocusNode();
+
   static const String _bootAdminUid = 'nw2CackXK6PQavoGPAAbhyp6d1R2';
 
-  // دالة تفعيل الإشعارات مع طلب الإذن الرسمي
   void _activateNotifications(String uid) async {
     try {
-      // طلب الإذن لأجهزة أندرويد الحديثة و iOS مع تفعيل التنبيهات الحرجة للصوت
       NotificationSettings settings =
           await FirebaseMessaging.instance.requestPermission(
         alert: true,
         badge: true,
         sound: true,
-        criticalAlert:
-            true, // ✅ الإضافة المطلوبة لضمان عمل الصوت القوي في الأيفون
-        announcement: true, // ✅ مطلوب لضمان تفعيل قنوات الصوت في iOS الحديث
+        criticalAlert: true,
+        announcement: true,
       );
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        FirebaseMessaging messaging = FirebaseMessaging.instance;
+        final messaging = FirebaseMessaging.instance;
 
-        // 🔥 الخطوة الجوهرية للأيفون: ربط التوكن مع APNS لتفعيل الصوت والتنبيهات
         if (Platform.isIOS) {
           await messaging.getAPNSToken();
         }
@@ -61,7 +56,6 @@ class _LoginScreenState extends State<LoginScreen> {
         await messaging.subscribeToTopic('all_users');
         await messaging.subscribeToTopic(uid);
 
-        // التحقق من الـ UID الخاص بالمسؤول لتفعيل إشعارات الإدارة
         if (uid == _bootAdminUid) {
           await messaging.subscribeToTopic('admin_notifications');
         }
@@ -101,11 +95,11 @@ class _LoginScreenState extends State<LoginScreen> {
             isOtpStage = true;
             isLoading = false;
           });
-          // تركيز تلقائي على أول حقل OTP
-          Future.delayed(const Duration(milliseconds: 300), () {
-            if (otpFocusNodes.isNotEmpty) {
-              otpFocusNodes[0].requestFocus();
-            }
+
+          // ✅ stable focus (iPad safe)
+          Future.delayed(const Duration(milliseconds: 350), () {
+            if (!mounted) return;
+            otpFocusNode.requestFocus();
           });
         },
         codeAutoRetrievalTimeout: (String verId) {
@@ -120,7 +114,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _verifyOtp() async {
-    String otp = otpControllers.map((e) => e.text).join();
+    final otp = otpController.text.trim();
+
     if (otp.length < 6) {
       _showSnackBar("يرجى إدخال الـ 6 أرقام كاملة", Colors.orange);
       return;
@@ -129,7 +124,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => isLoading = true);
 
     try {
-      PhoneAuthCredential credential = PhoneAuthProvider.credential(
+      final credential = PhoneAuthProvider.credential(
         verificationId: verificationId,
         smsCode: otp,
       );
@@ -141,7 +136,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // ✅ الدالة المعدلة والمحمية (Self-Healing Logic)
   void _navigateUser() async {
     final user = FirebaseAuth.instance.currentUser;
     final String? uid = user?.uid;
@@ -152,15 +146,12 @@ class _LoginScreenState extends State<LoginScreen> {
         final statsRef = FirebaseFirestore.instance.collection('user_stats');
         final userRef = usersRef.doc(user.uid);
 
-        // ✅ 1. حماية ضد النت البطيء (Timeout 10s)
         final userDoc =
             await userRef.get().timeout(const Duration(seconds: 10));
 
         final isBootAdmin = user.uid == _bootAdminUid;
 
-        // ✅ 2. إصلاح مشكلة المستخدم المحذوف أو الجديد (If not exists -> Create)
         if (!userDoc.exists) {
-          // إنشاء مستند المستخدم الأساسي مع الحقول المطلوبة في الـ Rules
           await userRef.set({
             'uid': user.uid,
             'name': "عضو L Pro جديد",
@@ -171,14 +162,13 @@ class _LoginScreenState extends State<LoginScreen> {
             'dailyStarsRounds': 0,
             'dailyProsRounds': 0,
             'dailyFreePlayRounds': 0,
-            'role': isBootAdmin ? 'admin' : 'user', // شرط الـ Rules
-            'isBlocked': false, // 🔥 حقل إلزامي حسب الـ Rules لنجاح الـ Create
+            'role': isBootAdmin ? 'admin' : 'user',
+            'isBlocked': false,
             'lastQuizDate': FieldValue.serverTimestamp(),
             'createdAt': FieldValue.serverTimestamp(),
             'updatedAt': FieldValue.serverTimestamp(),
           });
 
-          // ✅ إنشاء مستند الإحصائيات فوراً لضمان عدم فشل الجولات لاحقاً
           await statsRef.doc(user.uid).set({
             'updatedAt': FieldValue.serverTimestamp(),
             'stars': {
@@ -204,7 +194,6 @@ class _LoginScreenState extends State<LoginScreen> {
             },
           });
         } else {
-          // ✅ 3. تحديث البيانات للمستخدم الموجود
           final data = userDoc.data() ?? {};
           final currentRole = (data['role'] ?? '').toString();
 
@@ -221,8 +210,7 @@ class _LoginScreenState extends State<LoginScreen> {
             patch['phone'] = user.phoneNumber ?? phoneController.text;
           }
 
-          if (patch.length > 1 ||
-              (patch.length == 1 && patch['updatedAt'] != null)) {
+          if (patch.length > 1) {
             await userRef.set(patch, SetOptions(merge: true));
           }
         }
@@ -235,9 +223,10 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => isLoading = false);
 
       Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (c) => const MainWrapper()));
+        context,
+        MaterialPageRoute(builder: (c) => const MainWrapper()),
+      );
 
-      // ✅ تفعيل الإشعارات بعد الدخول
       if (uid != null) {
         Future.delayed(const Duration(milliseconds: 600), () {
           _activateNotifications(uid);
@@ -249,20 +238,17 @@ class _LoginScreenState extends State<LoginScreen> {
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-          content: Text(message, style: GoogleFonts.cairo()),
-          backgroundColor: color),
+        content: Text(message, style: GoogleFonts.cairo()),
+        backgroundColor: color,
+      ),
     );
   }
 
   @override
   void dispose() {
     phoneController.dispose();
-    for (var c in otpControllers) {
-      c.dispose();
-    }
-    for (var n in otpFocusNodes) {
-      n.dispose();
-    }
+    otpController.dispose();
+    otpFocusNode.dispose();
     super.dispose();
   }
 
@@ -294,45 +280,55 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        SvgPicture.asset('assets/logo.svg',
-                            height: 110,
-                            placeholderBuilder: (c) => const Icon(
-                                Icons.business,
-                                size: 80,
-                                color: Colors.white)),
+                        SvgPicture.asset(
+                          'assets/logo.svg',
+                          height: 110,
+                          placeholderBuilder: (c) => const Icon(
+                            Icons.business,
+                            size: 80,
+                            color: Colors.white,
+                          ),
+                        ),
                         const SizedBox(height: 12),
-                        Text("المعلومة بتفرق",
-                            style: GoogleFonts.cairo(
-                                color: AppColors.secondaryOrange,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                shadows: [
-                                  Shadow(
-                                    offset: const Offset(0, 2),
-                                    blurRadius: 8.0,
-                                    color: Colors.black.withValues(alpha: 0.3),
-                                  ),
-                                ])),
+                        Text(
+                          "المعلومة بتفرق",
+                          style: GoogleFonts.cairo(
+                            color: AppColors.secondaryOrange,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            shadows: [
+                              Shadow(
+                                offset: const Offset(0, 2),
+                                blurRadius: 8.0,
+                                color: Colors.black.withValues(alpha: 0.3),
+                              ),
+                            ],
+                          ),
+                        ),
                         const SizedBox(height: 60),
-                        Text(isOtpStage ? "تأكيد الرمز" : "تسجيل الدخول",
-                            style: GoogleFonts.cairo(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                shadows: [
-                                  Shadow(
-                                    offset: const Offset(0, 3),
-                                    blurRadius: 10.0,
-                                    color: Colors.black.withValues(alpha: 0.4),
-                                  ),
-                                ])),
+                        Text(
+                          isOtpStage ? "تأكيد الرمز" : "تسجيل الدخول",
+                          style: GoogleFonts.cairo(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            shadows: [
+                              Shadow(
+                                offset: const Offset(0, 3),
+                                blurRadius: 10.0,
+                                color: Colors.black.withValues(alpha: 0.4),
+                              ),
+                            ],
+                          ),
+                        ),
                         const SizedBox(height: 10),
                         Text(
-                            isOtpStage
-                                ? "أدخل الكود المرسل لهاتفك"
-                                : "اكتب رقم الموبيل",
-                            style: GoogleFonts.cairo(
-                                fontSize: 14, color: Colors.white70)),
+                          isOtpStage
+                              ? "أدخل الكود المرسل لهاتفك"
+                              : "اكتب رقم الموبيل",
+                          style: GoogleFonts.cairo(
+                              fontSize: 14, color: Colors.white70),
+                        ),
                         const SizedBox(height: 40),
                         Directionality(
                           textDirection: TextDirection.ltr,
@@ -362,7 +358,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 elevation: 0,
                                 padding: EdgeInsets.zero,
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(15)),
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
                               ),
                               onPressed: isOtpStage ? _verifyOtp : _sendOtp,
                               child: Container(
@@ -371,10 +368,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                   isOtpStage ? "تأكيد" : "إرسال",
                                   textAlign: TextAlign.center,
                                   style: GoogleFonts.cairo(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      height: 1.0,
-                                      fontSize: 18),
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.0,
+                                    fontSize: 18,
+                                  ),
                                 ),
                               ),
                             ),
@@ -384,11 +382,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           Padding(
                             padding: const EdgeInsets.only(top: 15),
                             child: TextButton(
-                              onPressed: () =>
-                                  setState(() => isOtpStage = false),
-                              child: Text("تعديل رقم الهاتف؟",
-                                  style:
-                                      GoogleFonts.cairo(color: Colors.white60)),
+                              onPressed: () {
+                                setState(() {
+                                  isOtpStage = false;
+                                  otpController.clear();
+                                });
+                              },
+                              child: Text(
+                                "تعديل رقم الهاتف؟",
+                                style: GoogleFonts.cairo(color: Colors.white60),
+                              ),
                             ),
                           )
                       ],
@@ -404,8 +407,14 @@ class _LoginScreenState extends State<LoginScreen> {
     return TextField(
       controller: phoneController,
       keyboardType: TextInputType.number,
-      style:
-          const TextStyle(color: Colors.white, fontSize: 18, letterSpacing: 2),
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+      ],
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 18,
+        letterSpacing: 2,
+      ),
       textAlign: TextAlign.left,
       decoration: InputDecoration(
         hintText: "10XXXXXXXX",
@@ -414,7 +423,6 @@ class _LoginScreenState extends State<LoginScreen> {
           initialValue: selectedCountry,
           onSelected: (val) => setState(() => selectedCountry = val),
           itemBuilder: (context) => [
-            const PopupMenuItem(value: "🇪🇬 +20", child: Text("مصر 🇪🇬")),
             const PopupMenuItem(value: "🇪🇬 +20", child: Text("مصر 🇪🇬")),
             const PopupMenuItem(
                 value: "🇦🇪 +971", child: Text("الإمارات 🇦🇪")),
@@ -425,73 +433,78 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(width: 12),
-              Text(selectedCountry,
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
+              Text(
+                selectedCountry,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const Icon(Icons.arrow_drop_down, color: Colors.white),
               const VerticalDivider(
-                  color: Colors.white24, indent: 15, endIndent: 15),
+                color: Colors.white24,
+                indent: 15,
+                endIndent: 15,
+              ),
             ],
           ),
         ),
         filled: true,
         fillColor: Colors.white.withValues(alpha: 0.1),
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(15),
-            borderSide: BorderSide.none),
+          borderRadius: BorderRadius.circular(15),
+          borderSide: BorderSide.none,
+        ),
       ),
     );
   }
 
+  // ✅ iOS/iPad safe OTP: Single TextField + oneTimeCode autofill
   Widget _buildOtpInput() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(
-        6,
-        (index) => Container(
-          width: 45,
-          height: 55,
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 5,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: TextField(
-            controller: otpControllers[index],
-            focusNode: otpFocusNodes[index],
-            textAlign: TextAlign.center,
-            keyboardType: TextInputType.number,
-            maxLength: 1,
-            showCursor: false,
-            onChanged: (val) {
-              if (val.length == 1 && index < 5) {
-                otpFocusNodes[index + 1].requestFocus();
-              }
-              if (val.isEmpty && index > 0) {
-                otpFocusNodes[index - 1].requestFocus();
-              }
-            },
-            style: GoogleFonts.poppins(
-                color: Colors.black,
-                fontSize: 22,
-                height: 1.0,
-                fontWeight: FontWeight.bold),
-            decoration: const InputDecoration(
-              counterText: "",
-              border: InputBorder.none,
-              isDense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
+    return SizedBox(
+      width: 220,
+      child: TextField(
+        controller: otpController,
+        focusNode: otpFocusNode,
+        textAlign: TextAlign.center,
+        keyboardType: const TextInputType.numberWithOptions(
+          signed: false,
+          decimal: false,
         ),
+        textInputAction: TextInputAction.done,
+        autofillHints: const [AutofillHints.oneTimeCode],
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(6),
+        ],
+        showCursor: true,
+        style: GoogleFonts.poppins(
+          color: Colors.black,
+          fontSize: 22,
+          height: 1.0,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 6,
+        ),
+        decoration: InputDecoration(
+          hintText: "••••••",
+          hintStyle: GoogleFonts.poppins(
+            color: Colors.black26,
+            fontSize: 18,
+            letterSpacing: 6,
+          ),
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
+        onChanged: (_) {},
+        onEditingComplete: () {
+          FocusScope.of(context).unfocus();
+        },
       ),
     );
   }
