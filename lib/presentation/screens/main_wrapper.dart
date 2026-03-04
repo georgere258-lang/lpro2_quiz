@@ -44,7 +44,7 @@ class _MainWrapperState extends State<MainWrapper> {
   void initState() {
     super.initState();
     if (widget.initialIndex != null) {
-      _currentIndex = widget.initialIndex!.clamp(0, 3); // تعديل للتأكد من المدى
+      _currentIndex = widget.initialIndex!.clamp(0, 3);
     }
 
     _pages = [
@@ -56,19 +56,19 @@ class _MainWrapperState extends State<MainWrapper> {
 
     _loadNotifications();
 
+    // الاستماع لإشارة تحديث الإشعارات من NotificationCenter (مثل عند النشر)
     _refreshSub = NotificationCenter().stream.listen((name) {
       if (name == "refresh_notifications" && mounted) {
         _loadNotifications();
       }
     });
 
+    // معالجة الإشعارات أثناء فتح التطبيق
     FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
       if (mounted) {
+        // تأخير بسيط لضمان حفظ الرسالة في الشيرد بريفرنسز أولاً
         await Future.delayed(const Duration(milliseconds: 1000));
         await _loadNotifications();
-        setState(() {
-          _hasNewNotification = true;
-        });
       }
     });
   }
@@ -90,6 +90,7 @@ class _MainWrapperState extends State<MainWrapper> {
         if (mounted) {
           setState(() {
             _notifications = loaded;
+            // فحص وجود أي إشعار جديد غير مقروء
             _hasNewNotification = loaded.any((n) => n['isNew'] == true);
           });
         }
@@ -103,16 +104,8 @@ class _MainWrapperState extends State<MainWrapper> {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      if (Platform.isIOS) {
-        final FlutterLocalNotificationsPlugin notificationsPlugin =
-            FlutterLocalNotificationsPlugin();
-        final dynamic iosImplementation =
-            notificationsPlugin.resolvePlatformSpecificImplementation<
-                IOSFlutterLocalNotificationsPlugin>();
-        if (iosImplementation != null) {
-          await iosImplementation.setApplicationIconBadgeNumber(0);
-        }
-      }
+      // ✅ تصفير الـ Badge الخارجي فوراً
+      await NotificationCenter().clearBadge();
 
       bool changed = false;
       for (var n in _notifications) {
@@ -170,10 +163,8 @@ class _MainWrapperState extends State<MainWrapper> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.scaffoldBackground,
-
-      // ✅ [FIX] Apple Jitter Protection: Prevent UI resizing when keyboard appears
+      // منع اهتزاز الشاشة عند ظهور الكيبورد
       resizeToAvoidBottomInset: false,
-
       appBar: _buildDynamicAppBar(),
       body: Stack(
         children: [
@@ -192,14 +183,14 @@ class _MainWrapperState extends State<MainWrapper> {
             ),
           ),
           AnimatedSwitcher(
-            duration: const Duration(milliseconds: 550),
+            duration: const Duration(milliseconds: 400),
             switchInCurve: Curves.easeInOutCubic,
             transitionBuilder: (Widget child, Animation<double> animation) {
               return FadeTransition(
                 opacity: animation,
                 child: SlideTransition(
                   position: Tween<Offset>(
-                    begin: const Offset(0, 0.02),
+                    begin: const Offset(0, 0.01),
                     end: Offset.zero,
                   ).animate(animation),
                   child: child,
@@ -207,6 +198,7 @@ class _MainWrapperState extends State<MainWrapper> {
               );
             },
             child: Container(
+              // الـ ValueKey يضمن تحديث الصفحة بسلاسة دون تكرار
               key: ValueKey<int>(_currentIndex),
               child: IndexedStack(
                 index: _currentIndex,
@@ -224,15 +216,10 @@ class _MainWrapperState extends State<MainWrapper> {
   }
 
   PreferredSizeWidget _buildDynamicAppBar() {
-    if (_currentIndex == 0) {
-      return _buildHomeAppBar();
-    } else if (_currentIndex == 1) {
-      return _buildCustomTitleAppBar("ترتيب L Pro");
-    } else if (_currentIndex == 2) {
-      return _buildCustomTitleAppBar("ملفي الشخصي");
-    } else {
-      return _buildCustomTitleAppBar("الدعم الفني");
-    }
+    if (_currentIndex == 0) return _buildHomeAppBar();
+    if (_currentIndex == 1) return _buildCustomTitleAppBar("ترتيب L Pro");
+    if (_currentIndex == 2) return _buildCustomTitleAppBar("ملفي الشخصي");
+    return _buildCustomTitleAppBar("الدعم الفني");
   }
 
   PreferredSizeWidget _buildHomeAppBar() {
@@ -253,21 +240,16 @@ class _MainWrapperState extends State<MainWrapper> {
         onPressed: () async {
           await _loadNotifications();
           _showNotificationSheet();
-          _markAllAsRead();
+          await _markAllAsRead();
         },
       ),
-      actions: const [
-        SizedBox(width: 48),
-      ],
+      actions: const [SizedBox(width: 48)],
       flexibleSpace: Container(
         decoration: const BoxDecoration(
           gradient: RadialGradient(
             center: Alignment(0, -0.6),
             radius: 1.6,
-            colors: [
-              Color(0xFF136161),
-              AppColors.primaryDeepTeal,
-            ],
+            colors: [Color(0xFF136161), AppColors.primaryDeepTeal],
           ),
         ),
       ),
@@ -310,10 +292,7 @@ class _MainWrapperState extends State<MainWrapper> {
           gradient: RadialGradient(
             center: Alignment(0, -0.5),
             radius: 1.5,
-            colors: [
-              Color(0xFF136161),
-              AppColors.primaryDeepTeal,
-            ],
+            colors: [Color(0xFF136161), AppColors.primaryDeepTeal],
           ),
         ),
       ),
@@ -366,14 +345,11 @@ class _MainWrapperState extends State<MainWrapper> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      "الإشعارات",
-                      style: GoogleFonts.cairo(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.primaryDeepTeal,
-                      ),
-                    ),
+                    Text("الإشعارات",
+                        style: GoogleFonts.cairo(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w900,
+                            color: AppColors.primaryDeepTeal)),
                     Icon(Icons.notifications_active_outlined,
                         color: AppColors.secondaryOrange, size: 22),
                   ],
@@ -383,15 +359,11 @@ class _MainWrapperState extends State<MainWrapper> {
               Expanded(
                 child: _notifications.isEmpty
                     ? Center(
-                        child: Text(
-                          "لا توجد إشعارات حديثة",
-                          style: GoogleFonts.cairo(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      )
+                        child: Text("لا توجد إشعارات حديثة",
+                            style: GoogleFonts.cairo(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade500)))
                     : ListView.builder(
                         physics: const BouncingScrollPhysics(),
                         padding: const EdgeInsets.symmetric(
@@ -417,13 +389,12 @@ class _MainWrapperState extends State<MainWrapper> {
     );
   }
 
-  Widget _buildNotificationItem({
-    required String title,
-    required String body,
-    required String time,
-    required bool isNew,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildNotificationItem(
+      {required String title,
+      required String body,
+      required String time,
+      required bool isNew,
+      required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -435,10 +406,9 @@ class _MainWrapperState extends State<MainWrapper> {
               : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isNew
-                ? AppColors.primaryDeepTeal.withValues(alpha: 0.2)
-                : Colors.grey.shade200,
-          ),
+              color: isNew
+                  ? AppColors.primaryDeepTeal.withValues(alpha: 0.2)
+                  : Colors.grey.shade200),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -446,9 +416,8 @@ class _MainWrapperState extends State<MainWrapper> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.primaryDeepTeal.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
+                  color: AppColors.primaryDeepTeal.withValues(alpha: 0.1),
+                  shape: BoxShape.circle),
               child: Icon(Icons.flash_on_rounded,
                   color: AppColors.secondaryOrange, size: 18),
             ),
@@ -457,45 +426,32 @@ class _MainWrapperState extends State<MainWrapper> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.cairo(
-                      fontWeight: isNew ? FontWeight.w900 : FontWeight.w700,
-                      fontSize: 14,
-                      color: AppColors.primaryDeepTeal,
-                    ),
-                  ),
+                  Text(title,
+                      style: GoogleFonts.cairo(
+                          fontWeight: isNew ? FontWeight.w900 : FontWeight.w700,
+                          fontSize: 14,
+                          color: AppColors.primaryDeepTeal)),
                   const SizedBox(height: 4),
-                  Text(
-                    body,
-                    style: GoogleFonts.cairo(
-                      fontSize: 12,
-                      color: Colors.black87,
-                      height: 1.4,
-                    ),
-                  ),
+                  Text(body,
+                      style: GoogleFonts.cairo(
+                          fontSize: 12, color: Colors.black87, height: 1.4)),
                   const SizedBox(height: 8),
-                  Text(
-                    time,
-                    style: GoogleFonts.cairo(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade500,
-                    ),
-                  ),
+                  Text(time,
+                      style: GoogleFonts.cairo(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade500)),
                 ],
               ),
             ),
             if (isNew)
               Container(
-                margin: const EdgeInsets.only(top: 5),
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: AppColors.secondaryOrange,
-                  shape: BoxShape.circle,
-                ),
-              ),
+                  margin: const EdgeInsets.only(top: 5),
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                      color: AppColors.secondaryOrange,
+                      shape: BoxShape.circle)),
           ],
         ),
       ),
