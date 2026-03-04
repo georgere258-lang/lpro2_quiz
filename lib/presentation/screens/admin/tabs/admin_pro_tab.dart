@@ -1,6 +1,4 @@
 // PATH: lib/presentation/screens/admin/tabs/admin_pro_tab.dart
-// Pro Card tab for admin panel
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -81,7 +79,6 @@ class AdminProTab extends StatelessWidget {
               adminCenterBtn(
                 onPressed: () => _openProEditor(context),
                 bg: AppColors.primaryDeepTeal,
-                // ✅ requested: slightly bigger
                 child: adminBtnText('تعديل / إنشاء الرسالة', size: 16),
               ),
               const SizedBox(height: 16),
@@ -110,8 +107,6 @@ class AdminProTab extends StatelessWidget {
                       children: [
                         adminStatusBadge(banner.isActive),
                         const SizedBox(height: 10),
-
-                        // Preview
                         if (banner.isImage)
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -167,7 +162,6 @@ class AdminProTab extends StatelessWidget {
                               ),
                             ],
                           ),
-
                         const SizedBox(height: 12),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -215,16 +209,13 @@ class AdminProTab extends StatelessWidget {
   Future<void> _openProEditor(BuildContext context) async {
     final textC = TextEditingController();
     final imageUrlC = TextEditingController();
-
-    // ✅ Push controls
-    bool notify = false; // ✅ ALWAYS start false (one-shot)
     final pushTitleC = TextEditingController();
     final pushBodyC = TextEditingController();
 
+    bool notify = false;
     bool isActive = true;
     ProCardContentType type = ProCardContentType.text;
 
-    // preload existing meta (best-effort) — WITHOUT notify (avoid sticky spam)
     final meta = await _loadPushMeta();
     pushTitleC.text = (meta['pushTitle'] ?? '').toString();
     pushBodyC.text = (meta['pushBody'] ?? '').toString();
@@ -244,6 +235,7 @@ class AdminProTab extends StatelessWidget {
             top: 12,
           ),
           child: Column(
+            key: const ValueKey('pro_editor_new'),
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
@@ -264,9 +256,6 @@ class AdminProTab extends StatelessWidget {
                         if (pushBodyC.text.trim().isEmpty) {
                           pushBodyC.text = _defaultPushBodyForType(type);
                         }
-                        if (pushTitleC.text.trim().isEmpty) {
-                          pushTitleC.text = _defaultPushTitle();
-                        }
                       }),
                       title: Text('نص', style: GoogleFonts.cairo(fontSize: 12)),
                     ),
@@ -282,9 +271,6 @@ class AdminProTab extends StatelessWidget {
                         if (pushBodyC.text.trim().isEmpty) {
                           pushBodyC.text = _defaultPushBodyForType(type);
                         }
-                        if (pushTitleC.text.trim().isEmpty) {
-                          pushTitleC.text = _defaultPushTitle();
-                        }
                       }),
                       title:
                           Text('صورة', style: GoogleFonts.cairo(fontSize: 12)),
@@ -292,20 +278,16 @@ class AdminProTab extends StatelessWidget {
                   ),
                 ],
               ),
-
               if (type == ProCardContentType.text)
                 adminTextField(textC, 'نص الرسالة...', maxLines: 4)
               else
                 adminTextField(imageUrlC, 'رابط الصورة (https://)...',
                     maxLines: 2),
-
               SwitchListTile(
                 value: isActive,
                 onChanged: (v) => setLocal(() => isActive = v),
                 title: Text('ظاهر', style: GoogleFonts.cairo(fontSize: 12)),
               ),
-
-              // ✅ Push controls (minimal)
               const SizedBox(height: 6),
               SwitchListTile(
                 value: notify,
@@ -317,7 +299,6 @@ class AdminProTab extends StatelessWidget {
                   maxLines: 1),
               const SizedBox(height: 8),
               adminTextField(pushBodyC, 'نص الإشعار (اختياري)', maxLines: 2),
-
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -327,6 +308,9 @@ class AdminProTab extends StatelessWidget {
                         backgroundColor: AppColors.primaryDeepTeal,
                       ),
                       onPressed: () async {
+                        // إغلاق الكيبورد فوراً لمنع تعارض الـ MediaQuery
+                        FocusScope.of(context).unfocus();
+
                         final nav = Navigator.of(context);
                         setSaving(true);
                         try {
@@ -343,12 +327,10 @@ class AdminProTab extends StatelessWidget {
 
                           String body = pushBodyC.text.trim();
                           if (body.isEmpty) {
-                            if (type == ProCardContentType.text &&
-                                textC.text.trim().isNotEmpty) {
-                              body = textC.text.trim();
-                            } else {
-                              body = _defaultPushBodyForType(type);
-                            }
+                            body = (type == ProCardContentType.text &&
+                                    textC.text.trim().isNotEmpty)
+                                ? textC.text.trim()
+                                : _defaultPushBodyForType(type);
                           }
 
                           await _savePushMeta(
@@ -377,6 +359,9 @@ class AdminProTab extends StatelessWidget {
       ),
     );
 
+    // ✅ التعديل الجوهري: تأخير الـ Dispose لضمان انتهاء الأنميشن وإغلاق النافذة تماماً
+    // هذا يمنع خطأ "used after being disposed" بنسبة 100%
+    await Future.delayed(const Duration(milliseconds: 500));
     textC.dispose();
     imageUrlC.dispose();
     pushTitleC.dispose();
@@ -387,12 +372,10 @@ class AdminProTab extends StatelessWidget {
       BuildContext context, ProCardBanner banner) async {
     final textC = TextEditingController(text: banner.text);
     final imageUrlC = TextEditingController(text: banner.imageUrl);
-
-    // ✅ Push controls
-    bool notify = false; // ✅ ALWAYS start false (one-shot)
     final pushTitleC = TextEditingController();
     final pushBodyC = TextEditingController();
 
+    bool notify = false;
     bool isActive = banner.isActive;
     ProCardContentType type = banner.contentType;
 
@@ -415,6 +398,7 @@ class AdminProTab extends StatelessWidget {
             top: 12,
           ),
           child: Column(
+            key: ValueKey('pro_editor_${banner.id}'),
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
@@ -435,9 +419,6 @@ class AdminProTab extends StatelessWidget {
                         if (pushBodyC.text.trim().isEmpty) {
                           pushBodyC.text = _defaultPushBodyForType(type);
                         }
-                        if (pushTitleC.text.trim().isEmpty) {
-                          pushTitleC.text = _defaultPushTitle();
-                        }
                       }),
                       title: Text('نص', style: GoogleFonts.cairo(fontSize: 12)),
                     ),
@@ -453,9 +434,6 @@ class AdminProTab extends StatelessWidget {
                         if (pushBodyC.text.trim().isEmpty) {
                           pushBodyC.text = _defaultPushBodyForType(type);
                         }
-                        if (pushTitleC.text.trim().isEmpty) {
-                          pushTitleC.text = _defaultPushTitle();
-                        }
                       }),
                       title:
                           Text('صورة', style: GoogleFonts.cairo(fontSize: 12)),
@@ -468,14 +446,11 @@ class AdminProTab extends StatelessWidget {
               else
                 adminTextField(imageUrlC, 'رابط الصورة (https://)...',
                     maxLines: 2),
-
               SwitchListTile(
                 value: isActive,
                 onChanged: (v) => setLocal(() => isActive = v),
                 title: Text('ظاهر', style: GoogleFonts.cairo(fontSize: 12)),
               ),
-
-              // ✅ Push controls (minimal)
               const SizedBox(height: 6),
               SwitchListTile(
                 value: notify,
@@ -487,7 +462,6 @@ class AdminProTab extends StatelessWidget {
                   maxLines: 1),
               const SizedBox(height: 8),
               adminTextField(pushBodyC, 'نص الإشعار (اختياري)', maxLines: 2),
-
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -497,6 +471,7 @@ class AdminProTab extends StatelessWidget {
                         backgroundColor: AppColors.primaryDeepTeal,
                       ),
                       onPressed: () async {
+                        FocusScope.of(context).unfocus();
                         final nav = Navigator.of(context);
                         setSaving(true);
                         try {
@@ -515,12 +490,10 @@ class AdminProTab extends StatelessWidget {
 
                           String body = pushBodyC.text.trim();
                           if (body.isEmpty) {
-                            if (type == ProCardContentType.text &&
-                                textC.text.trim().isNotEmpty) {
-                              body = textC.text.trim();
-                            } else {
-                              body = _defaultPushBodyForType(type);
-                            }
+                            body = (type == ProCardContentType.text &&
+                                    textC.text.trim().isNotEmpty)
+                                ? textC.text.trim()
+                                : _defaultPushBodyForType(type);
                           }
 
                           await _savePushMeta(
@@ -549,6 +522,8 @@ class AdminProTab extends StatelessWidget {
       ),
     );
 
+    // ✅ تأخير الـ Dispose هنا أيضاً لنفس السبب
+    await Future.delayed(const Duration(milliseconds: 500));
     textC.dispose();
     imageUrlC.dispose();
     pushTitleC.dispose();
