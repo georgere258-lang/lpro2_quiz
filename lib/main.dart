@@ -147,7 +147,8 @@ Future<void> _postBootstrap() async {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         try {
-          print('🚀 [FORCE SYNC] Starting background sync for ${user.uid}');
+          debugPrint(
+              '🚀 [FORCE SYNC] Starting background sync for ${user.uid}');
           String? token = await FirebaseMessaging.instance.getToken();
           if (token != null) {
             await FirebaseFirestore.instance
@@ -158,10 +159,11 @@ Future<void> _postBootstrap() async {
               'platform': Platform.isIOS ? 'ios' : 'android',
               'lastTokenUpdate': FieldValue.serverTimestamp(),
             }, SetOptions(merge: true));
-            print('✅ [FORCE SYNC] Token updated successfully in Firestore');
+            debugPrint(
+                '✅ [FORCE SYNC] Token updated successfully in Firestore');
           }
         } catch (e) {
-          print('⚠️ [FORCE SYNC] Deferred: $e');
+          debugPrint('⚠️ [FORCE SYNC] Deferred: $e');
         }
       }
     });
@@ -175,11 +177,12 @@ void _subscribeToNotificationTopics() {
 
   _authSub =
       FirebaseAuth.instance.authStateChanges().listen((User? user) async {
-    print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    print('🔔 [AUTH] حالة المستخدم تغيرت: ${user?.uid ?? "لا يوجد مستخدم"}');
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    debugPrint(
+        '🔔 [AUTH] حالة المستخدم تغيرت: ${user?.uid ?? "لا يوجد مستخدم"}');
 
     if (user != null) {
-      print('🚀 [FCM] جاري بدء عملية مزامنة التوكن...');
+      debugPrint('🚀 [FCM] جاري بدء عملية مزامنة التوكن...');
 
       unawaited(FirebaseMessaging.instance.subscribeToTopic(user.uid));
 
@@ -187,15 +190,17 @@ void _subscribeToNotificationTopics() {
         if (Platform.isIOS) {
           String? apnsToken = await FirebaseMessaging.instance.getAPNSToken();
           if (apnsToken == null) {
-            print('⏳ [APNs] التوكن غير جاهز، سأنتظر 3 ثوانٍ...');
+            debugPrint('⏳ [APNs] التوكن غير جاهز، سأنتظر 3 ثوانٍ...');
             await Future.delayed(const Duration(seconds: 3));
             apnsToken = await FirebaseMessaging.instance.getAPNSToken();
           }
-          print('🔑 [APNs] الحالة: ${apnsToken != null ? "جاهز ✅" : "فارغ ❌"}');
+          debugPrint(
+              '🔑 [APNs] الحالة: ${apnsToken != null ? "جاهز ✅" : "فارغ ❌"}');
         }
 
         String? token = await FirebaseMessaging.instance.getToken();
-        print('🔥 [FCM] التوكن: ${token != null ? "OBTAINED ✅" : "NULL ❌"}');
+        debugPrint(
+            '🔥 [FCM] التوكن: ${token != null ? "OBTAINED ✅" : "NULL ❌"}');
 
         if (token != null) {
           await FirebaseFirestore.instance
@@ -203,19 +208,17 @@ void _subscribeToNotificationTopics() {
               .doc(user.uid)
               .set({
             'fcmToken': token,
-            'fcmTokens': [
-              token
-            ], // ✅ تم التعديل: استبدال القائمة بالتوكن الجديد فقط لمنع التراكم
+            'fcmTokens': [token],
             'platform': Platform.isIOS ? 'ios' : 'android',
             'lastTokenUpdate': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
 
-          print('✅ [SUCCESS] تم مزامنة التوكن في Firestore');
-          print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          debugPrint('✅ [SUCCESS] تم مزامنة التوكن في Firestore');
+          debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         }
       } catch (e) {
-        print('🔴 [ERROR] فشل في مزامنة التوكن: $e');
-        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        debugPrint('🔴 [ERROR] فشل في مزامنة التوكن: $e');
+        debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       }
 
       if (user.uid == 'nw2CackXK6PQavoGPAAbhyp6d1R2') {
@@ -459,12 +462,12 @@ class _LProAppState extends State<LProApp> {
       navigatorKey: _navKey,
       builder: (context, child) {
         final mediaQueryData = MediaQuery.of(context);
+
+        // ✅ [FIX] Apple Stability: Static Text Scaling to avoid keyboard jitter
         return MediaQuery(
           data: mediaQueryData.copyWith(
-            textScaler: mediaQueryData.textScaler.clamp(
-              minScaleFactor: 0.9,
-              maxScaleFactor: 1.1,
-            ),
+            textScaler: TextScaler.noScaling,
+            viewInsets: mediaQueryData.viewInsets,
           ),
           child: child!,
         );
