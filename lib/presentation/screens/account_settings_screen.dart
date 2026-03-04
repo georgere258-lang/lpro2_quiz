@@ -27,6 +27,9 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
       final data = result.data;
       if (data is Map && data['success'] == true) {
+        // تأخير بسيط لضمان انتهاء أي عمليات خلفية قبل تسجيل الخروج
+        await Future.delayed(const Duration(milliseconds: 500));
+
         try {
           await FirebaseAuth.instance.signOut();
         } catch (e) {
@@ -110,7 +113,13 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
               ),
               actions: [
                 TextButton(
-                    onPressed: _isLoading ? null : () => Navigator.pop(context),
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            confirmController
+                                .dispose(); // تنظيف الذاكرة عند التراجع
+                            Navigator.pop(context);
+                          },
                     child: Text("تراجع",
                         style: GoogleFonts.cairo(color: Colors.grey[600]))),
                 ElevatedButton(
@@ -123,8 +132,14 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                   ),
                   onPressed: (isTextCorrect && !_isLoading)
                       ? () {
+                          // إغلاق الكيبورد فوراً لمنع تعليق الـ UI
+                          FocusScope.of(context).unfocus();
                           Navigator.pop(context);
                           _executeCloudDelete();
+                          // تنظيف بعد الإغلاق بـ 500ms
+                          Future.delayed(const Duration(milliseconds: 500), () {
+                            confirmController.dispose();
+                          });
                         }
                       : null,
                   child: Text("حذف حسابي",
@@ -136,7 +151,12 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
           ),
         ),
       ),
-    );
+    ).then((_) {
+      // ضمان تنظيف الـ Controller حتى لو أغلق المستخدم الـ Dialog بالضغط خارجه
+      if (confirmController.text != "حذف") {
+        confirmController.dispose();
+      }
+    });
   }
 
   @override
@@ -147,10 +167,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7F8),
-
-      // ✅ [FIX] Apple Jitter Protection: Fixed background for stability
       resizeToAvoidBottomInset: false,
-
       appBar: AppBar(
         title: Text("إعدادات الحساب",
             style: GoogleFonts.cairo(
@@ -162,7 +179,6 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         centerTitle: true,
       ),
       body: MediaQuery(
-        // ✅ [FIX] Red Screen Protection: Ensure layout consistency
         data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
         child: Stack(
           children: [
