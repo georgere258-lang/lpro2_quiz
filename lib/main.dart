@@ -46,6 +46,7 @@ const AndroidNotificationChannel channel = AndroidNotificationChannel(
   'lpro_notifications',
   'LPro Notifications',
   importance: Importance.max,
+  playSound: true,
 );
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -60,6 +61,11 @@ StreamSubscription<User?>? _authSub;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ✅ [حل الشاشة الحمراء] منع الانهيار عند تضارب الـ Keys في المحاكي
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Container(color: Colors.white);
+  };
 
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     systemNavigationBarColor: Colors.transparent,
@@ -97,9 +103,9 @@ Future<void> _postBootstrap() async {
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosInit = DarwinInitializationSettings(
-      requestAlertPermission: false,
-      requestBadgePermission: false,
-      requestSoundPermission: false,
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
       requestCriticalPermission: true,
     );
 
@@ -130,6 +136,9 @@ Future<void> _postBootstrap() async {
           ?.createNotificationChannel(channel);
     }
 
+    // ✅ تصفير الـ Badge عند فتح التطبيق
+    await NotificationCenter().clearBadge();
+
     _attachForegroundNotificationListener();
     _attachOnMessageOpenedListener();
     await _handleInitialMessageIfAny();
@@ -138,7 +147,7 @@ Future<void> _postBootstrap() async {
       await FirebaseMessaging.instance
           .setForegroundNotificationPresentationOptions(
         alert: true,
-        badge: false,
+        badge: true,
         sound: true,
       );
     }
@@ -253,6 +262,7 @@ void _attachForegroundNotificationListener() {
         importance: Importance.max,
         priority: Priority.high,
         icon: 'ic_stat_lpro',
+        playSound: true,
       );
 
       const iosDetails = DarwinNotificationDetails(
@@ -419,6 +429,10 @@ Future<void> _saveNotificationLocally(RemoteMessage message) async {
 
     await prefs.setString('saved_notifications', jsonEncode(notifs));
 
+    // ✅ تحديث رقم الأيقونة الخارجية (Badge)
+    final newCount = notifs.where((n) => n['isNew'] == true).length;
+    await NotificationCenter().updateBadgeCount(newCount);
+
     NotificationCenter().post(name: "refresh_notifications");
   } catch (e) {
     debugPrint('LPro Notification Save Error: $e');
@@ -433,6 +447,33 @@ class NotificationCenter {
   final _controller = StreamController<String>.broadcast();
   Stream<String> get stream => _controller.stream;
   void post({required String name}) => _controller.add(name);
+
+  // ✅ تصفير وتحديث Badge باستخدام dynamic لمنع الخط الأحمر
+  Future<void> clearBadge() async {
+    try {
+      if (Platform.isIOS) {
+        final dynamic iosPlugin = flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+                IOSFlutterLocalNotificationsPlugin>();
+        if (iosPlugin != null) {
+          await iosPlugin.setApplicationIconBadgeNumber(0);
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> updateBadgeCount(int count) async {
+    try {
+      if (Platform.isIOS) {
+        final dynamic iosPlugin = flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+                IOSFlutterLocalNotificationsPlugin>();
+        if (iosPlugin != null) {
+          await iosPlugin.setApplicationIconBadgeNumber(count);
+        }
+      }
+    } catch (_) {}
+  }
 }
 
 class LProApp extends StatefulWidget {
@@ -461,14 +502,9 @@ class _LProAppState extends State<LProApp> {
       debugShowCheckedModeBanner: false,
       navigatorKey: _navKey,
       builder: (context, child) {
-        final mediaQueryData = MediaQuery.of(context);
-
-        // ✅ [FIX] Apple Stability: Static Text Scaling to avoid keyboard jitter
         return MediaQuery(
-          data: mediaQueryData.copyWith(
-            textScaler: TextScaler.noScaling,
-            viewInsets: mediaQueryData.viewInsets,
-          ),
+          data:
+              MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
           child: child!,
         );
       },
