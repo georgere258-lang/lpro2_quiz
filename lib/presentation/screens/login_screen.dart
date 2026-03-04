@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/login_screen.dart
-// STATUS: iOS-SAFE OTP (Single Field + Stable Keyboard + Apple-friendly)
+// STATUS: iOS-SAFE OTP (Single Field + Stable Keyboard + Apple-friendly + Latin Numerals Force)
 
 import 'dart:async';
 import 'dart:io';
@@ -77,6 +77,15 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     setState(() => isLoading = true);
+
+    // ✅ [تحسين تقني] جلب توكن APNs فوراً لضمان التحقق الصامت في iOS ومنع صفحة الروبوت
+    if (Platform.isIOS) {
+      try {
+        await FirebaseMessaging.instance.getAPNSToken();
+      } catch (e) {
+        debugPrint("APNs fetch error during send: $e");
+      }
+    }
 
     try {
       await FirebaseAuth.instance.verifyPhoneNumber(
@@ -459,53 +468,99 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // ✅ iOS/iPad safe OTP: Single TextField + oneTimeCode autofill
+  // ✅ [تعديل النسخة 52] إجبار الأرقام اللاتينية (English) ومنع تعريب iOS
   Widget _buildOtpInput() {
-    return SizedBox(
-      width: 220,
-      child: TextField(
-        controller: otpController,
-        focusNode: otpFocusNode,
-        textAlign: TextAlign.center,
-        keyboardType: const TextInputType.numberWithOptions(
-          signed: false,
-          decimal: false,
-        ),
-        textInputAction: TextInputAction.done,
-        autofillHints: const [AutofillHints.oneTimeCode],
-        inputFormatters: [
-          FilteringTextInputFormatter.digitsOnly,
-          LengthLimitingTextInputFormatter(6),
-        ],
-        showCursor: true,
-        style: GoogleFonts.poppins(
-          color: Colors.black,
-          fontSize: 22,
-          height: 1.0,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 6,
-        ),
-        decoration: InputDecoration(
-          hintText: "••••••",
-          hintStyle: GoogleFonts.poppins(
-            color: Colors.black26,
-            fontSize: 18,
-            letterSpacing: 6,
-          ),
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        ),
-        onChanged: (_) {},
-        onEditingComplete: () {
-          FocusScope.of(context).unfocus();
+    return Localizations.override(
+      context: context,
+      locale: const Locale('en', 'US'), // ← فرض البيئة الإنجليزية على Autofill
+      child: Builder(
+        builder: (localizedContext) {
+          return SizedBox(
+            width: 220,
+            child: TextField(
+              controller: otpController,
+              focusNode: otpFocusNode,
+              textAlign: TextAlign.center,
+              keyboardType: const TextInputType.numberWithOptions(
+                signed: false,
+                decimal: false,
+              ),
+              textInputAction: TextInputAction.done,
+              autofillHints: const [AutofillHints.oneTimeCode],
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(6),
+                _LatinDigitsFormatter(), // ← مُحول الأرقام الاحترافي لضمان 123
+              ],
+              showCursor: true,
+              style: GoogleFonts.poppins(
+                color: Colors.black,
+                fontSize: 22,
+                height: 1.0,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 6,
+                locale: const Locale('en', 'US'), // ← فرض رسم الخط اللاتيني
+              ),
+              decoration: InputDecoration(
+                hintText: "••••••",
+                hintStyle: GoogleFonts.poppins(
+                  color: Colors.black26,
+                  fontSize: 18,
+                  letterSpacing: 6,
+                  locale: const Locale('en', 'US'),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+              onChanged: (_) {},
+              onEditingComplete: () {
+                FocusScope.of(context).unfocus();
+              },
+            ),
+          );
         },
       ),
     );
+  }
+}
+
+// ✅ [مُلحق النسخة 52] كلاس احترافي لتحويل الأرقام العربية/الهندية إلى لاتينية فوراً
+class _LatinDigitsFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+    final converted = _convertToLatinDigits(text);
+
+    if (converted != text) {
+      return TextEditingValue(
+        text: converted,
+        selection: TextSelection.collapsed(offset: converted.length),
+      );
+    }
+    return newValue;
+  }
+
+  String _convertToLatinDigits(String input) {
+    const arabicNumerals = '٠١٢٣٤٥٦٧٨٩';
+    const hindiNumerals = '०१२३४५६७८९';
+    const latinDigits = '0123456789';
+
+    var result = input;
+    for (var i = 0; i < arabicNumerals.length; i++) {
+      result = result.replaceAll(arabicNumerals[i], latinDigits[i]);
+    }
+    for (var i = 0; i < hindiNumerals.length; i++) {
+      result = result.replaceAll(hindiNumerals[i], latinDigits[i]);
+    }
+    return result;
   }
 }
