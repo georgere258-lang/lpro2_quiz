@@ -386,6 +386,9 @@ void _handleNotificationTap(Map<String, dynamic> data) {
 Future<void> _saveNotificationLocally(RemoteMessage message) async {
   try {
     final prefs = await SharedPreferences.getInstance();
+    // ✅ [تعديل 54] مزامنة الذاكرة فوراً لضمان القراءة في iOS من الخلفية
+    if (Platform.isIOS) await prefs.reload();
+
     final String? notifsString = prefs.getString('saved_notifications');
     List<dynamic> notifs = notifsString != null ? jsonDecode(notifsString) : [];
 
@@ -441,15 +444,17 @@ class NotificationCenter {
   Stream<String> get stream => _controller.stream;
   void post({required String name}) => _controller.add(name);
 
-  // ✅ تصفير وتحديث Badge باستخدام dynamic لمنع الخط الأحمر
+  // ✅ [تعديل 54] استخدام dynamic للتحايل على الـ IDE على ويندوز
   Future<void> clearBadge() async {
     try {
       if (Platform.isIOS) {
-        final dynamic iosPlugin = flutterLocalNotificationsPlugin
-            .resolvePlatformSpecificImplementation<
-                IOSFlutterLocalNotificationsPlugin>();
+        final dynamic plugin = flutterLocalNotificationsPlugin;
+        final dynamic iosPlugin =
+            plugin.resolvePlatformSpecificImplementation();
         if (iosPlugin != null) {
-          await iosPlugin.setApplicationIconBadgeNumber(0);
+          try {
+            await iosPlugin.setApplicationIconBadgeNumber(0);
+          } catch (_) {}
         }
       }
     } catch (_) {}
@@ -458,11 +463,13 @@ class NotificationCenter {
   Future<void> updateBadgeCount(int count) async {
     try {
       if (Platform.isIOS) {
-        final dynamic iosPlugin = flutterLocalNotificationsPlugin
-            .resolvePlatformSpecificImplementation<
-                IOSFlutterLocalNotificationsPlugin>();
+        final dynamic plugin = flutterLocalNotificationsPlugin;
+        final dynamic iosPlugin =
+            plugin.resolvePlatformSpecificImplementation();
         if (iosPlugin != null) {
-          await iosPlugin.setApplicationIconBadgeNumber(count);
+          try {
+            await iosPlugin.setApplicationIconBadgeNumber(count);
+          } catch (_) {}
         }
       }
     } catch (_) {}
