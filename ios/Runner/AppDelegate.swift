@@ -12,7 +12,7 @@ import UserNotifications
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     
-    // 1️⃣ تهيئة Firebase بالكود البرمجي
+    // 1️⃣ تهيئة Firebase بالكود البرمجي لضمان أقصى درجات الاستقرار
     if FirebaseApp.app() == nil {
       let options = FirebaseOptions(
         googleAppID: "1:905243871570:ios:7dd006b803e36a4c66928b",
@@ -39,30 +39,28 @@ import UserNotifications
     // 4️⃣ تسجيل إضافات Flutter
     GeneratedPluginRegistrant.register(with: self)
 
-    // تصفير عداد الإشعارات فور تشغيل التطبيق لضمان اختفاء الرقم
-    if #available(iOS 10.0, *) {
-        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
-    }
+    // ✅ [تم التعديل] إزالة أمر مسح الإشعارات DeliveredNotifications لضمان ثباتها في الستارة
+    // نكتفي فقط بتصفير رقم الأيقونة الخارجي عند الفتح
     UIApplication.shared.applicationIconBadgeNumber = 0
-    print("🧹 [Badge] Icon badge and notification center cleared on launch")
+    print("🧹 [Badge] Icon badge cleared on launch. System tray preserved.")
     
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
   
-  // ✅ التعديل الجوهري: ربط التوكن يدوياً بـ Firebase لفك القفلة
+  // ✅ التعديل الجوهري: ربط التوكن يدوياً بـ Firebase لفك "قفلة" التحقق
   override func application(
     _ application: UIApplication,
     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
   ) {
     print("✅ [APNs] Token received from Apple")
     
-    // إرسال التوكن لـ Firebase يدوياً (هذا السطر هو الحل)
+    // إرسال التوكن لـ Firebase يدوياً لضمان نجاح Silent Auth
     Messaging.messaging().apnsToken = deviceToken
     
     super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
   }
   
-  // ✅ Handle APNs Registration Failure
+  // ✅ التعامل مع فشل التسجيل
   override func application(
     _ application: UIApplication,
     didFailToRegisterForRemoteNotificationsWithError error: Error
@@ -70,7 +68,7 @@ import UserNotifications
     print("🔴 [APNs] Registration failed: \(error.localizedDescription)")
   }
   
-  // ✅ CRITICAL: Handle Foreground Notifications
+  // ✅ التحكم في ظهور الإشعار والتطبيق مفتوح (Foreground)
   @available(iOS 10.0, *)
   override func userNotificationCenter(
     _ center: UNUserNotificationCenter,
@@ -80,36 +78,43 @@ import UserNotifications
     let userInfo = notification.request.content.userInfo
     print("🔔 [FCM] Notification received in FOREGROUND: \(userInfo)")
     
+    // نطلب من النظام إظهار البانر والصوت والبادج
     if #available(iOS 14.0, *) {
-      completionHandler([[.banner, .sound, .badge]])
+      completionHandler([.banner, .sound, .badge])
     } else {
-      completionHandler([[.alert, .sound, .badge]])
+      completionHandler([.alert, .sound, .badge])
     }
   }
   
-  // ✅ CRITICAL: Handle Notification Tap
+  // ✅ التعامل مع الضغط على الإشعار من الستارة
   @available(iOS 10.0, *)
   override func userNotificationCenter(
     _ center: UNUserNotificationCenter,
     didReceive response: UNNotificationResponse,
     withCompletionHandler completionHandler: @escaping () -> Void
   ) {
-    print("🔔 [FCM] Notification tapped")
+    print("🔔 [FCM] Notification tapped by user")
+    // عند الضغط، نصفّر البادج فوراً
     UIApplication.shared.applicationIconBadgeNumber = 0
     completionHandler()
   }
 }
 
-// ✅ Messaging Delegate Extension
+// ✅ ملحق مفوض المراسلة لربط التوكن وتخزينه
 extension AppDelegate: MessagingDelegate {
   func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
-    print("🔥 [FCM] Token: \(fcmToken ?? "nil")")
+    print("🔥 [FCM] New Token generated: \(fcmToken ?? "nil")")
     
-    let dataDict: [String: String] = ["token": fcmToken ?? ""]
-    NotificationCenter.default.post(
-      name: Notification.Name("FCMToken"),
-      object: nil,
-      userInfo: dataDict
-    )
+    if let token = fcmToken {
+        // ✅ تخزين التوكن في ذاكرة الموبايل (Native) لسرعة استدعائه في الدارت
+        UserDefaults.standard.set(token, forKey: "fcm_token")
+        
+        let dataDict: [String: String] = ["token": token]
+        NotificationCenter.default.post(
+          name: Notification.Name("FCMToken"),
+          object: nil,
+          userInfo: dataDict
+        )
+    }
   }
 }
