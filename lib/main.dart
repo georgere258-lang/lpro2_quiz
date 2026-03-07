@@ -96,7 +96,6 @@ Future<void> _postBootstrap() async {
   try {
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
     ]);
 
     SoundManager.init();
@@ -239,6 +238,9 @@ void _attachForegroundNotificationListener() {
     try {
       await _saveNotificationLocally(message);
 
+      // ✅ [تعديل النسخة 55] في iOS نترك المهمة لـ AppDelegate لعرض البانر ومنع الازدواجية واختفاء الستارة
+      if (Platform.isIOS) return;
+
       final notif = message.notification;
       if (notif == null) return;
 
@@ -258,11 +260,12 @@ void _attachForegroundNotificationListener() {
         playSound: true,
       );
 
+      // ✅ [تعديل النسخة 55] تغيير المستوى لـ active لضمان الثبات في الستارة
       const iosDetails = DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
-        interruptionLevel: InterruptionLevel.critical,
+        interruptionLevel: InterruptionLevel.active,
       );
 
       final details = NotificationDetails(
@@ -444,7 +447,7 @@ class NotificationCenter {
   Stream<String> get stream => _controller.stream;
   void post({required String name}) => _controller.add(name);
 
-  // ✅ [تعديل 54] استخدام dynamic للتحايل على الـ IDE على ويندوز
+  // ✅ [تعديل 55] استخدام dynamic للتحايل على الـ IDE على ويندوز ومنع الخطوط الحمراء
   Future<void> clearBadge() async {
     try {
       if (Platform.isIOS) {
