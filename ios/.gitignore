@@ -1,4 +1,6 @@
-# إعدادات ملفات مشروع Xcode و iOS
+# ============================================
+# 🍎 إعدادات ملفات مشروع Xcode و iOS
+# ============================================
 **/dgph
 *.mode1v3
 *.mode2v3
@@ -11,13 +13,15 @@
 **/.vagrant/
 **/DerivedData/
 Icon?
-**/Pods/
 **/.symlinks/
 profile
 xcuserdata
 **/.generated/
+.DS_Store
 
-# ملفات فلوتر الداخلية والمؤقتة (تنشأ عند البناء)
+# ============================================
+# 💙 ملفات فلوتر الداخلية والمؤقتة (تنشأ عند البناء)
+# ============================================
 Flutter/App.framework
 Flutter/Flutter.framework
 Flutter/Flutter.podspec
@@ -30,17 +34,53 @@ Flutter/flutter_export_environment.sh
 ServiceDefinitions.json
 Runner/GeneratedPluginRegistrant.*
 
-# استثناءات للملفات الضرورية لنظام Xcode
+# ============================================
+# 🛠️ استثناءات للملفات الضرورية لنظام Xcode
+# ============================================
 !default.mode1v3
 !default.mode2v3
 !default.pbxuser
 !default.perspectivev3
 
 # ============================================
-# ✅ السماح برفع ملفات Firebase (لأن المستودع خاص)
+# ✅ إدارة Firebase والـ Pods (تأمين الـ Build)
 # ============================================
+# السماح برفع ملفات الإعدادات لضمان نجاح بناء Codemagic (مستودع خاص)
 !Runner/GoogleService-Info.plist
+!Podfile
+!Podfile.lock
 
-# منع رفع الشهادات الشخصية (يفضل دائماً رفعها يدوياً لـ Codemagic)
+# تجاهل مجلد المكتبات الفعلي (يتم تحميله أوتوماتيكياً عند البناء)
+**/Pods/
+
+# ضمان عدم تجاهل ملفات الربط الأساسية حتى لو كانت داخل مجلدات فرعية
+!Pods/Podfile
+!Pods/Podfile.lock
+
+# تجاهل بيانات الـ Workspace والبيانات الشخصية للمطورين
+**/*.xcworkspace/contents.xcworkspacedata
+**/*.xcworkspace/xcshareddata/
+**/*.xcworkspace/xcuserdata/
+
+# منع رفع الشهادات الشخصية والسرية (أمان - ترفع يدوياً لـ Codemagic)
 *.p12
 *.mobileprovision
+
+# ============================================
+# 🧹 إضافات التنظيف والاحترافية
+# ============================================
+# Fastlane (للأتمتة)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
+
+# Build artifacts (ممنوع رفعها لمساحتها الضخمة)
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Backup & Swap files
+*.swp
+*~.nib
+*.bak
