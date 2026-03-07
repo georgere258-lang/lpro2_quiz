@@ -30,7 +30,8 @@ class MainWrapper extends StatefulWidget {
   State<MainWrapper> createState() => _MainWrapperState();
 }
 
-class _MainWrapperState extends State<MainWrapper> {
+// ✅ إضافة WidgetsBindingObserver لمراقبة عودة التطبيق من الخلفية (Lifecycle Observer)
+class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
   int _currentIndex = 0;
   late final List<Widget> _pages;
   final User? _user = FirebaseAuth.instance.currentUser;
@@ -43,8 +44,10 @@ class _MainWrapperState extends State<MainWrapper> {
   @override
   void initState() {
     super.initState();
+    // ✅ تسجيل المراقب عند بدء الشاشة
+    WidgetsBinding.instance.addObserver(this);
 
-    // ✅ [تعديل النسخة 51] تصفير الأيقونة الخارجية بأمان فور الدخول للتطبيق
+    // ✅ [تعديل النسخة 55] تصفير الأيقونة الخارجية فور الدخول الأول
     NotificationCenter().clearBadge();
 
     if (widget.initialIndex != null) {
@@ -79,8 +82,24 @@ class _MainWrapperState extends State<MainWrapper> {
 
   @override
   void dispose() {
+    // ✅ إزالة المراقب عند إغلاق الشاشة
+    WidgetsBinding.instance.removeObserver(this);
     _refreshSub?.cancel();
     super.dispose();
+  }
+
+  // ✅ [تعديل النسخة 55] تنفيذ وظيفة الـ Lifecycle Observer
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // إذا عاد المستخدم للتطبيق من الخلفية (Resume)
+    if (state == AppLifecycleState.resumed) {
+      debugPrint(
+          "🔄 [Lifecycle] App Resumed: Syncing notifications and badge...");
+      // 1. تحديث قائمة الإشعارات والجرس فوراً
+      _loadNotifications();
+      // 2. تصفير رقم الأيقونة الخارجية (Badge)
+      NotificationCenter().clearBadge();
+    }
   }
 
   Future<void> _loadNotifications() async {
