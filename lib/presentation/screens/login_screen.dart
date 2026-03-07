@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/login_screen.dart
-// STATUS: iOS-SAFE OTP (Single Field + Stable Keyboard + Apple-friendly + Latin Numerals Force)
+// STATUS: iOS-SAFE OTP (Full Version 55 - Merged with Claude's Architecture)
 
 import 'dart:async';
 import 'dart:io';
@@ -29,7 +29,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final TextEditingController phoneController = TextEditingController();
 
-  // ✅ iOS-safe: OTP in ONE field
+  // ✅ iOS-safe: OTP controllers & Focus
   final TextEditingController otpController = TextEditingController();
   final FocusNode otpFocusNode = FocusNode();
 
@@ -342,7 +342,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         Directionality(
                           textDirection: TextDirection.ltr,
                           child: isOtpStage
-                              ? _buildOtpInput()
+                              ? _LatinOtpField(
+                                  controller: otpController,
+                                  focusNode: otpFocusNode)
                               : _buildPhoneInput(),
                         ),
                         const SizedBox(height: 40),
@@ -467,70 +469,78 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+}
 
-  // ✅ [تعديل النسخة 54] استخدام خط Poppins اللاتيني حصرياً لمنع الكيبورد من الانقلاب لعربي
-  Widget _buildOtpInput() {
+// ✅ [تعديل النسخة 55 - iOS Final Safe]
+// عزل حقل الـ OTP في Widget منفصل (اقتراح كلود) يمنع "اهتزاز" الواجهة ويضمن اللغة اللاتينية
+class _LatinOtpField extends StatelessWidget {
+  final TextEditingController controller;
+  final FocusNode focusNode;
+
+  const _LatinOtpField({required this.controller, required this.focusNode});
+
+  @override
+  Widget build(BuildContext context) {
     return Localizations.override(
       context: context,
-      locale: const Locale('en', 'US'), // فرض البيئة الإنجليزية على Autofill
-      child: Builder(
-        builder: (localizedContext) {
-          return SizedBox(
-            width: 220,
-            child: TextField(
-              controller: otpController,
-              focusNode: otpFocusNode,
-              textAlign: TextAlign.center,
-              keyboardType: const TextInputType.numberWithOptions(
-                signed: false,
-                decimal: false,
-              ),
-              textInputAction: TextInputAction.done,
-              autofillHints: const [AutofillHints.oneTimeCode],
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(6),
-                _LatinDigitsFormatter(), // مُحول الأرقام لضمان 123
-              ],
-              showCursor: true,
-              style: GoogleFonts.poppins(
-                // ← استخدام خط Poppins يثبّت الكيبورد الإنجليزي
-                color: Colors.black,
-                fontSize: 22,
-                height: 1.0,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 6,
-                locale: const Locale('en', 'US'),
-              ),
-              decoration: InputDecoration(
-                hintText: "••••••",
-                hintStyle: GoogleFonts.poppins(
-                  color: Colors.black26,
-                  fontSize: 18,
-                  letterSpacing: 6,
-                  locale: const Locale('en', 'US'),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              ),
-              onEditingComplete: () {
-                FocusScope.of(context).unfocus();
-              },
+      locale: const Locale('en', 'US'), // فرض البيئة الإنجليزية لضمان 123
+      child: SizedBox(
+        width: 220,
+        child: TextField(
+          controller: controller,
+          focusNode: focusNode,
+          textAlign: TextAlign.center,
+          // ✅ منع جميع ثغرات تبديل اللغة في iOS
+          autocorrect: false,
+          enableSuggestions: false,
+          keyboardAppearance: Brightness.light,
+          keyboardType: const TextInputType.numberWithOptions(
+            signed: false,
+            decimal: false,
+          ),
+          textInputAction: TextInputAction.done,
+          autofillHints: const [AutofillHints.oneTimeCode],
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(6),
+            _LatinDigitsFormatter(), // مُحول الأرقام لضمان 123
+          ],
+          showCursor: true,
+          style: GoogleFonts.poppins(
+            color: Colors.black,
+            fontSize: 22,
+            height: 1.0,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 6,
+            locale: const Locale('en', 'US'),
+          ),
+          decoration: InputDecoration(
+            hintText: "••••••",
+            hintStyle: GoogleFonts.poppins(
+              color: Colors.black26,
+              fontSize: 18,
+              letterSpacing: 6,
+              locale: const Locale('en', 'US'),
             ),
-          );
-        },
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+          onEditingComplete: () {
+            FocusScope.of(context).unfocus();
+          },
+        ),
       ),
     );
   }
 }
 
-// ✅ كلاس احترافي لتحويل الأرقام العربية/الهندية إلى لاتينية فوراً
+// ✅ كلاس احترافي لتحويل الأرقام العربية/الهندية إلى لاتينية فوراً لضمان نجاح التحقق
 class _LatinDigitsFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
