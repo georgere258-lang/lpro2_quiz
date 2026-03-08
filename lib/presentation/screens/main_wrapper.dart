@@ -1,4 +1,5 @@
 // PATH: lib/presentation/screens/main_wrapper.dart
+// STATUS: Version 56 - Final Consolidated Notification Sync Logic
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
@@ -41,6 +42,9 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
 
   StreamSubscription? _refreshSub;
 
+  // ✅ [جديد v56] مؤقت فحص الإشعارات لضمان المزامنة في iOS (Safety Net)
+  Timer? _notificationPollTimer;
+
   @override
   void initState() {
     super.initState();
@@ -63,40 +67,72 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
 
     _loadNotifications();
 
-    // الاستماع لإشارة تحديث الإشعارات من NotificationCenter (مثل عند النشر)
+    // ✅ الاستماع لإشارة تحديث الإشعارات من NotificationCenter
+    // (الآن تأتي الإشارة من main.dart بعد أن يتم الحفظ الفعلي)
     _refreshSub = NotificationCenter().stream.listen((name) {
       if (name == "refresh_notifications" && mounted) {
+        debugPrint('🔔 [MainWrapper] Refresh signal received. Loading...');
         _loadNotifications();
       }
     });
 
-    // معالجة الإشعارات أثناء فتح التطبيق
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-      if (mounted) {
-        // تأخير بسيط لضمان حفظ الرسالة في الشيرد بريفرنسز أولاً
-        await Future.delayed(const Duration(milliseconds: 1000));
-        await _loadNotifications();
-      }
-    });
+    // ❌ [إزالة v56] تم حذف مستمع FirebaseMessaging.onMessage من هنا
+    // السبب: تم توحيد المنطق في main.dart لمنع الازدواجية وضمان الحفظ أولاً.
+
+    // ✅ [جديد v56] تشغيل صمام الأمان لنظام iOS
+    if (Platform.isIOS) {
+      _startNotificationPolling();
+    }
   }
 
   @override
   void dispose() {
-    // ✅ إزالة المراقب عند إغلاق الشاشة
+    // ✅ إزالة المراقب والمؤقت عند إغلاق الشاشة
     WidgetsBinding.instance.removeObserver(this);
     _refreshSub?.cancel();
+    _stopNotificationPolling();
     super.dispose();
   }
 
-  // ✅ [تعديل النسخة 55] تنفيذ وظيفة الـ Lifecycle Observer
+  // ✅ [جديد v56] وظيفة مؤقت المزامنة لـ iOS
+  void _startNotificationPolling() {
+    _notificationPollTimer?.cancel();
+    _notificationPollTimer =
+        Timer.periodic(const Duration(seconds: 2), (timer) {
+      if (mounted) {
+        _checkNotificationFlagSilently();
+      }
+    });
+  }
+
+  void _stopNotificationPolling() {
+    _notificationPollTimer?.cancel();
+  }
+
+  // فحص صامت للراية في الخلفية دون إعادة تحميل الواجهة إلا عند الضرورة
+  Future<void> _checkNotificationFlagSilently() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      final bool hasNew = prefs.getBool('has_new_notification_flag') ?? false;
+
+      if (hasNew && !_hasNewNotification) {
+        debugPrint('🕵️ [Polling] New notification detected via Flag!');
+        await _loadNotifications();
+      }
+    } catch (_) {}
+  }
+
+  // ✅ [تعديل النسخة 55/56] تنفيذ وظيفة الـ Lifecycle Observer
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // إذا عاد المستخدم للتطبيق من الخلفية (Resume)
     if (state == AppLifecycleState.resumed) {
-      debugPrint(
-          "🔄 [Lifecycle] App Resumed: Syncing notifications and badge...");
-      // 1. تحديث قائمة الإشعارات والجرس فوراً
-      _loadNotifications();
+      debugPrint("🔄 [Lifecycle] App Resumed: Checking persistent flag...");
+
+      // 1. مزامنة الذاكرة والبحث عن "الراية" (Flag) التي رفعها السيرفر المحلي
+      _checkNotificationFlagSilently();
+
       // 2. تصفير رقم الأيقونة الخارجية (Badge)
       NotificationCenter().clearBadge();
     }
@@ -108,14 +144,25 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
       if (Platform.isIOS) await prefs.reload();
 
       final String? notifsString = prefs.getString('saved_notifications');
+
+      // ✅ [تعديل جراحي v56] قراءة الراية المستمرة
+      final bool hasNewFlag =
+          prefs.getBool('has_new_notification_flag') ?? false;
+
       if (notifsString != null) {
         final List<dynamic> loaded = jsonDecode(notifsString);
         if (mounted) {
           setState(() {
             _notifications = loaded;
-            // فحص وجود أي إشعار جديد غير مقروء
-            _hasNewNotification = loaded.any((n) => n['isNew'] == true);
+            // ✅ النقطة الأورانج تظهر إذا وجد إشعار جديد في القائمة "أو" إذا كانت الراية مرفوعة
+            _hasNewNotification =
+                hasNewFlag || loaded.any((n) => n['isNew'] == true);
           });
+        }
+      } else {
+        // في حالة القائمة فارغة لكن الراية مرفوعة
+        if (mounted && hasNewFlag) {
+          setState(() => _hasNewNotification = true);
         }
       }
     } catch (e) {
@@ -129,6 +176,9 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
 
       // ✅ تصفير الـ Badge الخارجي فوراً عند فتح القائمة
       await NotificationCenter().clearBadge();
+
+      // ✅ [تعديل جراحي v56] تصفير "الراية المستمرة" في الذاكرة فوراً
+      await prefs.setBool('has_new_notification_flag', false);
 
       bool changed = false;
       for (var n in _notifications) {
