@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/login_screen.dart
-// STATUS: iOS-SAFE OTP (Full Version 55 - Merged with Claude's Architecture)
+// STATUS: iOS-SAFE OTP (Full Version 56 - Hardened Architectural Fix)
 
 import 'dart:async';
 import 'dart:io';
@@ -13,6 +13,9 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../../core/constants/app_colors.dart';
 import 'main_wrapper.dart';
+
+// ✅ [تعديل جراحي v56] استيراد الـ main للوصول لـ LocaleController
+import '../../main.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -91,6 +94,8 @@ class _LoginScreenState extends State<LoginScreen> {
       await FirebaseAuth.instance.verifyPhoneNumber(
         phoneNumber: '${selectedCountry.split(' ')[1]}$phone',
         verificationCompleted: (PhoneAuthCredential credential) async {
+          // ✅ [تعديل v56] استعادة اللغة العربية قبل الدخول التلقائي
+          LocaleController().restoreArabic();
           await FirebaseAuth.instance.signInWithCredential(credential);
           _navigateUser();
         },
@@ -104,6 +109,10 @@ class _LoginScreenState extends State<LoginScreen> {
             isOtpStage = true;
             isLoading = false;
           });
+
+          // ✅ [تعديل جراحي v56] خدعة اللغة: تحويل التطبيق لإنجليزي فوراً
+          // هذا يمنع iOS من قلب الكيبورد للعربي عند وصول الـ SMS
+          LocaleController().setEnglishTemporarily();
 
           // ✅ stable focus (iPad safe)
           Future.delayed(const Duration(milliseconds: 350), () {
@@ -231,6 +240,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (mounted) {
       setState(() => isLoading = false);
 
+      // ✅ [تعديل جراحي v56] استعادة العربية قبل الانتقال للرئيسية
+      LocaleController().restoreArabic();
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (c) => const MainWrapper()),
@@ -255,6 +267,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    // ✅ [تعديل v56] ضمان استعادة اللغة العربية عند الخروج من الشاشة
+    LocaleController().restoreArabic();
     phoneController.dispose();
     otpController.dispose();
     otpFocusNode.dispose();
@@ -398,6 +412,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   isOtpStage = false;
                                   otpController.clear();
                                 });
+                                // ✅ [تعديل v56] استعادة العربية عند التراجع عن الـ OTP
+                                LocaleController().restoreArabic();
                               },
                               child: Text(
                                 "تعديل رقم الهاتف؟",
@@ -471,8 +487,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// ✅ [تعديل النسخة 55 - iOS Final Safe]
-// عزل حقل الـ OTP في Widget منفصل (اقتراح كلود) يمنع "اهتزاز" الواجهة ويضمن اللغة اللاتينية
+// ✅ [تعديل جراحي v56 - iOS Triple Defense]
 class _LatinOtpField extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
@@ -483,14 +498,13 @@ class _LatinOtpField extends StatelessWidget {
   Widget build(BuildContext context) {
     return Localizations.override(
       context: context,
-      locale: const Locale('en', 'US'), // فرض البيئة الإنجليزية لضمان 123
+      locale: const Locale('en', 'US'),
       child: SizedBox(
         width: 220,
         child: TextField(
           controller: controller,
           focusNode: focusNode,
           textAlign: TextAlign.center,
-          // ✅ منع جميع ثغرات تبديل اللغة في iOS
           autocorrect: false,
           enableSuggestions: false,
           keyboardAppearance: Brightness.light,
@@ -503,24 +517,27 @@ class _LatinOtpField extends StatelessWidget {
           inputFormatters: [
             FilteringTextInputFormatter.digitsOnly,
             LengthLimitingTextInputFormatter(6),
-            _LatinDigitsFormatter(), // مُحول الأرقام لضمان 123
+            _LatinDigitsFormatter(),
           ],
           showCursor: true,
-          style: GoogleFonts.poppins(
+          // ✅ [v56] الدفاع الطبقي: استخدام خط النظام مع Locale إنجليزي لضمان 123
+          style: const TextStyle(
             color: Colors.black,
-            fontSize: 22,
+            fontSize: 24,
             height: 1.0,
+            fontFamily: 'Roboto', // خط النظام يمنع قلب الأرقام
             fontWeight: FontWeight.bold,
             letterSpacing: 6,
-            locale: const Locale('en', 'US'),
+            locale: Locale('en', 'US'),
           ),
           decoration: InputDecoration(
             hintText: "••••••",
-            hintStyle: GoogleFonts.poppins(
+            hintStyle: const TextStyle(
               color: Colors.black26,
               fontSize: 18,
               letterSpacing: 6,
-              locale: const Locale('en', 'US'),
+              fontFamily: 'Roboto',
+              locale: Locale('en', 'US'),
             ),
             filled: true,
             fillColor: Colors.white,
@@ -540,7 +557,6 @@ class _LatinOtpField extends StatelessWidget {
   }
 }
 
-// ✅ كلاس احترافي لتحويل الأرقام العربية/الهندية إلى لاتينية فوراً لضمان نجاح التحقق
 class _LatinDigitsFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
@@ -561,7 +577,7 @@ class _LatinDigitsFormatter extends TextInputFormatter {
 
   String _convertToLatinDigits(String input) {
     const arabicNumerals = '٠١٢٣٤٥٦٧٨٩';
-    const hindiNumerals = '०१२३४५६७८९';
+    const hindiNumerals = '०१२३४٥٦٧٨٩';
     const latinDigits = '0123456789';
 
     var result = input;
