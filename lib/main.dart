@@ -1,4 +1,5 @@
 // PATH: lib/main.dart
+// STATUS: Version 56 - Final Surgical Fix for iOS Keyboard & Notifications
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -30,12 +31,43 @@ import 'package:lpro2_quiz/presentation/screens/know_client_articles_screen.dart
 
 import 'core/curriculum/unit_repository.dart';
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 🛡️ [جديد v56] متحكم اللغة الاستراتيجي (LocaleController)
+// الوظيفة: يخدع نظام iOS لترك الكيبورد إنجليزي في شاشة الـ OTP
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+class LocaleController {
+  static final LocaleController _instance = LocaleController._internal();
+  factory LocaleController() => _instance;
+  LocaleController._internal();
+
+  final _localeStream = StreamController<Locale>.broadcast();
+  Stream<Locale> get localeStream => _localeStream.stream;
+
+  Locale _currentLocale = const Locale('ar', 'EG');
+  Locale get currentLocale => _currentLocale;
+
+  // استدعاء هذه الدالة عند دخول شاشة الـ OTP (تخدع iOS)
+  void setEnglishTemporarily() {
+    _currentLocale = const Locale('en', 'US');
+    _localeStream.add(_currentLocale);
+    debugPrint('🌐 [Locale] Switched to English to Prevent Keyboard Flip');
+  }
+
+  // استدعاء هذه الدالة عند تسجيل الدخول أو الخروج من الـ OTP
+  void restoreArabic() {
+    _currentLocale = const Locale('ar', 'EG');
+    _localeStream.add(_currentLocale);
+    debugPrint('🌐 [Locale] Restored Arabic for Application UI');
+  }
+}
+
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    // حفظ الإشعار ورفع الراية (حتى والتطبيق مغلق تماماً)
     await _saveNotificationLocally(message);
   } catch (_) {}
 }
@@ -236,10 +268,15 @@ void _attachForegroundNotificationListener() {
   _onMessageSub =
       FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
     try {
+      // ✅ [تعديل جراحي v56] نضمن الحفظ ورفع الراية قبل أي return
       await _saveNotificationLocally(message);
 
       // ✅ [تعديل النسخة 55] في iOS نترك المهمة لـ AppDelegate لعرض البانر ومنع الازدواجية واختفاء الستارة
-      if (Platform.isIOS) return;
+      if (Platform.isIOS) {
+        // نرسل إشارة للواجهة فقط لتحديث الجرس بما أن الحفظ تم
+        NotificationCenter().post(name: "refresh_notifications");
+        return;
+      }
 
       final notif = message.notification;
       if (notif == null) return;
@@ -428,6 +465,9 @@ Future<void> _saveNotificationLocally(RemoteMessage message) async {
 
     await prefs.setString('saved_notifications', jsonEncode(notifs));
 
+    // ✅ [تعديل جراحي v56] رفع راية وجود إشعار جديد لضمان تحديث النقطة في iOS
+    await prefs.setBool('has_new_notification_flag', true);
+
     // ✅ تحديث رقم الأيقونة الخارجية (Badge)
     final newCount = notifs.where((n) => n['isNew'] == true).length;
     await NotificationCenter().updateBadgeCount(newCount);
@@ -492,7 +532,28 @@ class LProApp extends StatefulWidget {
 }
 
 class _LProAppState extends State<LProApp> {
-  Locale _locale = const Locale('ar', 'EG');
+  // ✅ [تعديل جراحي v56] الاستماع للمتحكم في اللغة
+  late StreamSubscription _localeSub;
+  Locale _locale = LocaleController().currentLocale;
+
+  @override
+  void initState() {
+    super.initState();
+    // ✅ مراقبة تغيير اللغة (تغيير الـ MaterialApp ديناميكياً)
+    _localeSub = LocaleController().localeStream.listen((newLocale) {
+      if (mounted) {
+        setState(() {
+          _locale = newLocale;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _localeSub.cancel();
+    super.dispose();
+  }
 
   void changeLanguage(Locale locale) {
     setState(() => _locale = locale);
@@ -520,6 +581,7 @@ class _LProAppState extends State<LProApp> {
         Locale('ar', 'EG'),
         Locale('en', 'US'),
       ],
+      // ✅ [تعديل جراحي v56] الربط مع المتغير الديناميكي للتحكم في الكيبورد
       locale: _locale,
       theme: LproTheme.lightTheme,
       initialRoute: '/',
