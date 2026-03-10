@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/main_wrapper.dart
-// STATUS: Version 56 - Final Consolidated Notification Sync Logic
+// STATUS: Version 56 - Final Consolidated Notification Sync Logic (Hardened by Gemini & Claude)
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
@@ -68,7 +68,6 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
     _loadNotifications();
 
     // ✅ الاستماع لإشارة تحديث الإشعارات من NotificationCenter
-    // (الآن تأتي الإشارة من main.dart بعد أن يتم الحفظ الفعلي)
     _refreshSub = NotificationCenter().stream.listen((name) {
       if (name == "refresh_notifications" && mounted) {
         debugPrint('🔔 [MainWrapper] Refresh signal received. Loading...');
@@ -76,8 +75,7 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
       }
     });
 
-    // ❌ [إزالة v56] تم حذف مستمع FirebaseMessaging.onMessage من هنا
-    // السبب: تم توحيد المنطق في main.dart لمنع الازدواجية وضمان الحفظ أولاً.
+    // ❌ [إزالة v56] تم حذف مستمع FirebaseMessaging.onMessage من هنا لتوحيد المنطق في main.dart
 
     // ✅ [جديد v56] تشغيل صمام الأمان لنظام iOS
     if (Platform.isIOS) {
@@ -126,18 +124,14 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
   // ✅ [تعديل النسخة 55/56] تنفيذ وظيفة الـ Lifecycle Observer
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // إذا عاد المستخدم للتطبيق من الخلفية (Resume)
     if (state == AppLifecycleState.resumed) {
       debugPrint("🔄 [Lifecycle] App Resumed: Checking persistent flag...");
-
-      // 1. مزامنة الذاكرة والبحث عن "الراية" (Flag) التي رفعها السيرفر المحلي
       _checkNotificationFlagSilently();
-
-      // 2. تصفير رقم الأيقونة الخارجية (Badge)
       NotificationCenter().clearBadge();
     }
   }
 
+  // ✅ [تعديل جراحي v56 - دمج حل كلود لضمان الـ setState دائماً]
   Future<void> _loadNotifications() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -145,28 +139,39 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
 
       final String? notifsString = prefs.getString('saved_notifications');
 
-      // ✅ [تعديل جراحي v56] قراءة الراية المستمرة
+      // ✅ قراءة الراية المستمرة
       final bool hasNewFlag =
           prefs.getBool('has_new_notification_flag') ?? false;
 
-      if (notifsString != null) {
-        final List<dynamic> loaded = jsonDecode(notifsString);
-        if (mounted) {
-          setState(() {
-            _notifications = loaded;
-            // ✅ النقطة الأورانج تظهر إذا وجد إشعار جديد في القائمة "أو" إذا كانت الراية مرفوعة
-            _hasNewNotification =
-                hasNewFlag || loaded.any((n) => n['isNew'] == true);
-          });
-        }
-      } else {
-        // في حالة القائمة فارغة لكن الراية مرفوعة
-        if (mounted && hasNewFlag) {
-          setState(() => _hasNewNotification = true);
+      // ✅ تحضير البيانات أولاً (سواء كانت القائمة فارغة أو ممتلئة)
+      List<dynamic> loaded = [];
+      if (notifsString != null && notifsString.isNotEmpty) {
+        try {
+          loaded = jsonDecode(notifsString);
+        } catch (e) {
+          debugPrint("⚠️ Error parsing notifications: $e");
+          loaded = [];
         }
       }
+
+      // ✅ حساب وجود إشعارات جديدة من داخل القائمة
+      final bool hasNewInList = loaded.any((n) => n['isNew'] == true);
+
+      // ✅ القرار النهائي لظهور النقطة (راية الـ Background أو حالة القائمة)
+      final bool shouldShowBadge = hasNewFlag || hasNewInList;
+
+      // ✅ [CRITICAL FIX] استدعاء setState دائماً لضمان تحديث الواجهة حتى لو القائمة فارغة
+      if (mounted) {
+        setState(() {
+          _notifications = loaded;
+          _hasNewNotification = shouldShowBadge;
+        });
+
+        debugPrint(
+            '✅ [LOAD] Sync Complete. Badge: $shouldShowBadge (Flag: $hasNewFlag, List: $hasNewInList)');
+      }
     } catch (e) {
-      debugPrint("Error loading notifications: $e");
+      debugPrint("🔴 Error loading notifications: $e");
     }
   }
 
@@ -174,10 +179,10 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // ✅ تصفير الـ Badge الخارجي فوراً عند فتح القائمة
+      // ✅ تصفير الـ Badge الخارجي فوراً
       await NotificationCenter().clearBadge();
 
-      // ✅ [تعديل جراحي v56] تصفير "الراية المستمرة" في الذاكرة فوراً
+      // ✅ تصفير الراية المستمرة لضمان اختفاء النقطة
       await prefs.setBool('has_new_notification_flag', false);
 
       bool changed = false;
@@ -236,7 +241,6 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.scaffoldBackground,
-      // منع اهتزاز الشاشة عند ظهور الكيبورد
       resizeToAvoidBottomInset: false,
       appBar: _buildDynamicAppBar(),
       body: Stack(
@@ -271,7 +275,6 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
               );
             },
             child: Container(
-              // الـ ValueKey يضمن تحديث الصفحة بسلاسة دون تكرار
               key: ValueKey<int>(_currentIndex),
               child: IndexedStack(
                 index: _currentIndex,
