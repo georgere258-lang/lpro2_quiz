@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/main_wrapper.dart
-// STATUS: Version 56 - Final Consolidated Notification Sync Logic (Hardened by Gemini & Claude)
+// STATUS: Version 57 - Final Consolidated Notification Sync Logic (Hardened with Always-setState Fix)
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
@@ -42,7 +42,7 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
 
   StreamSubscription? _refreshSub;
 
-  // ✅ [جديد v56] مؤقت فحص الإشعارات لضمان المزامنة في iOS (Safety Net)
+  // ✅ [جديد v56/57] مؤقت فحص الإشعارات لضمان المزامنة في iOS (Safety Net)
   Timer? _notificationPollTimer;
 
   @override
@@ -51,7 +51,7 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
     // ✅ تسجيل المراقب عند بدء الشاشة
     WidgetsBinding.instance.addObserver(this);
 
-    // ✅ [تعديل النسخة 55] تصفير الأيقونة الخارجية فور الدخول الأول
+    // ✅ تصفير الأيقونة الخارجية فور الدخول الأول
     NotificationCenter().clearBadge();
 
     if (widget.initialIndex != null) {
@@ -75,9 +75,7 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
       }
     });
 
-    // ❌ [إزالة v56] تم حذف مستمع FirebaseMessaging.onMessage من هنا لتوحيد المنطق في main.dart
-
-    // ✅ [جديد v56] تشغيل صمام الأمان لنظام iOS
+    // ✅ تشغيل صمام الأمان لنظام iOS
     if (Platform.isIOS) {
       _startNotificationPolling();
     }
@@ -92,7 +90,7 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  // ✅ [جديد v56] وظيفة مؤقت المزامنة لـ iOS
+  // ✅ وظيفة مؤقت المزامنة لـ iOS
   void _startNotificationPolling() {
     _notificationPollTimer?.cancel();
     _notificationPollTimer =
@@ -121,7 +119,7 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
     } catch (_) {}
   }
 
-  // ✅ [تعديل النسخة 55/56] تنفيذ وظيفة الـ Lifecycle Observer
+  // ✅ تنفيذ وظيفة الـ Lifecycle Observer
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -131,7 +129,7 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
     }
   }
 
-  // ✅ [تعديل جراحي v56 - دمج حل كلود لضمان الـ setState دائماً]
+  // ✅ [تعديل جراحي v57 - دمج حل كلود لضمان الـ setState دائماً]
   Future<void> _loadNotifications() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -160,7 +158,7 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
       // ✅ القرار النهائي لظهور النقطة (راية الـ Background أو حالة القائمة)
       final bool shouldShowBadge = hasNewFlag || hasNewInList;
 
-      // ✅ [CRITICAL FIX] استدعاء setState دائماً لضمان تحديث الواجهة حتى لو القائمة فارغة
+      // ✅ [CRITICAL FIX v57] استدعاء setState دائماً لضمان تحديث الواجهة حتى لو القائمة فارغة
       if (mounted) {
         setState(() {
           _notifications = loaded;
@@ -168,7 +166,7 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
         });
 
         debugPrint(
-            '✅ [LOAD] Sync Complete. Badge: $shouldShowBadge (Flag: $hasNewFlag, List: $hasNewInList)');
+            '✅ [LOAD v57] Sync Complete. Count: ${loaded.length}, Badge: $shouldShowBadge (Flag: $hasNewFlag, List: $hasNewInList)');
       }
     } catch (e) {
       debugPrint("🔴 Error loading notifications: $e");
