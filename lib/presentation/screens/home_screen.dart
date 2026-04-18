@@ -1,21 +1,17 @@
 // 🔒 HOME SCREEN: ELITE DYNAMIC EDITION
-// PATH: lib/presentation/screens/home_screen.dart
-// STATUS: ULTRA-PREMIUM (Size Optimized & Spacing Balanced)
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/utils/sound_manager.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/services/user_service.dart';
+import '../../core/data/models/user_model.dart';
 import '../home/widgets/home_pro_card_container.dart';
+// ✅ استدعاء الكارت المنفصل
+import '../home/widgets/premium_event_card.dart';
 
 import 'quiz_screen.dart';
-import 'fact_screen.dart';
-import 'know_client_screen.dart';
-import 'market_radar_screen.dart';
-import 'money_economy_screen.dart';
 import 'stats_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -26,7 +22,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  final User? user = FirebaseAuth.instance.currentUser;
   late final AnimationController _bgController;
   late final AnimationController _floatController;
 
@@ -75,20 +70,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 return Stack(
                   children: [
                     Positioned(
-                      top: -150 + (40 * v),
                       right: -100 + (30 * v),
+                      top: -150 + (40 * v),
                       child: _blob(
                           size: 400,
-                          color:
-                              const Color(0xFFFF8C00).withValues(alpha: 0.06)),
+                          color: const Color(0xFFFF8C00).withOpacity(0.06)),
                     ),
                     Positioned(
                       bottom: -100 + (40 * v),
                       left: -50 + (20 * v),
                       child: _blob(
                           size: 450,
-                          color: AppColors.primaryDeepTeal
-                              .withValues(alpha: 0.07)),
+                          color: AppColors.primaryDeepTeal.withOpacity(0.07)),
                     ),
                   ],
                 );
@@ -100,27 +93,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
-                // 1. كارت الترحيب
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    child: RepaintBoundary(child: _WelcomeCard(user: user)),
+                    child: const RepaintBoundary(child: _WelcomeCard()),
                   ),
                 ),
-
                 const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-                // 2. كارت معلومة برو
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: RepaintBoundary(child: HomeProCardContainer()),
                   ),
                 ),
-
                 const SliverToBoxAdapter(child: SizedBox(height: 16)),
-
-                // 3. شبكة الكروت الأربعة (Grid)
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   sliver: SliverGrid(
@@ -151,45 +137,42 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             const QuizScreen(categoryTitle: "دوري المحترفين")),
                       ),
                       _SectionCard(
-                        title: "المعلومة بتفرق",
-                        icon: Icons.lightbulb_outline,
-                        accent: AppColors.secondaryOrange,
-                        onTap: () => _go(context, const FactScreen()),
+                        title: "سوق العقار",
+                        icon: Icons.apartment_rounded,
+                        accent: const Color(0xFF2ECC71),
+                        onTap: () => _go(
+                            context,
+                            const QuizScreen(
+                                categoryTitle: "سوق العقار",
+                                isStudyMode: true)),
                       ),
                       _SectionCard(
-                        title: "اعرف عميلك",
-                        icon: Icons.groups_outlined,
+                        title: "البيع وعقد المطور",
+                        icon: Icons.gavel_rounded,
                         accent: AppColors.primaryDeepTeal,
-                        onTap: () => _go(context, const KnowClientScreen()),
+                        onTap: () => _go(
+                            context,
+                            const QuizScreen(
+                                categoryTitle: "البيع وعقد المطور",
+                                isStudyMode: true)),
                       ),
                     ]),
                   ),
                 ),
-
                 const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-                // 4. الكروت العريضة
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
-                      _SecondarySectionCard(
-                        title: "رادار السوق",
-                        icon: Icons.radar_rounded,
-                        accent: const Color(0xFF2ECC71),
-                        onTap: () => _go(context, const MarketRadarScreen()),
-                      ),
-                      const SizedBox(height: 12),
-                      _SecondarySectionCard(
-                        title: "اقتصاد عقاري",
-                        icon: Icons.attach_money_rounded,
-                        accent: const Color(0xFF9B59B6),
-                        onTap: () => _go(context, const MoneyEconomyScreen()),
+                      // ✅ استدعاء الكارت المنفصل هنا
+                      const PremiumEventCard(
+                        title: "قريباً",
+                        subtitle: "مفاجآت في الطريق",
+                        onTap: null,
                       ),
                     ]),
                   ),
                 ),
-
                 SliverToBoxAdapter(child: SizedBox(height: bottomScrollSpacer)),
               ],
             ),
@@ -205,7 +188,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(colors: [color, color.withValues(alpha: 0.0)]),
+        gradient: RadialGradient(colors: [color, color.withOpacity(0.0)]),
       ),
     );
   }
@@ -216,72 +199,64 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 }
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// WIDGETS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 class _WelcomeCard extends StatelessWidget {
-  final User? user;
-  const _WelcomeCard({required this.user});
+  const _WelcomeCard();
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('users')
-          .doc(user?.uid)
-          .snapshots(),
+    return StreamBuilder<UserModel?>(
+      stream: UserService().currentUserStream,
       builder: (context, snapshot) {
-        String name = "عضو Pro";
-        int points = 0;
-        if (snapshot.hasData && snapshot.data!.exists) {
-          final data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
-          name = (data['name'] ?? name).toString();
-          final p = data['points'];
-          if (p is int) points = p;
+        if (!snapshot.hasData) {
+          return _buildStaticUI(context, "عضو Pro", 0);
         }
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: AppColors.eliteShadowL1,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text.rich(
-                  TextSpan(
-                    text: "أهلاً بك، ",
-                    style: GoogleFonts.cairo(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w600),
-                    children: [
-                      TextSpan(
-                          text: name,
-                          style: GoogleFonts.cairo(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w900,
-                              color: const Color(0xFF1B4D57))),
-                    ],
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              InkWell(
-                onTap: () {
-                  SoundManager.playTap();
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const StatsScreen()),
-                  );
-                },
-                borderRadius: BorderRadius.circular(20),
-                child: _PointsBadge(points: points),
-              ),
-            ],
-          ),
-        );
+        final user = snapshot.data!;
+        return _buildStaticUI(context, user.displayName, user.points);
       },
+    );
+  }
+
+  Widget _buildStaticUI(BuildContext context, String name, int points) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: AppColors.eliteShadowL1),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+              child: Text.rich(
+                  TextSpan(
+                      text: "أهلاً بك، ",
+                      style: GoogleFonts.cairo(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w600),
+                      children: [
+                        TextSpan(
+                            text: name,
+                            style: GoogleFonts.cairo(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                                color: const Color(0xFF1B4D57)))
+                      ]),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis)),
+          Builder(builder: (btnContext) {
+            return InkWell(
+              onTap: null,
+              borderRadius: BorderRadius.circular(20),
+              child: _PointsBadge(points: points),
+            );
+          }),
+        ],
+      ),
     );
   }
 }
@@ -294,30 +269,18 @@ class _PointsBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: AppColors.secondaryOrange,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-              color: AppColors.secondaryOrange.withValues(alpha: 0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 2))
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text("$points ",
-              style: GoogleFonts.cairo(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white)),
-          Text("نقطة",
-              style: GoogleFonts.cairo(
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white)),
-        ],
-      ),
+          color: AppColors.secondaryOrange,
+          borderRadius: BorderRadius.circular(20)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Text("$points ",
+            style: GoogleFonts.cairo(
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                color: Colors.white)),
+        Text("نقطة",
+            style: GoogleFonts.cairo(
+                fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white))
+      ]),
     );
   }
 }
@@ -330,14 +293,13 @@ class _SectionCard extends StatelessWidget {
   final bool isHighFocus;
   final AnimationController? floatAnimation;
 
-  const _SectionCard({
-    required this.title,
-    required this.icon,
-    required this.accent,
-    required this.onTap,
-    this.isHighFocus = false,
-    this.floatAnimation,
-  });
+  const _SectionCard(
+      {required this.title,
+      required this.icon,
+      required this.accent,
+      required this.onTap,
+      this.isHighFocus = false,
+      this.floatAnimation});
 
   @override
   Widget build(BuildContext context) {
@@ -345,76 +307,53 @@ class _SectionCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          color: Colors.white,
-          boxShadow:
-              isHighFocus ? AppColors.eliteShadowL2 : AppColors.eliteShadowL1,
-        ),
-        child: Stack(
-          children: [
-            Positioned(
+            borderRadius: BorderRadius.circular(22),
+            color: Colors.white,
+            boxShadow: isHighFocus
+                ? AppColors.eliteShadowL2
+                : AppColors.eliteShadowL1),
+        child: Stack(children: [
+          Positioned(
               bottom: -12,
               left: -12,
-              child:
-                  Icon(icon, size: 85, color: accent.withValues(alpha: 0.06)),
-            ),
-            Padding(
+              child: Icon(icon, size: 85, color: accent.withOpacity(0.06))),
+          Padding(
               padding: const EdgeInsets.all(14),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  AnimatedBuilder(
-                    animation: floatAnimation ?? kAlwaysCompleteAnimation,
-                    builder: (context, child) {
-                      final floatValue = floatAnimation?.value ?? 0.0;
-                      return Transform.translate(
-                        offset: Offset(0, isHighFocus ? -4 * floatValue : 0),
-                        child: Container(
-                          padding: const EdgeInsets.all(11),
-                          decoration: BoxDecoration(
-                            color: isHighFocus
-                                ? accent.withValues(
-                                    alpha: 0.05 + (0.05 * floatValue))
-                                : Colors.white,
-                            shape: BoxShape.circle,
-                            border: isHighFocus
-                                ? Border.all(
-                                    color: accent.withValues(
-                                        alpha: 0.15 + (0.1 * floatValue)),
-                                    width: 1.5)
-                                : null,
-                            boxShadow: [
-                              BoxShadow(
-                                  color: accent.withValues(
-                                      alpha: isHighFocus
-                                          ? 0.3 + (0.2 * floatValue)
-                                          : 0.3),
-                                  blurRadius:
-                                      isHighFocus ? 12 + (8 * floatValue) : 8,
-                                  spreadRadius:
-                                      isHighFocus ? 1 * floatValue : 0,
-                                  offset: const Offset(0, 4))
-                            ],
-                          ),
-                          child: Icon(icon, color: accent, size: 24),
-                        ),
-                      );
-                    },
-                  ),
-                  Text(
-                    title,
-                    style: GoogleFonts.cairo(
-                        fontSize: 14,
-                        fontWeight:
-                            isHighFocus ? FontWeight.w900 : FontWeight.w800,
-                        color: const Color(0xFF1B4D57)),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    AnimatedBuilder(
+                        animation: floatAnimation ?? kAlwaysCompleteAnimation,
+                        builder: (context, child) {
+                          final floatValue = floatAnimation?.value ?? 0.0;
+                          return Transform.translate(
+                              offset:
+                                  Offset(0, isHighFocus ? -4 * floatValue : 0),
+                              child: Container(
+                                  padding: const EdgeInsets.all(11),
+                                  decoration: BoxDecoration(
+                                      color: isHighFocus
+                                          ? accent.withOpacity(
+                                              0.05 + (0.05 * floatValue))
+                                          : Colors.white,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                            color: accent.withOpacity(0.3),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 4))
+                                      ]),
+                                  child: Icon(icon, color: accent, size: 24)));
+                        }),
+                    Text(title,
+                        style: GoogleFonts.cairo(
+                            fontSize: 14,
+                            fontWeight:
+                                isHighFocus ? FontWeight.w900 : FontWeight.w800,
+                            color: const Color(0xFF1B4D57))),
+                  ])),
+        ]),
       ),
     );
   }
@@ -425,13 +364,11 @@ class _SecondarySectionCard extends StatelessWidget {
   final IconData icon;
   final Color accent;
   final VoidCallback onTap;
-
   const _SecondarySectionCard(
       {required this.title,
       required this.icon,
       required this.accent,
       required this.onTap});
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -439,34 +376,26 @@ class _SecondarySectionCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border(
-              right:
-                  BorderSide(color: accent.withValues(alpha: 0.4), width: 4.5)),
-          boxShadow: AppColors.eliteShadowL1,
-        ),
-        child: Row(
-          children: [
-            Container(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border(
+                right: BorderSide(color: accent.withOpacity(0.4), width: 4.5)),
+            boxShadow: AppColors.eliteShadowL1),
+        child: Row(children: [
+          Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.1),
+                  color: accent.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10)),
-              child: Icon(icon, color: accent, size: 22),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                title,
-                style: GoogleFonts.cairo(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF1B4D57)),
-              ),
-            ),
-          ],
-        ),
+              child: Icon(icon, color: accent, size: 22)),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Text(title,
+                  style: GoogleFonts.cairo(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF1B4D57)))),
+        ]),
       ),
     );
   }

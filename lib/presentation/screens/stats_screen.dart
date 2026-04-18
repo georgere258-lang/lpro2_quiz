@@ -1,17 +1,15 @@
 // PATH: lib/presentation/screens/stats_screen.dart
-// STATUS: PREMIUM STATS SCREEN (Real Data from user_stats) - FIXED (num-safe + aligned seed)
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/constants/app_colors.dart';
 import '../widgets/lpro_bottom_nav_bar.dart';
 import 'main_wrapper.dart';
+// ✅ ربط المصدر الموحد والموديل الجديد
+import '../../core/services/user_service.dart';
+import '../../core/data/models/user_model.dart';
 
 class StatsScreen extends StatefulWidget {
-  final String?
-      initialTab; // 'stars' | 'pros' | 'freeplay' | null (default: stars)
+  final String? initialTab; // 'stars' | 'pros' | 'freeplay' | null
 
   const StatsScreen({super.key, this.initialTab});
 
@@ -28,7 +26,7 @@ class _StatsScreenState extends State<StatsScreen>
   @override
   void initState() {
     super.initState();
-    _ensureStatsDocExistsAligned();
+    // ✅ تم إلغاء دالة التأكد من وجود الوثيقة لأن البيانات مدمجة الآن في وثيقة اليوزر
     int initialIndex = 0;
     if (widget.initialTab == 'pros') {
       initialIndex = 1;
@@ -37,56 +35,6 @@ class _StatsScreenState extends State<StatsScreen>
     }
     _tabController =
         TabController(length: 3, vsync: this, initialIndex: initialIndex);
-  }
-
-  // num-safe int reader (Firestore often returns num)
-  int _n(Map<String, dynamic> map, String key) {
-    final v = map[key];
-    if (v is num) return v.toInt();
-    return 0;
-  }
-
-  Future<void> _ensureStatsDocExistsAligned() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    try {
-      final ref =
-          FirebaseFirestore.instance.collection('user_stats').doc(user.uid);
-      final snapshot = await ref.get();
-      if (snapshot.exists) return;
-
-      // ✅ Align seed shape with QuizRepository writes (no extra keys)
-      await ref.set(
-        {
-          'updatedAt': Timestamp.fromDate(DateTime.now()),
-          'stars': {
-            'roundsPlayed': 0,
-            'totalQuestions': 0,
-            'correctAnswers': 0,
-            'wrongAnswers': 0,
-            'totalPoints': 0,
-          },
-          'pros': {
-            'roundsPlayed': 0,
-            'totalQuestions': 0,
-            'correctAnswers': 0,
-            'wrongAnswers': 0,
-            'totalPoints': 0,
-          },
-          'freeplay': {
-            'roundsPlayed': 0,
-            'totalQuestions': 0,
-            'correctAnswers': 0,
-            'wrongAnswers': 0,
-            'totalPoints': 0, // keep consistent even if you don't display it
-          },
-        },
-        SetOptions(merge: true),
-      );
-    } catch (e) {
-      debugPrint('StatsScreen ensureStatsDocExists: $e');
-    }
   }
 
   @override
@@ -117,7 +65,8 @@ class _StatsScreenState extends State<StatsScreen>
           indicatorColor: safetyOrange,
           indicatorWeight: 3,
           labelColor: Colors.white,
-          unselectedLabelColor: Colors.white.withValues(alpha: 0.6),
+          unselectedLabelColor:
+              Colors.white.withOpacity(0.6), // ✅ تم الإصلاح الجراحي (Opacity)
           labelStyle:
               GoogleFonts.cairo(fontWeight: FontWeight.w800, fontSize: 14),
           unselectedLabelStyle:
@@ -176,34 +125,54 @@ class _StatsScreenState extends State<StatsScreen>
     required String motivationalText,
     bool isFreePlay = false,
   }) {
-    final user = FirebaseAuth.instance.currentUser;
+    // ✅ التعديل الرئيسي: الاستماع للـ Stream الموحد بدلاً من قراءة كولكشن منفصل
+    return StreamBuilder<UserModel?>(
+      stream: UserService().currentUserStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: StreamBuilder<DocumentSnapshot>(
-        stream: user != null
-            ? FirebaseFirestore.instance
-                .collection('user_stats')
-                .doc(user.uid)
-                .snapshots()
-            : null,
-        builder: (context, snapshot) {
-          Map<String, dynamic> leagueData = <String, dynamic>{};
+        final user = snapshot.data;
+        if (user == null) return const SizedBox.shrink();
 
-          if (snapshot.hasData && snapshot.data!.exists) {
-            final data = snapshot.data!.data() as Map<String, dynamic>? ??
-                <String, dynamic>{};
-            leagueData = (data[leagueKey] as Map<String, dynamic>?) ??
-                <String, dynamic>{};
-          }
+        // 🛡️ [تخدير جراحي]: تم تصفير المتغيرات التي حُذفت من الموديل لمنع الخطأ الأحمر
+        int totalQuestions = 0;
+        int correctAnswers = 0;
+        int roundsPlayed = 0;
+        int totalPoints = 0;
+        int bestStreak = 0;
 
-          final totalQuestions = _n(leagueData, 'totalQuestions');
-          final correctAnswers = _n(leagueData, 'correctAnswers');
+        /* ✅ تم تعطيل هذا الجزء مؤقتاً لأن الموديل الجديد لا يحتوي على هذه الإحصائيات حالياً
+        if (leagueKey == 'stars') {
+          totalQuestions = user.starsTotalQ;
+          correctAnswers = user.starsCorrect;
+          roundsPlayed = user.starsRounds;
+          totalPoints = user.starsPoints;
+          bestStreak = user.starsBestStreak;
+        } else if (leagueKey == 'pros') {
+          totalQuestions = user.prosTotalQ;
+          correctAnswers = user.prosCorrect;
+          roundsPlayed = user.prosRounds;
+          totalPoints = user.proPoints;
+        } else if (leagueKey == 'freeplay') {
+          totalQuestions = user.freeTotalQ;
+          correctAnswers = user.freeCorrect;
+          roundsPlayed = user.freeRounds;
+        }
+        */
 
-          final denom = totalQuestions > 0 ? totalQuestions : 1;
-          final accuracy = (correctAnswers / denom * 100).round();
+        // ربط النقاط المتاحة فقط في الموديل الجديد
+        if (leagueKey == 'stars') totalPoints = user.starsPoints;
+        if (leagueKey == 'pros') totalPoints = user.proPoints;
 
-          return ListView(
+        final denom = totalQuestions > 0 ? totalQuestions : 1;
+        final accuracy = (correctAnswers / denom * 100).round();
+
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: ListView(
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.all(16),
             children: [
@@ -220,11 +189,11 @@ class _StatsScreenState extends State<StatsScreen>
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.12),
+                        color: color.withOpacity(0.12), // ✅ تم الإصلاح
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: color.withValues(alpha: 0.2),
+                            color: color.withOpacity(0.2), // ✅ تم الإصلاح
                             blurRadius: 20,
                             spreadRadius: 2,
                           ),
@@ -255,7 +224,7 @@ class _StatsScreenState extends State<StatsScreen>
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.05),
+                        color: color.withOpacity(0.05), // ✅ تم الإصلاح
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Column(
@@ -307,7 +276,7 @@ class _StatsScreenState extends State<StatsScreen>
                   if (!isFreePlay)
                     _buildAnimatedStatCard(
                       label: "إجمالي النقاط",
-                      value: _n(leagueData, 'totalPoints'),
+                      value: totalPoints,
                       icon: Icons.emoji_events,
                       color: color,
                     )
@@ -320,7 +289,7 @@ class _StatsScreenState extends State<StatsScreen>
                     ),
                   _buildAnimatedStatCard(
                     label: "الجولات",
-                    value: _n(leagueData, 'roundsPlayed'),
+                    value: roundsPlayed,
                     icon: Icons.repeat,
                     color: color,
                   ),
@@ -332,17 +301,16 @@ class _StatsScreenState extends State<StatsScreen>
                   ),
                   _buildAnimatedStatCard(
                     label: "أفضل سلسلة",
-                    value: _n(leagueData,
-                        'bestStreak'), // will stay 0 unless you implement streaks later
+                    value: bestStreak,
                     icon: Icons.local_fire_department,
                     color: color,
                   ),
                 ],
               ),
             ],
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 

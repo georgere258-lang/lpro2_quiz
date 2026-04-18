@@ -1,3 +1,4 @@
+// PATH: lib/features/leaderboards/models/leaderboard_entry.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LeaderboardEntry {
@@ -17,12 +18,26 @@ class LeaderboardEntry {
     this.updatedAt,
   });
 
-  factory LeaderboardEntry.fromFirestore(Map<String, dynamic> data, String docId) {
+  // ✅ للقراءة من الكاش الموحد (الذي يحفظ البيانات في Map)
+  factory LeaderboardEntry.fromMap(Map<String, dynamic> data) {
+    return LeaderboardEntry(
+      uid: data['uid'] as String? ?? '',
+      name: data['name'] as String? ?? 'لاعب مجهول',
+      avatarIndex: (data['avatarIndex'] as int?) ?? 0,
+      points: (data['points'] as int?) ?? 0,
+      rank: (data['rank'] as int?) ?? 0,
+      updatedAt: data['updatedAt'] != null
+          ? (data['updatedAt'] as Timestamp).toDate()
+          : null,
+    );
+  }
+
+  // ✅ المصنع الأصلي للقراءة من وثيقة Firestore مباشرة (يستخدمه الأدمن فقط)
+  factory LeaderboardEntry.fromFirestore(
+      Map<String, dynamic> data, String docId) {
     DateTime? updated;
     final ts = data['updatedAt'];
-    if (ts is Timestamp) {
-      updated = ts.toDate();
-    }
+    if (ts is Timestamp) updated = ts.toDate();
 
     return LeaderboardEntry(
       uid: data['uid'] as String? ?? docId,

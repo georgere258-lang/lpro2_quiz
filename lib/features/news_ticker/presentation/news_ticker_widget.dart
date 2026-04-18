@@ -1,5 +1,5 @@
 // PATH: lib/features/news_ticker/presentation/news_ticker_widget.dart
-// STATUS: CLEAN SEAMLESS TEXT ✅ (FULL FILE)
+// STATUS: ULTRA-OPTIMIZED (Static Stream / Zero Extra Consumption) ✅
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -20,6 +20,9 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
   final NewsTickerService _service = NewsTickerService();
   late final ScrollController _scrollController;
 
+  // ✅ تعريف الـ Stream هنا لضمان فتحه مرة واحدة فقط عند بداية تشغيل الودجت
+  late final Stream<List<Map<String, dynamic>>> _newsStream;
+
   static const double _pixelsPerSecond = 35.0;
   static const Duration _tick = Duration(milliseconds: 16);
 
@@ -32,6 +35,10 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
   void initState() {
     super.initState();
     _scrollController = ScrollController();
+
+    // ✅ تهيئة المستمع اللحظي مرة واحدة فقط عند الدخول
+    _newsStream = _service.streamTickerItems();
+
     _timer = Timer.periodic(_tick, (_) => _onTick());
   }
 
@@ -93,7 +100,8 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: _service.streamTickerItems(),
+      // ✅ نستخدم الـ Stream الثابت المسجل في الذاكرة
+      stream: _newsStream,
       builder: (context, snapshot) {
         final messages = _extractMessages(snapshot);
         if (messages.isEmpty) return const SizedBox.shrink();
@@ -113,7 +121,7 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
         return Container(
           height: 34,
           width: double.infinity,
-          color: Colors.transparent, // ✅ شفاف تماماً للاندماج مع الهيدر
+          color: Colors.transparent,
           child: IgnorePointer(
             child: ListView.builder(
               controller: _scrollController,
@@ -144,7 +152,7 @@ class _NewsTickerWidgetState extends State<NewsTickerWidget> {
           fontSize: 12.5,
           fontWeight: FontWeight.w800,
           height: 1.2,
-          color: const Color(0xFFFDFBF7), // العاجي الفخم
+          color: const Color(0xFFFDFBF7),
           shadows: [
             Shadow(
               color: Colors.black.withValues(alpha: 0.15),

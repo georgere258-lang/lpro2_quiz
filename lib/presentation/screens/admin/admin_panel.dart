@@ -93,6 +93,7 @@ class _AdminPanelState extends State<AdminPanel>
   Future<void> _refreshLeaderboards() async {
     _setSaving(true);
     try {
+      // ✅ هذه الدالة الآن تستدعي منطق الـ Snapshot (الكاش الموحد) في الـ Repository
       await _leaderboardsRepo.refreshTop10AsAdmin();
       _snack('تم تحديث الترتيب ✅');
     } catch (e) {

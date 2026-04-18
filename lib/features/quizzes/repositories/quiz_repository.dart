@@ -1,6 +1,7 @@
 // PATH: lib/features/quizzes/repositories/quiz_repository.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../../../core/constants/firestore_paths.dart';
 import '../../../core/models/admin_control_models.dart';
 import '../models/quiz.dart';
@@ -15,7 +16,130 @@ class QuizRepository {
     _collection = _firestore.collection(FirestorePaths.quizzes);
   }
 
-  /// Watches quizzes filtered by category and league.
+  // ────────────────────────────────────────────────────────────────────────────
+  // 1. الذكاء الاصطناعي للسحب (Smart Fetch) - الموفر للقراءات
+  // ────────────────────────────────────────────────────────────────────────────
+
+  Future<List<Quiz>> getSmartBatch({
+    required String category,
+    required int difficulty,
+    required List<String> excludedIds,
+    int limit = 15,
+  }) async {
+    try {
+      // ✅ تبسيط الاستعلام للبحث بالقسم فقط لضمان العمل بدون Composite Index
+      final snap = await _collection
+          .where('category', isEqualTo: category)
+          .where('isActive', isEqualTo: true)
+          .get();
+
+      if (snap.docs.isEmpty) {
+        debugPrint("⚠️ [QuizRepo] No questions found for category: $category");
+        return [];
+      }
+
+      // تحويل المستندات إلى كائنات Quiz
+      final List<Quiz> allResults =
+          snap.docs.map((d) => Quiz.fromFirestore(d.data(), d.id)).toList();
+
+      // ✅ فلترة النتائج محلياً لضمان أقصى درجات المرونة
+      List<Quiz> filtered = allResults.where((q) {
+        final bool isNotDeleted = q.isDeleted == false;
+        final bool isNotSeen = !excludedIds.contains(q.id);
+        final bool matchesDiff = q.difficulty == difficulty;
+        return isNotDeleted && isNotSeen && matchesDiff;
+      }).toList();
+
+      // 🛡️ خطة دفاعية: إذا لم نجد أسئلة في الصعوبة المطلوبة، نسحب أي أسئلة غير ممسوحة لفتح اللعبة
+      if (filtered.isEmpty) {
+        filtered = allResults.where((q) => q.isDeleted == false).toList();
+      }
+
+      filtered.shuffle();
+      return filtered.take(limit).toList();
+    } catch (e) {
+      debugPrint("❌ [QuizRepo] getSmartBatch Error: $e");
+      return [];
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // 2. نظام الحفظ (Save Session) - مدمج لضمان سلامة البيانات
+  // ────────────────────────────────────────────────────────────────────────────
+
+  Future<void> saveGameSession({
+    required String uid,
+    required String leagueKey,
+    required int score,
+    required int correctAnswers,
+    required int totalQuestions,
+  }) async {
+    // توحيد المفاتيح برمجياً بناءً على المسميات العربية المستلمة
+    String k = leagueKey.trim();
+    String normalized = 'freeplay';
+    if (k == 'stars' || k == 'دوري النجوم') normalized = 'stars';
+    if (k == 'pros' || k == 'دوري المحترفين') normalized = 'pros';
+
+    final userRef = _firestore.collection(FirestorePaths.users).doc(uid);
+    final statsRef = _firestore.collection(FirestorePaths.userStats).doc(uid);
+
+    try {
+      await _firestore.runTransaction((transaction) async {
+        final userSnap = await transaction.get(userRef);
+        final statsSnap = await transaction.get(statsRef);
+
+        final userData = userSnap.data() ?? {};
+        final rootData = statsSnap.data() ?? {};
+
+        String dailyField = normalized == 'stars'
+            ? 'dailyStarsRounds'
+            : (normalized == 'pros'
+                ? 'dailyProsRounds'
+                : 'dailyFreePlayRounds');
+
+        // تحديث جدول المستخدم (النقاط والعدادات اليومية)
+        final userUpdates = <String, dynamic>{
+          dailyField: (userData[dailyField] ?? 0) + 1,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+
+        if (normalized != 'freeplay') {
+          userUpdates['points'] = FieldValue.increment(score);
+          userUpdates['lastQuizDate'] = FieldValue.serverTimestamp();
+        }
+
+        transaction.set(userRef, userUpdates, SetOptions(merge: true));
+
+        // تحديث جدول الإحصائيات (Map-Safe) لليوزرز في الدوري المحدد
+        final Map<String, dynamic> leagueMap = rootData[normalized] is Map
+            ? Map<String, dynamic>.from(rootData[normalized])
+            : {};
+
+        leagueMap['roundsPlayed'] = (leagueMap['roundsPlayed'] ?? 0) + 1;
+        leagueMap['totalQuestions'] =
+            (leagueMap['totalQuestions'] ?? 0) + totalQuestions;
+        leagueMap['correctAnswers'] =
+            (leagueMap['correctAnswers'] ?? 0) + correctAnswers;
+        leagueMap['totalPoints'] = (leagueMap['totalPoints'] ?? 0) + score;
+
+        transaction.set(
+            statsRef,
+            {
+              normalized: leagueMap,
+              'updatedAt': FieldValue.serverTimestamp(),
+            },
+            SetOptions(merge: true));
+      });
+    } catch (e) {
+      debugPrint("❌ [QuizRepo] Save Error: $e");
+      rethrow;
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // 3. العمليات التقليدية (Admin & Streams)
+  // ────────────────────────────────────────────────────────────────────────────
+
   Stream<List<Quiz>> watchByCategoryLeague({
     required String category,
     required String league,
@@ -28,73 +152,51 @@ class QuizRepository {
         .where('category', isEqualTo: category)
         .where('league', isEqualTo: league);
 
-    if (!includeDeleted) {
-      query = query.where('isDeleted', isEqualTo: false);
-    }
-    if (!includeInactive) {
-      query = query.where('isActive', isEqualTo: true);
-    }
+    if (!includeDeleted) query = query.where('isDeleted', isEqualTo: false);
+    if (!includeInactive) query = query.where('isActive', isEqualTo: true);
 
     return query
         .orderBy('createdAt', descending: true)
         .limit(safeLimit)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => Quiz.fromFirestore(d.data(), d.id)).toList());
+        .map((snap) =>
+            snap.docs.map((d) => Quiz.fromFirestore(d.data(), d.id)).toList());
   }
 
-  /// Watches all quizzes.
   Stream<List<Quiz>> watchAll({
     bool includeDeleted = false,
     int limit = 50,
   }) {
     final safeLimit = limit.clamp(1, 100);
     Query<Map<String, dynamic>> query = _collection;
-
-    if (!includeDeleted) {
-      query = query.where('isDeleted', isEqualTo: false);
-    }
-
+    if (!includeDeleted) query = query.where('isDeleted', isEqualTo: false);
     return query
         .orderBy('createdAt', descending: true)
         .limit(safeLimit)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => Quiz.fromFirestore(d.data(), d.id)).toList());
+        .map((snap) =>
+            snap.docs.map((d) => Quiz.fromFirestore(d.data(), d.id)).toList());
   }
 
-  /// Creates a new quiz and returns its ID.
   Future<String> create(Quiz quiz) async {
     quiz.validate();
-
     final data = quiz.toFirestore();
     data['createdAt'] = FieldValue.serverTimestamp();
     data['updatedAt'] = FieldValue.serverTimestamp();
     data['isDeleted'] = false;
-
     final docRef = await _collection.add(data);
     return docRef.id;
   }
 
-  /// Updates a quiz with the given fields.
   Future<void> update(String id, Map<String, dynamic> updates) async {
     final sanitized = <String, dynamic>{};
-
-    for (final entry in updates.entries) {
-      final key = entry.key;
-      final value = entry.value;
-
-      // Normalize DateTime fields to UTC Timestamp
-      if (value is DateTime) {
-        sanitized[key] = UtcNormalizer.toTimestamp(value);
-      } else {
-        sanitized[key] = value;
-      }
-    }
-
+    updates.forEach((key, value) {
+      sanitized[key] = (value is DateTime) ? Timestamp.fromDate(value) : value;
+    });
     sanitized['updatedAt'] = FieldValue.serverTimestamp();
     await _collection.doc(id).update(sanitized);
   }
 
-  /// Toggles the active state of a quiz.
   Future<void> toggleActive(String id, bool isActive) async {
     await _collection.doc(id).update({
       'isActive': isActive,
@@ -102,19 +204,11 @@ class QuizRepository {
     });
   }
 
-  /// Moves a quiz to a new category and/or league.
-  Future<void> move(
-    String id, {
-    required String newCategory,
-    required String newLeague,
-  }) async {
-    if (!QuizCategory.isValid(newCategory)) {
-      throw ArgumentError('Invalid category: $newCategory');
-    }
-    if (!QuizLeague.isValid(newLeague)) {
-      throw ArgumentError('Invalid league: $newLeague');
-    }
-
+  Future<void> move(String id,
+      {required String newCategory, required String newLeague}) async {
+    if (!QuizCategory.isValid(newCategory))
+      throw ArgumentError('Invalid category');
+    if (!QuizLeague.isValid(newLeague)) throw ArgumentError('Invalid league');
     await _collection.doc(id).update({
       'category': newCategory,
       'league': newLeague,
@@ -122,7 +216,6 @@ class QuizRepository {
     });
   }
 
-  /// Soft deletes a quiz (sets isDeleted=true, isActive=false).
   Future<void> softDelete(String id) async {
     await _collection.doc(id).update({
       'isDeleted': true,
@@ -131,8 +224,6 @@ class QuizRepository {
     });
   }
 
-  /// Restores a soft-deleted quiz (sets isDeleted=false).
-  /// Note: Does NOT auto-enable isActive - admin must manually activate.
   Future<void> restore(String id) async {
     await _collection.doc(id).update({
       'isDeleted': false,
@@ -140,7 +231,6 @@ class QuizRepository {
     });
   }
 
-  /// Builds a share payload for a quiz (zero-cost, no network calls).
   Map<String, dynamic> buildSharePayload(Quiz quiz) {
     return {
       'quizId': quiz.id,

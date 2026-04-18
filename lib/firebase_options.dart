@@ -24,10 +24,11 @@ class DefaultFirebaseOptions {
     }
   }
 
-  /// 🤖 إعدادات الأندرويد (تطابق ملف google-services.json)
+  /// 🤖 إعدادات الأندرويد (تم تصحيح الـ App ID ليتطابق مع Google-Services.json والكونسول)
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCtwb0fAIMq3q_YMIkHMLUD3_-GvGkYdVw',
-    appId: '1:905243871570:android:d884ea928cedb56b66928b',
+    appId:
+        '1:905243871570:android:c818cc440407f6e366928b', // ✅ تم التحديث للهوية الصحيحة
     messagingSenderId: '905243871570',
     projectId: 'lpro2-quiz',
     storageBucket: 'lpro2-quiz.firebasestorage.app',

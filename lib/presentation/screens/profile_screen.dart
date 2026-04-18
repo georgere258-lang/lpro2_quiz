@@ -1,21 +1,21 @@
 // PATH: lib/presentation/screens/profile_screen.dart
-// STATUS: ULTRA PREMIUM ELITE (Clean UI, No Redundant Settings)
+// STATUS: ULTRA PREMIUM ELITE (Clean UI, No Redundant Settings) - FULL INTEGRATED - FIX V4 (Surgical Fix)
 
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/sound_manager.dart';
+import '../../core/services/user_service.dart';
 import 'package:lpro2_quiz/core/data/models/user_model.dart';
 
 import 'about_screen.dart';
 import 'login_screen.dart';
 import 'admin/admin_panel.dart';
 import 'stats_screen.dart';
-import 'chat_support_screen.dart';
 import 'account_settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -33,8 +33,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final Color deepTeal = AppColors.primaryDeepTeal;
   final Color safetyOrange = AppColors.secondaryOrange;
 
-  static const String _androidStoreUrl = 'PUT_PLAY_STORE_LINK_HERE';
-  static const String _iosStoreUrl = 'PUT_APP_STORE_LINK_HERE';
+  static const String _androidStoreUrl =
+      'https://play.google.com/store/apps/details?id=com.george.lpro';
+  static const String _iosStoreUrl =
+      'https://apps.apple.com/app/lpro/id6758677424';
+  static const String _whatsappChannelUrl =
+      'https://whatsapp.com/channel/0029VbCKNM12phHUmptkga2b';
+  static const String _whatsappContactUrl = 'https://wa.me/201060620315';
 
   final List<IconData> avatars = [
     Icons.workspace_premium,
@@ -52,24 +57,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return "Pro جديد ✨";
   }
 
-  String _buildInviteMessage() {
-    final uid = user?.uid ?? '';
+  String _buildInviteMessage(String uid) {
     final ref =
         uid.isEmpty ? '' : uid.substring(0, uid.length < 8 ? uid.length : 8);
 
-    final hasAndroid = _androidStoreUrl.startsWith('http');
-    final hasIos = _iosStoreUrl.startsWith('http');
-
     final buffer = StringBuffer()
       ..writeln("✨ انضم إلى L Pro — طريقك لتطوير نفسك في العقار.")
-      ..writeln("ابدأ رحلتك الآن 💪");
-
-    if (hasAndroid) buffer.writeln("Android: $_androidStoreUrl");
-    if (hasIos) buffer.writeln("iOS: $_iosStoreUrl");
+      ..writeln("ابدأ رحلتك الآن 💪")
+      ..writeln("")
+      ..writeln("Android: $_androidStoreUrl")
+      ..writeln("iOS: $_iosStoreUrl");
 
     if (ref.isNotEmpty) buffer.writeln("كود دعوة: $ref");
 
     return buffer.toString().trim();
+  }
+
+  Future<void> _launchURL(String url) async {
+    final Uri uri = Uri.parse(url);
+    try {
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        debugPrint('Could not launch $url');
+      }
+    } catch (e) {
+      debugPrint('Error launching URL: $e');
+    }
   }
 
   @override
@@ -79,18 +91,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
       resizeToAvoidBottomInset: false,
       body: Directionality(
         textDirection: TextDirection.rtl,
-        child: StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('users')
-              .doc(user?.uid)
-              .snapshots(),
+        child: StreamBuilder<UserModel?>(
+          stream: UserService().currentUserStream,
           builder: (context, snapshot) {
-            if (!snapshot.hasData) {
+            // معالجة الخطأ لمنع التصفير
+            if (snapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.wifi_off_rounded,
+                        color: Colors.grey, size: 40),
+                    const SizedBox(height: 10),
+                    Text("خطأ في الاتصال بالسيرفر",
+                        style: GoogleFonts.cairo(color: Colors.grey)),
+                    TextButton(
+                        onPressed: () => setState(() {}),
+                        child: const Text("إعادة محاولة")),
+                  ],
+                ),
+              );
+            }
+
+            // حالة التحميل (Loading)
+            if (snapshot.connectionState == ConnectionState.waiting) {
               return Center(child: CircularProgressIndicator(color: deepTeal));
             }
 
-            final data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
-            final userModel = UserModel.fromMap(data, user?.uid ?? '');
+            // في حالة عدم وجود داتا (يمنع الانهيار)
+            if (!snapshot.hasData || snapshot.data == null) {
+              return Center(child: CircularProgressIndicator(color: deepTeal));
+            }
+
+            final userModel = snapshot.data!;
 
             return Stack(
               children: [
@@ -125,6 +158,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       userModel.proPoints,
                     ),
                     const SizedBox(height: 35),
+
+                    // لوحة التحكم (Admin)
                     if (userModel.role == 'admin' ||
                         userModel.role == 'moderator' ||
                         userModel.role == 'manager')
@@ -140,22 +175,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         },
                         iconColor: safetyOrange,
                       ),
+
+                    // تغيير الاسم
                     _buildProfileBtn(
                       "تغيير الاسم",
                       Icons.edit_rounded,
                       () {
                         SoundManager.playTap();
-                        _showRenameBottomSheet();
+                        _showRenameBottomSheet(userModel.displayName);
                       },
                     ),
+
+                    // دعوة صديق
                     _buildProfileBtn(
-                      "دعوة Pro جديد",
+                      " دعوه صديق يستفيد ",
                       Icons.person_add_rounded,
                       () {
                         SoundManager.playTap();
-                        _invitePro();
+                        final msg = _buildInviteMessage(userModel.uid);
+                        Share.share(msg);
                       },
                     ),
+
+                    _buildProfileBtn(
+                      "قناة الواتساب (مهارات وتطوير)",
+                      Icons.campaign_rounded,
+                      () {
+                        SoundManager.playTap();
+                        _launchURL(_whatsappChannelUrl);
+                      },
+                      iconColor: const Color(0xFF25D366),
+                    ),
+
+                    _buildProfileBtn(
+                      "اتصل بنا (واتساب)",
+                      Icons.chat_bubble_outline_rounded,
+                      () {
+                        SoundManager.playTap();
+                        _launchURL(_whatsappContactUrl);
+                      },
+                      iconColor: const Color(0xFF128C7E),
+                    ),
+
                     _buildProfileBtn(
                       "حول L Pro",
                       Icons.info_outline_rounded,
@@ -167,20 +228,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 builder: (_) => const AboutScreen()));
                       },
                     ),
-                    _buildProfileBtn(
-                      "الدعم والمساعدة",
-                      Icons.support_agent_rounded,
-                      () {
-                        SoundManager.playTap();
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const ChatSupportScreen(),
-                          ),
-                        );
-                      },
-                      iconColor: deepTeal,
-                    ),
+
                     _buildProfileBtn(
                       "إعدادات الحساب والخصوصية",
                       Icons.shield_outlined,
@@ -194,6 +242,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       },
                       iconColor: deepTeal,
                     ),
+
+                    // تسجيل الخروج (تم تعديلها جراحياً)
                     _buildProfileBtn(
                       "تسجيل الخروج",
                       Icons.logout_rounded,
@@ -218,7 +268,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         GestureDetector(
           onTap: () {
             SoundManager.playTap();
-            _showAvatarPicker();
+            _showAvatarPicker(avatarIndex);
           },
           child: Container(
             padding: const EdgeInsets.all(5),
@@ -272,8 +322,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 24),
-        _buildPointsCards(starsPoints, proPoints),
+        // ✅ [تعطيل كروت النقط] تم إخفاء استدعاء _buildPointsCards بناءً على طلبك
       ],
     );
   }
@@ -396,6 +445,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // ✅ [تعديل جراحي] حذفنا UserService().dispose() لمنع تعليقة الـ Loading
   Future<void> _handleLogout() async {
     await FirebaseAuth.instance.signOut();
     if (mounted) {
@@ -406,38 +456,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _invitePro() async {
-    final message = _buildInviteMessage();
-    try {
-      await Share.share(message);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("حدث خطأ في المشاركة", style: GoogleFonts.cairo()),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  void _showRenameBottomSheet() async {
-    String currentName = '';
-    if (user?.uid != null) {
-      try {
-        final snapshot = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user!.uid)
-            .get();
-        if (snapshot.exists && snapshot.data() != null) {
-          currentName = (snapshot.data() as Map<String, dynamic>)['name'] ?? '';
-        }
-      } catch (e) {
-        debugPrint('ProfileScreen: Error loading name: $e');
-      }
-    }
-
+  void _showRenameBottomSheet(String currentName) async {
     final TextEditingController nameController =
         TextEditingController(text: currentName);
 
@@ -447,155 +466,89 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Scaffold(
-        backgroundColor: Colors.transparent,
-        resizeToAvoidBottomInset: true,
-        body: GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            color: Colors.transparent,
-            alignment: Alignment.bottomCenter,
-            child: GestureDetector(
-              onTap: () {},
-              child: Container(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).viewInsets.bottom,
-                  top: 20,
-                  left: 20,
-                  right: 20,
-                ),
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(10))),
-                    const SizedBox(height: 20),
-                    Text(
-                      "تغيير الاسم",
-                      style: GoogleFonts.cairo(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        color: deepTeal,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    TextField(
-                      controller: nameController,
-                      textDirection: TextDirection.rtl,
-                      decoration: InputDecoration(
-                        hintText: "أدخل اسمك",
-                        filled: true,
-                        fillColor: Colors.grey[50],
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(15),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      style: GoogleFonts.cairo(fontSize: 16),
-                      autofocus: true,
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          // ✅ إغلاق الكيبورد فوراً
-                          FocusScope.of(context).unfocus();
-                          _handleRename(nameController.text);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: deepTeal,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15)),
-                        ),
-                        child: Text("حفظ",
-                            style: GoogleFonts.cairo(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white)),
-                      ),
-                    ),
-                    const SizedBox(height: 15),
-                  ],
+      builder: (context) => Padding(
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(10))),
+              const SizedBox(height: 20),
+              Text(
+                "تغيير الاسم",
+                style: GoogleFonts.cairo(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: deepTeal,
                 ),
               ),
-            ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: nameController,
+                textDirection: TextDirection.rtl,
+                decoration: InputDecoration(
+                  hintText: "أدخل اسمك",
+                  filled: true,
+                  fillColor: Colors.grey[50],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                style: GoogleFonts.cairo(fontSize: 16),
+                autofocus: true,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    FocusScope.of(context).unfocus();
+                    _handleRename(nameController.text);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: deepTeal,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15)),
+                  ),
+                  child: Text("حفظ",
+                      style: GoogleFonts.cairo(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white)),
+                ),
+              ),
+              const SizedBox(height: 15),
+            ],
           ),
         ),
       ),
     );
-
-    // ✅ التعديل الجوهري: تنظيف الذاكرة بعد إغلاق النافذة بـ 500ms لمنع الشاشة البيضاء
-    Future.delayed(const Duration(milliseconds: 500), () {
-      nameController.dispose();
-    });
   }
 
   Future<void> _handleRename(String newName) async {
     final trimmedName = newName.trim();
-    if (trimmedName.length < 3) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text("الاسم يجب أن يكون 3 أحرف على الأقل",
-                  style: GoogleFonts.cairo()),
-              backgroundColor: Colors.orange),
-        );
-      }
-      return;
-    }
+    if (trimmedName.length < 3) return;
 
-    if (user == null) return;
     try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user!.uid)
-          .update({'name': trimmedName});
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text("تم تحديث الاسم بنجاح ✅", style: GoogleFonts.cairo()),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2)),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text("حدث خطأ", style: GoogleFonts.cairo()),
-              backgroundColor: Colors.red),
-        );
-      }
-    }
+      await UserService().updateUserData({'name': trimmedName});
+      if (mounted) Navigator.pop(context);
+    } catch (_) {}
   }
 
-  void _showAvatarPicker() async {
-    if (user == null || !mounted) return;
-    int currentIndex = 0;
-    try {
-      final snapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user!.uid)
-          .get();
-      if (snapshot.exists && snapshot.data() != null) {
-        currentIndex = snapshot.data()!['avatarIndex'] ?? 0;
-      }
-    } catch (e) {
-      debugPrint('ProfileScreen: Error loading avatarIndex: $e');
-    }
-
+  void _showAvatarPicker(int currentAvatarIndex) async {
     if (!mounted) return;
     showModalBottomSheet(
       context: context,
@@ -632,27 +585,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               itemCount: avatars.length,
               itemBuilder: (context, index) {
-                final isSelected = index == currentIndex;
+                final isSelected = index == currentAvatarIndex;
                 return GestureDetector(
                   onTap: () => _handleAvatarSelection(index),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isSelected ? deepTeal : Colors.grey[50],
-                      border: Border.all(
-                          color: isSelected ? deepTeal : Colors.grey[200]!,
-                          width: isSelected ? 3 : 1),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                  color: deepTeal.withValues(alpha: 0.2),
-                                  blurRadius: 10)
-                            ]
-                          : null,
-                    ),
+                  child: CircleAvatar(
+                    backgroundColor: isSelected ? deepTeal : Colors.grey[100],
                     child: Icon(avatars[index],
-                        size: 35, color: isSelected ? Colors.white : deepTeal),
+                        color: isSelected ? Colors.white : deepTeal),
                   ),
                 );
               },
@@ -665,30 +604,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _handleAvatarSelection(int selectedIndex) async {
-    if (user == null) return;
     try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user!.uid)
-          .update({'avatarIndex': selectedIndex});
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text("تم تحديث الأفاتار بنجاح ✅", style: GoogleFonts.cairo()),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2)),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text("حدث خطأ", style: GoogleFonts.cairo()),
-              backgroundColor: Colors.red),
-        );
-      }
-    }
+      await UserService().updateUserData({'avatarIndex': selectedIndex});
+      if (mounted) Navigator.pop(context);
+    } catch (_) {}
   }
 }

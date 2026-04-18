@@ -1,5 +1,5 @@
 // PATH: lib/main.dart
-// STATUS: Version 56 - Final Surgical Fix for iOS Keyboard & Notifications
+// STATUS: Version 56.2 - Final Surgical Fix (Full Unified Sync)
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -11,6 +11,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+// 🛡️ [إضافة] مكتبة App Check لفك حظر المحاكي
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -30,6 +32,9 @@ import 'package:lpro2_quiz/presentation/screens/fact_articles_screen.dart';
 import 'package:lpro2_quiz/presentation/screens/know_client_articles_screen.dart';
 
 import 'core/curriculum/unit_repository.dart';
+
+// ✅ ربط المحرك الموحد لمنع تصفير النقط وتحسين القراءات
+import 'package:lpro2_quiz/core/services/user_service.dart';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 🛡️ [جديد v56] متحكم اللغة الاستراتيجي (LocaleController)
@@ -110,6 +115,13 @@ Future<void> main() async {
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
+  // 🛡️ [تعديل جراحي] تفعيل App Check لفك حظر طلبات المحاكي فوراً
+  await FirebaseAppCheck.instance.activate(
+    androidProvider: AndroidProvider.debug,
+    appleProvider: AppleProvider.debug,
+  );
+  await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(true);
+
   runApp(
     RepositoryProvider<UnitRepository>(
       create: (_) => LocalUnitRepository(),
@@ -173,9 +185,7 @@ Future<void> _postBootstrap() async {
     _attachOnMessageOpenedListener();
     await _handleInitialMessageIfAny();
 
-    // ❌ تم حذف كتلة setForegroundNotificationPresentationOptions هنا للـ iOS
-    // لترك الصلاحية الكاملة لملف AppDelegate.swift لضمان تخطي صفحة الروبوت
-
+    // 🛡️ [تعديل جراحي] مزامنة التوكن (متوافق مع آبل) عبر المحرك الموحد
     Future.delayed(const Duration(seconds: 5), () async {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
@@ -184,16 +194,14 @@ Future<void> _postBootstrap() async {
               '🚀 [FORCE SYNC] Starting background sync for ${user.uid}');
           String? token = await FirebaseMessaging.instance.getToken();
           if (token != null) {
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .set({
+            // ✅ استخدام UserService لضمان التحديث الموحد وحماية النقاط
+            await UserService().updateUserData({
               'fcmToken': token,
               'platform': Platform.isIOS ? 'ios' : 'android',
               'lastTokenUpdate': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
+            });
             debugPrint(
-                '✅ [FORCE SYNC] Token updated successfully in Firestore');
+                '✅ [FORCE SYNC] Token updated via UserService successfully');
           }
         } catch (e) {
           debugPrint('⚠️ [FORCE SYNC] Deferred: $e');
@@ -236,17 +244,15 @@ void _subscribeToNotificationTopics() {
             '🔥 [FCM] التوكن: ${token != null ? "OBTAINED ✅" : "NULL ❌"}');
 
         if (token != null) {
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .set({
+          // ✅ [تعديل جراحي] استخدام المحرك الموحد UserService لمنع تصفير النقط
+          await UserService().updateUserData({
             'fcmToken': token,
-            'fcmTokens': [token],
+            'fcmTokens': FieldValue.arrayUnion([token]),
             'platform': Platform.isIOS ? 'ios' : 'android',
             'lastTokenUpdate': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
+          });
 
-          debugPrint('✅ [SUCCESS] تم مزامنة التوكن في Firestore');
+          debugPrint('✅ [SUCCESS] تم مزامنة التوكن عبر UserService');
           debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         }
       } catch (e) {

@@ -20,6 +20,10 @@ import 'profile_screen.dart';
 import '../../features/news_ticker/presentation/news_ticker_widget.dart';
 import '../widgets/lpro_bottom_nav_bar.dart';
 
+// 🛡️ [تعديل جراحي] المسارات الدقيقة بناءً على توضيحك لمنع أي خطأ أحمر
+import '../../core/data/models/user_model.dart';
+import '../../core/services/user_service.dart';
+
 // ✅ ربط مع NotificationCenter الموجود في main.dart
 import '../../main.dart';
 
@@ -335,21 +339,18 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
         preferredSize: const Size.fromHeight(42),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
-          child: _user == null
-              ? const _TickerBox(userName: "Pro")
-              : StreamBuilder<DocumentSnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(_user!.uid)
-                      .snapshots(),
-                  builder: (context, snapshot) {
-                    String name = "Pro";
-                    if (snapshot.hasData && snapshot.data!.exists) {
-                      name = (snapshot.data!.data() as Map)['name'] ?? "Pro";
-                    }
-                    return _TickerBox(userName: name);
-                  },
-                ),
+          // ✅ [تعديل استراتيجي]: تم توحيد مصدر البيانات مع UserService 
+          // لضمان ثبات الاسم والنقاط (1519) ومنع التصفير عند تحديثات الخلفية.
+          child: StreamBuilder<UserModel?>(
+            stream: UserService().currentUserStream,
+            builder: (context, snapshot) {
+              String name = "Pro";
+              if (snapshot.hasData && snapshot.data != null) {
+                name = snapshot.data!.displayName;
+              }
+              return _TickerBox(userName: name);
+            },
+          ),
         ),
       ),
     );

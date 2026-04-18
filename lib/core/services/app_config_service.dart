@@ -45,14 +45,19 @@ class AppConfigService {
   static const String _docId = 'current';
 
   // ─────────────────────────────────────────────────────────────
-  // Default values (used when doc is missing or fields are null)
+  // Default values (إضافة مفاتيح الأقسام الجديدة هنا)
   // ─────────────────────────────────────────────────────────────
 
   static const Map<String, dynamic> defaultFeatures = {
     'pushNotificationsEnabled': false,
     'sectionNotificationsEnabled': false,
-    'supportChatEnabled': false, // default FALSE to avoid cost
+    'supportChatEnabled': false,
     'quizShareEnabled': true,
+    // مفاتيح التحكم في ظهور الأقسام (جديد)
+    'showRadar': false, // رادار السوق
+    'showEconomy': false, // اقتصاد عقاري
+    'showInfoDiff': true, // المعلومة بتفرق
+    'showCustomerInfo': true, // اعرف عميلك
   };
 
   static const Map<String, dynamic> defaultLimits = {
@@ -67,7 +72,7 @@ class AppConfigService {
       };
 
   // ─────────────────────────────────────────────────────────────
-  // Strongly-typed getters (with safe defaults from cached config)
+  // Strongly-typed getters
   // ─────────────────────────────────────────────────────────────
 
   Map<String, dynamic> get _features =>
@@ -86,40 +91,37 @@ class AppConfigService {
   bool get supportChatEnabled =>
       _features['supportChatEnabled'] as bool? ?? false;
 
-  bool get quizShareEnabled =>
-      _features['quizShareEnabled'] as bool? ?? true;
+  bool get quizShareEnabled => _features['quizShareEnabled'] as bool? ?? true;
+
+  // Getters الجديدة للتحكم في الأقسام (جديد)
+  bool get showRadar => _features['showRadar'] as bool? ?? false;
+  bool get showEconomy => _features['showEconomy'] as bool? ?? false;
+  bool get showInfoDiff => _features['showInfoDiff'] as bool? ?? true;
+  bool get showCustomerInfo => _features['showCustomerInfo'] as bool? ?? true;
 
   // Limits
-  int get maxFetchPerPage =>
-      _limits['maxFetchPerPage'] as int? ?? 50;
+  int get maxFetchPerPage => _limits['maxFetchPerPage'] as int? ?? 50;
 
-  int get maxProInsightScan =>
-      _limits['maxProInsightScan'] as int? ?? 200;
+  int get maxProInsightScan => _limits['maxProInsightScan'] as int? ?? 200;
 
   int get maxSupportMessagesPerDay =>
       _limits['maxSupportMessagesPerDay'] as int? ?? 20;
 
   // ─────────────────────────────────────────────────────────────
-  // Public API
+  // Public API (تظل كما هي تماماً)
   // ─────────────────────────────────────────────────────────────
 
-  /// Watch the current config document as a stream.
-  /// Returns defaults merged with actual data.
   Stream<Map<String, dynamic>> watchCurrent() {
     return _db.collection(_col).doc(_docId).snapshots().map((snap) {
       return _mergeWithDefaults(snap.data());
     });
   }
 
-  /// Get the current config once.
-  /// Returns defaults merged with actual data.
   Future<Map<String, dynamic>> getCurrent() async {
     final snap = await _db.collection(_col).doc(_docId).get();
     return _mergeWithDefaults(snap.data());
   }
 
-  /// Upsert (merge) updates into the current config document.
-  /// Always sets updatedAt to serverTimestamp.
   Future<void> upsertCurrent(Map<String, dynamic> update) async {
     final payload = Map<String, dynamic>.from(update);
     payload['updatedAt'] = FieldValue.serverTimestamp();
@@ -130,16 +132,10 @@ class AppConfigService {
         .set(payload, SetOptions(merge: true));
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Helpers
-  // ─────────────────────────────────────────────────────────────
-
   Map<String, dynamic> _mergeWithDefaults(Map<String, dynamic>? data) {
     final result = defaults;
-
     if (data == null) return result;
 
-    // Merge features
     if (data['features'] is Map) {
       final f = data['features'] as Map<String, dynamic>;
       for (final key in defaultFeatures.keys) {
@@ -149,7 +145,6 @@ class AppConfigService {
       }
     }
 
-    // Merge limits
     if (data['limits'] is Map) {
       final l = data['limits'] as Map<String, dynamic>;
       for (final key in defaultLimits.keys) {
@@ -158,7 +153,6 @@ class AppConfigService {
         }
       }
     }
-
     return result;
   }
 }

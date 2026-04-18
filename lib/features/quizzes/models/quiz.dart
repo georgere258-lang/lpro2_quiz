@@ -9,7 +9,17 @@ class QuizCategory {
   static const String pros = 'pros';
   static const String general = 'general';
 
-  static const List<String> values = [stars, pros, general];
+  // المسميات العربية لضمان توافق الـ Validation
+  static const String starsArabic = 'دوري النجوم';
+  static const String prosArabic = 'دوري المحترفين';
+
+  static const List<String> values = [
+    stars,
+    pros,
+    general,
+    starsArabic,
+    prosArabic
+  ];
 
   static bool isValid(String value) => values.contains(value);
 }
@@ -75,48 +85,39 @@ class Quiz implements IAdminControlled {
   @override
   void validate() {
     // Question validation
-    if (question.trim().length < 10) {
-      throw ArgumentError('question must be at least 10 characters');
+    if (question.trim().length < 5) {
+      // قللنا القيد لـ 5 لمرونة الأسئلة الحالية
+      throw ArgumentError('الاستبيان يجب أن يكون على الأقل 5 أحرف');
     }
 
     // Options validation
-    if (options.length < 2 || options.length > 4) {
-      throw ArgumentError('options must have 2-4 items');
+    if (options.length < 2 || options.length > 5) {
+      throw ArgumentError('يجب أن تحتوي الاختيارات على 2-5 عناصر');
     }
     for (var i = 0; i < options.length; i++) {
       if (options[i].trim().isEmpty) {
-        throw ArgumentError('option[$i] cannot be empty');
+        throw ArgumentError('الاختيار رقم [$i] لا يمكن أن يكون فارغاً');
       }
     }
 
     // Correct index validation
     if (correctOptionIndex < 0 || correctOptionIndex >= options.length) {
       throw ArgumentError(
-        'correctOptionIndex must be 0..${options.length - 1}',
+        'مؤشر الإجابة الصحيحة يجب أن يكون بين 0 و ${options.length - 1}',
       );
     }
 
     // Category validation
     if (!QuizCategory.isValid(category)) {
-      throw ArgumentError('category must be one of: ${QuizCategory.values}');
-    }
-
-    // League validation
-    if (!QuizLeague.isValid(league)) {
-      throw ArgumentError('league must be one of: ${QuizLeague.values}');
+      throw ArgumentError('الفئة غير صالحة: $category');
     }
 
     // Difficulty validation
     if (difficulty < 1 || difficulty > 5) {
-      throw ArgumentError('difficulty must be 1-5');
+      throw ArgumentError('الصعوبة يجب أن تكون من 1 لـ 5');
     }
 
-    // Explanation validation (if present)
-    if (explanation != null && explanation!.trim().length < 10) {
-      throw ArgumentError('explanation must be at least 10 characters if set');
-    }
-
-    // AdminControlFields validation (includes tags max 5)
+    // AdminControlFields validation
     control.validate();
   }
 
@@ -125,7 +126,8 @@ class Quiz implements IAdminControlled {
     final map = control.toFirestore();
     map['question'] = question.trim();
     map['options'] = options.map((o) => o.trim()).toList();
-    map['correctOptionIndex'] = correctOptionIndex;
+    // نرفعها باسم correctAnswer لتوافق الداتابيز عندك
+    map['correctAnswer'] = correctOptionIndex;
     map['category'] = category;
     map['league'] = league;
     map['difficulty'] = difficulty;
@@ -133,18 +135,22 @@ class Quiz implements IAdminControlled {
     if (explanation != null) {
       map['explanation'] = explanation!.trim();
     }
-    // Remove timestamps - repository handles serverTimestamp
+    // الـ Repository هو المسؤول عن الـ Timestamps
     map.remove('createdAt');
     map.remove('updatedAt');
     return map;
   }
 
   factory Quiz.fromFirestore(Map<String, dynamic> data, String id) {
+    // ✅ دعم الحقلين لضمان قراءة correctAnswer من فايربيز عندك
+    final dynamic correctVal =
+        data['correctAnswer'] ?? data['correctOptionIndex'] ?? 0;
+
     return Quiz(
       id: id,
       question: (data['question'] as String?) ?? '',
       options: _parseOptions(data['options']),
-      correctOptionIndex: (data['correctOptionIndex'] as int?) ?? 0,
+      correctOptionIndex: correctVal is int ? correctVal : 0,
       category: (data['category'] as String?) ?? QuizCategory.general,
       league: (data['league'] as String?) ?? QuizLeague.bronze,
       difficulty: _parseDifficulty(data['difficulty']),
@@ -160,7 +166,7 @@ class Quiz implements IAdminControlled {
   static List<String> _parseOptions(dynamic value) {
     if (value == null) return const ['', ''];
     if (value is List) {
-      final parsed = value.whereType<String>().toList();
+      final parsed = value.map((e) => e.toString().trim()).toList();
       return parsed.length >= 2 ? parsed : const ['', ''];
     }
     return const ['', ''];
@@ -168,6 +174,7 @@ class Quiz implements IAdminControlled {
 
   static int _parseDifficulty(dynamic value) {
     if (value is int && value >= 1 && value <= 5) return value;
+    if (value is String) return int.tryParse(value)?.clamp(1, 5) ?? 3;
     return 3;
   }
 }

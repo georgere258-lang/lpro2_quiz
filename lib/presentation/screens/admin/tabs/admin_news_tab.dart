@@ -1,13 +1,5 @@
 // PATH: lib/presentation/screens/admin/tabs/admin_news_tab.dart
-// News Ticker tab for admin panel
-//
-// ✅ Notifications review:
-// - Writes `notify: true` ONLY when toggle is ON (per-item).
-// - Adds `pushTitle/pushBody` ONLY when notify is ON + non-empty.
-// - Works perfectly with your Cloud Function (onDocumentWritten ONE-SHOT):
-//   * CREATE with notify=true => sends once, then function resets notify=false.
-//   * CREATE with notify=false => no push.
-// - No other behavior touched.
+// STATUS: OPTIMIZED FOR CLEAN DATA FLOW ✅ (NO NAME CHANGES)
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -188,17 +180,17 @@ class _AdminNewsTabState extends State<AdminNewsTab> {
       final pushTitle = _pushTitleCtrl.text.trim();
       final pushBody = _pushBodyCtrl.text.trim();
 
+      // ✅ تم تنظيف الـ Payload (الـ Repository سيتكفل بالـ updatedAt تلقائياً)
       final payload = <String, dynamic>{
         'text_ar': text,
         'priority': _tickerPriority,
         'isActive': true,
         'notify': notify, // ✅ ONE-SHOT gate for Cloud Function
         'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
         'source': 'admin',
       };
 
-      // ✅ Only add these fields if notify is ON and value is not empty
+      // ✅ إضافة حقول الإشعارات فقط عند التفعيل
       if (notify && pushTitle.isNotEmpty) payload['pushTitle'] = pushTitle;
       if (notify && pushBody.isNotEmpty) payload['pushBody'] = pushBody;
 

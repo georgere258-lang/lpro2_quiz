@@ -1,62 +1,53 @@
+// PATH: lib/features/leaderboards/repositories/leaderboards_repository.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/leaderboard_entry.dart';
 
-/// Repository for public leaderboard reads and admin refresh operations.
+/// المستودع المحدث: يقرأ من وثيقة ملخص واحدة لكل دوري لتوفير القراءات 90%
 class LeaderboardsRepository {
   final FirebaseFirestore _firestore;
 
   LeaderboardsRepository({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
 
-  /// Collection reference for a specific league.
-  CollectionReference<Map<String, dynamic>> _entriesRef(String league) {
-    return _firestore.collection('leaderboards').doc(league).collection('entries');
+  // ✅ تم تغيير المسار ليشير إلى وثيقة الملخص الموحدة في الكاش
+  DocumentReference<Map<String, dynamic>> _leagueCacheRef(String league) {
+    return _firestore.collection('leaderboard_cache').doc(league);
   }
 
-  /// Fetch top 10 entries for a league, ordered by rank ascending.
+  /// جلب الـ 10 الأوائل (قراءة وثيقة واحدة فقط)
   Future<List<LeaderboardEntry>> getTop10(String league) async {
-    final snap = await _entriesRef(league)
-        .orderBy('rank', descending: false)
-        .limit(10)
-        .get();
+    final doc = await _leagueCacheRef(league).get();
+    if (!doc.exists || doc.data() == null) return [];
 
-    return snap.docs
-        .map((d) => LeaderboardEntry.fromFirestore(d.data(), d.id))
+    final List<dynamic> entriesData = doc.data()!['entries'] ?? [];
+    return entriesData
+        .map((e) => LeaderboardEntry.fromMap(e as Map<String, dynamic>))
         .toList();
   }
 
-  /// Stream top 10 entries for a league (real-time).
+  /// بث الـ 10 الأوائل (بث وثيقة واحدة فقط - صفر نزيف عند التنقل)
   Stream<List<LeaderboardEntry>> streamTop10(String league) {
-    return _entriesRef(league)
-        .orderBy('rank', descending: false)
-        .limit(10)
-        .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => LeaderboardEntry.fromFirestore(d.data(), d.id))
-            .toList());
-  }
+    return _leagueCacheRef(league).snapshots().map((doc) {
+      if (!doc.exists || doc.data() == null) return [];
 
-  /// Fetch current user's entry in a league (by uid).
-  /// Returns null if user is not in the leaderboard.
-  Future<LeaderboardEntry?> getUserEntry(String league, String uid) async {
-    final doc = await _entriesRef(league).doc(uid).get();
-    if (!doc.exists || doc.data() == null) return null;
-    return LeaderboardEntry.fromFirestore(doc.data()!, doc.id);
+      final List<dynamic> entriesData = doc.data()!['entries'] ?? [];
+      return entriesData
+          .map((e) => LeaderboardEntry.fromMap(e as Map<String, dynamic>))
+          .toList();
+    });
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ADMIN ONLY: Refresh leaderboard from /users collection.
-  // Caller must be admin/moderator (enforced by Firestore rules on write).
+  // ADMIN ONLY: تحديث "الصحيفة الموحدة" بضغطة زر واحدة
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /// Refresh top 10 for all leagues.
-  /// Reads /users (admin permission required), computes top 10, writes to /leaderboards.
+  /// تحديث كافة الدوريات (يُستدعى من زر Refresh في لوحة التحكم)
   Future<void> refreshTop10AsAdmin() async {
-    // Read all users with points > 0 (admin has read access to /users)
+    // 1. جلب بيانات المستخدمين (الأدمن فقط لديه صلاحية الوصول لـ users)
     final usersSnap = await _firestore
         .collection('users')
         .orderBy('points', descending: true)
-        .limit(100) // Fetch more to sort for different leagues
+        .limit(100)
         .get();
 
     final users = usersSnap.docs.map((d) {
@@ -71,48 +62,46 @@ class LeaderboardsRepository {
       };
     }).toList();
 
-    // Refresh each league
-    await _refreshLeague('general', users, 'points');
-    await _refreshLeague('stars', users, 'starsPoints');
-    await _refreshLeague('pros', users, 'proPoints');
+    // 2. تحديث كل دوري في وثيقة كاش منفصلة (عملية كتابة واحدة لكل دوري)
+    await _updateLeagueCache('general', users, 'points');
+    await _updateLeagueCache('stars', users, 'starsPoints');
+    await _updateLeagueCache('pros', users, 'proPoints');
   }
 
-  /// Refresh a single league's top 10.
-  Future<void> _refreshLeague(
+  /// معالجة وحفظ الدوري في وثيقة ملخص واحدة
+  Future<void> _updateLeagueCache(
     String league,
     List<Map<String, dynamic>> users,
     String pointsField,
   ) async {
-    // Sort by the league's points field
+    // ترتيب المستخدمين حسب نقاط الدوري
     final sorted = List<Map<String, dynamic>>.from(users)
-      ..sort((a, b) => (b[pointsField] as int).compareTo(a[pointsField] as int));
+      ..sort(
+          (a, b) => (b[pointsField] as int).compareTo(a[pointsField] as int));
 
-    // Take top 10
+    // أخذ أفضل 10 فقط
     final top10 = sorted.take(10).toList();
 
-    final batch = _firestore.batch();
-    final entriesRef = _entriesRef(league);
-
-    // Delete existing entries first (clean slate)
-    final existing = await entriesRef.get();
-    for (final doc in existing.docs) {
-      batch.delete(doc.reference);
-    }
-
-    // Write new top 10
+    // تحويلهم لقائمة Maps جاهزة للتخزين
+    final List<Map<String, dynamic>> entriesToStore = [];
     for (int i = 0; i < top10.length; i++) {
       final user = top10[i];
-      final uid = user['uid'] as String;
-      final entry = LeaderboardEntry(
-        uid: uid,
-        name: user['name'] as String,
-        avatarIndex: user['avatarIndex'] as int,
-        points: user[pointsField] as int,
-        rank: i + 1,
-      );
-      batch.set(entriesRef.doc(uid), entry.toFirestore());
+      entriesToStore.add({
+        'uid': user['uid'],
+        'name': user['name'],
+        'avatarIndex': user['avatarIndex'],
+        'points': user[pointsField],
+        'rank': i + 1,
+        'updatedAt': Timestamp.now(),
+      });
     }
 
-    await batch.commit();
+    // ✅ التوفير الأكبر: كتابة وثيقة واحدة تحتوي على القائمة كاملة
+    // هذا يمسح القديم ويضع الجديد في "خبطة واحدة"
+    await _leagueCacheRef(league).set({
+      'league': league,
+      'lastUpdate': FieldValue.serverTimestamp(),
+      'entries': entriesToStore,
+    });
   }
 }

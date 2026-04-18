@@ -18,19 +18,26 @@ import '../home/widgets/section_identity_card.dart';
 import '../widgets/lpro_bottom_nav_bar.dart';
 import 'main_wrapper.dart';
 
-import '../../features/quiz/repositories/quiz_repository_impl.dart';
+// ✅ استدعاء الملف الصحيح الذي يحتوي على getSmartBatch و saveGameSession
+import '../../features/quizzes/repositories/quiz_repository.dart';
 
 class QuizScreen extends StatefulWidget {
   final String categoryTitle;
+  final bool isStudyMode; // ✅ مضاف
 
-  const QuizScreen({super.key, required this.categoryTitle});
+  const QuizScreen({
+    super.key,
+    required this.categoryTitle,
+    this.isStudyMode = false, // ✅ مضاف
+  });
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
 }
 
 class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
-  final QuizRepositoryImpl _quizRepo = QuizRepositoryImpl();
+  // ✅ استخدام الكلاس الموحد
+  final QuizRepository _quizRepo = QuizRepository();
 
   static const int _roundsPerDay = 4;
   static const int _questionsPerRound = 5;
@@ -41,7 +48,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   final Color accentColor = AppColors.secondaryOrange;
 
   bool get _isStars => widget.categoryTitle == "دوري النجوم";
-  String get _enterButtonText => _isStars ? "انت نجم Pro ⭐" : "ملعبك يا Pro 🔥";
+  String get _enterButtonText => widget.isStudyMode
+      ? "ابدأ المذاكرة 📖"
+      : (_isStars ? "انت نجم Pro ⭐" : "ملعبك يا Pro 🔥");
   int get _secondsPerQuestion => _isStars ? 25 : 15;
 
   List<_QuizQuestion> _candidatePool = [];
@@ -70,7 +79,11 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   bool _isFreePlaySession = false;
   bool _isSaving = false;
 
-  int get _roundsDoneToday => _isStars ? _starsRoundsToday : _prosRoundsToday;
+  // ✅ تعديل: في وضع المذاكرة نعتبر الجولات المنجزة دائماً 0 لضمان عدم القفل
+  int get _roundsDoneToday => widget.isStudyMode
+      ? 0
+      : (_isStars ? _starsRoundsToday : _prosRoundsToday);
+
   bool get _isCurrentLeagueLocked => _roundsDoneToday >= _roundsPerDay;
   bool get _areBothLeaguesLocked =>
       _starsRoundsToday >= _roundsPerDay && _prosRoundsToday >= _roundsPerDay;
@@ -156,39 +169,36 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
 
   Future<void> _loadCandidatePool() async {
     try {
-      final snap1 = await FirebaseFirestore.instance
-          .collection(FirestorePaths.quizzes)
-          .where('category', isEqualTo: widget.categoryTitle)
-          .where('isActive', isEqualTo: true)
-          .orderBy('createdAt', descending: true)
-          .limit(kPoolLimit)
-          .get()
-          .timeout(const Duration(seconds: 3));
+      final String currentCategory = widget.categoryTitle;
 
-      if (snap1.docs.isNotEmpty) {
-        _candidatePool = _parseQuestionDocs(snap1.docs);
-        return;
+      final batch = await _quizRepo.getSmartBatch(
+        category: currentCategory,
+        difficulty: (_stage + 1).clamp(1, 5),
+        excludedIds: _recentlySeenList,
+        limit: 20,
+      );
+
+      if (mounted) {
+        setState(() {
+          if (batch.isNotEmpty) {
+            _candidatePool = batch.map((q) {
+              return _QuizQuestion(
+                docId: q.id,
+                question: q.question,
+                options: q.options,
+                correctAnswer: q.correctOptionIndex,
+                createdAtMs: q.updatedAt?.millisecondsSinceEpoch ?? 0,
+                difficulty: q.difficulty,
+              );
+            }).toList();
+          }
+          _isLoading = false;
+        });
       }
     } catch (e) {
-      debugPrint("Q1 Fail or Timeout - Switching to Fallback");
+      debugPrint("❌ Smart Fetch Fail: $e");
+      if (mounted) setState(() => _isLoading = false);
     }
-
-    try {
-      final snap2 = await FirebaseFirestore.instance
-          .collection(FirestorePaths.quizzes)
-          .where('category', isEqualTo: widget.categoryTitle)
-          .where('isActive', isEqualTo: true)
-          .limit(kPoolLimit)
-          .get();
-      if (snap2.docs.isNotEmpty) {
-        _candidatePool = _parseQuestionDocs(snap2.docs);
-        return;
-      }
-    } catch (e) {
-      debugPrint("Q2 Fail");
-    }
-
-    _candidatePool = [];
   }
 
   List<_QuizQuestion> _parseQuestionDocs(
@@ -323,6 +333,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   void _startTimer() {
+    if (widget.isStudyMode) return; // ✅ وضع المذاكرة: تعطيل التايمر تماماً
     _timeLeft = _secondsPerQuestion;
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
@@ -376,23 +387,27 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       _showFeedback = true;
       if (isCorrect) {
         SoundManager.playCorrect();
-        _roundScore += _isStars ? 2 : 5;
+        if (!widget.isStudyMode)
+          _roundScore += _isStars ? 2 : 5; // ✅ لا نقاط في المذاكرة
         _correctAnswersCount++;
       } else {
         SoundManager.playWrong();
       }
     });
 
-    Future.delayed(const Duration(milliseconds: 900), () {
-      if (!mounted) return;
-      if (_isSaving || !_gameStarted) return;
+    // ✅ تعديل: وضع التحدي ينتقل تلقائياً | وضع المذاكرة ينتظر ضغطة "التالي" يدوياً
+    if (!widget.isStudyMode) {
+      Future.delayed(const Duration(milliseconds: 900), () {
+        if (!mounted) return;
+        if (_isSaving || !_gameStarted) return;
 
-      if (_questionIndexInRound + 1 >= _questionsPerRound) {
-        _finishRound();
-      } else {
-        _nextQuestion();
-      }
-    });
+        if (_questionIndexInRound + 1 >= _questionsPerRound) {
+          _finishRound();
+        } else {
+          _nextQuestion();
+        }
+      });
+    }
   }
 
   void _nextQuestion() {
@@ -416,6 +431,13 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   Future<void> _finishRound() async {
     _timer?.cancel();
     if (_isSaving) return;
+
+    // ✅ وضع المذاكرة: تخطي الحفظ في فايربيز والتوجه للنتائج فوراً
+    if (widget.isStudyMode) {
+      _showResultSheet();
+      return;
+    }
+
     setState(() => _isSaving = true);
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -502,13 +524,17 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                               "سؤال ${_questionIndexInRound + 1}/$_questionsPerRound",
                           color: primaryColor),
                       const SizedBox(width: 12),
-                      _counterPill(_timeLeft.toString()),
-                      const SizedBox(width: 12),
+                      // ✅ إخفاء التايمر في وضع المذاكرة
+                      if (!widget.isStudyMode)
+                        _counterPill(_timeLeft.toString()),
+                      if (!widget.isStudyMode) const SizedBox(width: 12),
                       _pill(
                           icon: Icons.emoji_events_outlined,
-                          text: _isFreePlaySession
-                              ? "وضع التدريب"
-                              : "جولة ${_roundsDoneToday + 1}",
+                          text: widget.isStudyMode
+                              ? "وضع المذاكرة"
+                              : (_isFreePlaySession
+                                  ? "وضع التدريب"
+                                  : "جولة ${_roundsDoneToday + 1}"),
                           color: primaryColor),
                     ],
                   ),
@@ -516,48 +542,78 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.only(top: 24),
-                    child: Column(
-                      children: [
-                        Padding(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
+                              child: _questionCard(
+                                  child: Text(q.question,
+                                      textAlign: TextAlign.center,
+                                      style: GoogleFonts.cairo(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w900,
+                                          color: primaryColor)))),
+                          const SizedBox(height: 20),
+                          Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: _questionCard(
-                                child: Text(q.question,
-                                    textAlign: TextAlign.center,
-                                    style: GoogleFonts.cairo(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w900,
-                                        color: primaryColor)))),
-                        const SizedBox(height: 20),
-                        Expanded(
-                          child: ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                            itemCount: options.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 10),
-                            itemBuilder: (context, i) {
-                              final opt = options[i];
-                              Color bg = Colors.white;
-                              Color fg = primaryColor;
-                              if (_showFeedback) {
-                                if (opt == correct) {
-                                  bg = Colors.green;
-                                  fg = Colors.white;
-                                } else if (opt == _selectedOption) {
-                                  bg = Colors.red;
-                                  fg = Colors.white;
+                            child: Column(
+                              children: List.generate(options.length, (i) {
+                                final opt = options[i];
+                                Color bg = Colors.white;
+                                Color fg = primaryColor;
+                                if (_showFeedback) {
+                                  if (opt == correct) {
+                                    bg = Colors.green;
+                                    fg = Colors.white;
+                                  } else if (opt == _selectedOption) {
+                                    bg = Colors.red;
+                                    fg = Colors.white;
+                                  }
                                 }
-                              }
-                              return GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: _showFeedback
-                                    ? null
-                                    : () => _handleAnswer(opt),
-                                child: _optionTile(opt, bg, fg),
-                              );
-                            },
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: _showFeedback
+                                        ? null
+                                        : () => _handleAnswer(opt),
+                                    child: _optionTile(opt, bg, fg),
+                                  ),
+                                );
+                              }),
+                            ),
                           ),
-                        ),
-                      ],
+                          // ✅ زر الانتقال اليدوي يظهر فقط في وضع المذاكرة وبعد اختيار إجابة
+                          if (widget.isStudyMode && _showFeedback)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 20),
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor: primaryColor,
+                                    minimumSize:
+                                        const Size(double.infinity, 50),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(15))),
+                                onPressed: _questionIndexInRound + 1 >=
+                                        _questionsPerRound
+                                    ? _finishRound
+                                    : _nextQuestion,
+                                child: Text(
+                                    _questionIndexInRound + 1 >=
+                                            _questionsPerRound
+                                        ? "إنهاء المراجعة"
+                                        : "السؤال التالي",
+                                    style: GoogleFonts.cairo(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white)),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -601,14 +657,12 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           Directionality(
             textDirection: TextDirection.rtl,
             child: SafeArea(
-              // ✅ تم إضافة التمرير هنا لتحرير السكرول في شاشة المقدمة
               child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 26, 16, 16),
                   child: Column(
                     children: [
-                      Text("الدوريات",
+                      Text(widget.isStudyMode ? "قسم المذاكرة" : "الدوريات",
                           style: GoogleFonts.cairo(
                               fontSize: 14,
                               fontWeight: FontWeight.w900,
@@ -616,36 +670,44 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                       const SizedBox(height: 14),
                       SectionIdentityCard(
                         sectionKey: widget.categoryTitle,
-                        icon: _isStars
-                            ? Icons.auto_awesome_rounded
-                            : Icons.workspace_premium,
-                        title: _isStars ? "✨ دوري النجوم" : "🔥 دوري المحترفين",
-                        description: _isStars
-                            ? ""
-                            : "الاحتراف مش إنك تعرف معلومة واحدة،\nالاحتراف إن كل خيوط المعلومة تبقى في إيدك.",
+                        icon: widget.isStudyMode
+                            ? (widget.categoryTitle.contains("سوق")
+                                ? Icons.apartment_rounded
+                                : Icons.gavel_rounded)
+                            : (_isStars
+                                ? Icons.auto_awesome_rounded
+                                : Icons.workspace_premium),
+                        title: widget.categoryTitle,
+                        description: widget.isStudyMode
+                            ? "تعلم من خلال الأسئلة التفاعلية بدون تايمر."
+                            : (_isStars
+                                ? ""
+                                : "الاحتراف مش إنك تعرف معلومة واحدة،\nالاحتراف إن كل خيوط المعلومة تبقى في إيدك."),
                         benefits: const [],
                       ),
                       const SizedBox(height: 20),
-                      _glassCard(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 12),
-                          child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.emoji_events_outlined,
-                                    color: primaryColor, size: 18),
-                                const SizedBox(width: 8),
-                                Text(
-                                    _isCurrentLeagueLocked
-                                        ? "أنهيت جولات هذا الدوري ✅"
-                                        : "تحدي اليوم: $_roundsDoneToday/$_roundsPerDay جولات",
-                                    style: GoogleFonts.cairo(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w900,
-                                        color: _isCurrentLeagueLocked
-                                            ? Colors.green
-                                            : primaryColor))
-                              ])),
+                      if (!widget
+                          .isStudyMode) // ✅ إخفاء عداد الجولات في وضع المذاكرة
+                        _glassCard(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                            child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.emoji_events_outlined,
+                                      color: primaryColor, size: 18),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                      _isCurrentLeagueLocked
+                                          ? "أنهيت جولات هذا الدوري ✅"
+                                          : "تحدي اليوم: $_roundsDoneToday/$_roundsPerDay جولات",
+                                      style: GoogleFonts.cairo(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w900,
+                                          color: _isCurrentLeagueLocked
+                                              ? Colors.green
+                                              : primaryColor))
+                                ])),
                       const SizedBox(height: 16),
                       Builder(builder: (context) {
                         final canStart = !_isLoading &&
@@ -671,7 +733,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                 if (!canStart) {
                                   _showLoadingSheet();
                                 } else {
-                                  _openDailyChallengeSheet();
+                                  // ✅ المذاكرة تبدأ مباشرة | التحدي يفتح شاشة الجولات
+                                  widget.isStudyMode
+                                      ? _startRound(freePlay: false)
+                                      : _openDailyChallengeSheet();
                                 }
                               },
                               child: Row(
@@ -703,12 +768,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                       }),
                       const SizedBox(height: 10),
                       TextButton(
-                          onPressed: () => Navigator.pushAndRemoveUntil(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) =>
-                                      const MainWrapper(initialIndex: 0)),
-                              (route) => false),
+                          onPressed: () => Navigator.pop(context),
                           child: Text("رجوع",
                               style: GoogleFonts.cairo(
                                   fontWeight: FontWeight.w800,
@@ -929,8 +989,10 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         enableDrag: false,
         backgroundColor: Colors.transparent,
         builder: (_) {
-          final bool canPlayMore =
-              !_isFreePlaySession && !_isCurrentLeagueLocked;
+          // ✅ تعديل: في وضع المذاكرة يمكن دائماً لعب جولة أخرى
+          final bool canPlayMore = widget.isStudyMode ||
+              (!_isFreePlaySession && !_isCurrentLeagueLocked);
+
           return Container(
               padding: const EdgeInsets.all(24),
               decoration: const BoxDecoration(
@@ -938,7 +1000,12 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                   borderRadius:
                       BorderRadius.vertical(top: Radius.circular(30))),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Text(_isFreePlaySession ? "ملخص التدريب ✅" : "نتيجة الجولة",
+                Text(
+                    widget.isStudyMode
+                        ? "تمت المراجعة بنجاح ✅"
+                        : (_isFreePlaySession
+                            ? "ملخص التدريب ✅"
+                            : "نتيجة الجولة"),
                     style: GoogleFonts.cairo(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
@@ -947,7 +1014,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                 Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _resultDetail("النقاط", "+$_roundScore", accentColor),
+                      if (!widget.isStudyMode)
+                        _resultDetail("النقاط", "+$_roundScore", accentColor),
                       _resultDetail(
                           "الدقة",
                           "$_correctAnswersCount/$_questionsPerRound",
@@ -973,12 +1041,15 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                             borderRadius:
                                                 BorderRadius.circular(25))),
                                     child: FittedBox(
-                                        child: Text("لعب جولة أخرى",
+                                        child: Text(
+                                            widget.isStudyMode
+                                                ? "العب جولة أخرى"
+                                                : "لعب جولة أخرى",
                                             style: GoogleFonts.cairo(
                                                 fontWeight: FontWeight.w900,
                                                 color: Colors.white))))),
                           if (canPlayMore) const SizedBox(height: 12),
-                          if (_isFreePlaySession)
+                          if (_isFreePlaySession && !widget.isStudyMode)
                             SizedBox(
                                 width: double.infinity,
                                 height: 48,
@@ -997,7 +1068,8 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                             style: GoogleFonts.cairo(
                                                 fontWeight: FontWeight.w900,
                                                 color: Colors.white))))),
-                          if (_isFreePlaySession) const SizedBox(height: 12),
+                          if (_isFreePlaySession && !widget.isStudyMode)
+                            const SizedBox(height: 12),
                           SizedBox(
                               width: double.infinity,
                               height: 48,

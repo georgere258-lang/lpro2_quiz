@@ -2,15 +2,10 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '../constants/firestore_paths.dart';
 import '../../features/pro_card/models/pro_card_banner.dart';
 import '../../core/models/admin_control_models.dart';
 
-/// مصدر واحد: home_pro_card/current
-/// يُرجِع ProCardBanner صالح لو:
-/// isActive && (publishAt == null || publishAt <= now) && (expireAt == null || now < expireAt)
-/// مع Cache محلي لمنع الوميض والاختفاء المؤقت.
 class HomeProCardService {
   final FirebaseFirestore _db;
   HomeProCardService({FirebaseFirestore? db})
@@ -22,68 +17,76 @@ class HomeProCardService {
 
   Stream<ProCardBanner?> streamBanner() async* {
     final prefs = await SharedPreferences.getInstance();
-    final cachedTypeStr = prefs.getString(_cacheTypeKey);
-    final cachedText = prefs.getString(_cacheTextKey);
-    final cachedImage = prefs.getString(_cacheImageKey);
 
-    ProCardBanner? cachedBanner;
+    // 1. إرسال الكاش فوراً (صفر قراءة من فايربيز)
+    ProCardBanner? cached = _loadFromCache(prefs);
+    if (cached != null) yield cached;
 
-    if ((cachedText != null && cachedText.trim().isNotEmpty) ||
-        (cachedImage != null && cachedImage.trim().isNotEmpty)) {
-      final type = (cachedTypeStr ?? 'text').toLowerCase() == 'image'
-          ? ProCardContentType.image
-          : ProCardContentType.text;
+    try {
+      // 2. طلب الوثيقة "مرة واحدة" فقط (قراءة واحدة فقط)
+      // ✅ استبدلنا snapshots بـ get لمنع النزيف المستمر
+      final snap = await _db
+          .collection(FirestorePaths.homeProCard)
+          .doc(FirestorePaths.currentDoc)
+          .get();
 
-      cachedBanner = ProCardBanner(
-        id: FirestorePaths.currentDoc,
-        text: cachedText ?? '',
-        imageUrl: cachedImage ?? '',
-        contentType: type,
-        control: AdminControlFields(
-          isActive: true,
-          publishAt: null,
-          expireAt: null,
-          sectionKey: FirestorePaths.sectionKeyProCard,
-        ),
-      );
+      final data = snap.data();
+      if (data == null) {
+        yield null;
+        return;
+      }
 
-      // بثّ القيمة المخزنة فورًا (إن وُجدت) لمنع الوميض
-      yield cachedBanner;
-    }
+      final banner = ProCardBanner.fromFirestore(data, snap.id);
 
-    yield* _db
-        .collection(FirestorePaths.homeProCard)
-        .doc(FirestorePaths.currentDoc)
-        .snapshots()
-        .map((snap) {
-      final d = snap.data();
-      if (d == null) return null;
-
-      final banner = ProCardBanner.fromFirestore(d, snap.id);
-
-      final now = DateTime.now().toUtc();
-      final publishUtc = banner.publishAt?.toUtc();
-      final expireUtc = banner.expireAt?.toUtc();
-
-      if (!banner.isActive) return null;
-      if (publishUtc != null && now.isBefore(publishUtc)) return null;
-      if (expireUtc != null && !now.isBefore(expireUtc)) return null;
-
-      // تحقق من المحتوى حسب النوع
-      if (banner.isText) {
-        return banner.text.trim().isEmpty ? null : banner;
+      // 3. فحص الصلاحية (Admin Logic)
+      if (_isValid(banner)) {
+        await _saveToCache(prefs, banner);
+        yield banner;
       } else {
-        return banner.imageUrl.trim().isEmpty ? null : banner;
+        yield null;
       }
-    }).asyncMap((banner) async {
-      if (banner != null) {
-        await prefs.setString(_cacheTypeKey, banner.isImage ? 'image' : 'text');
-        await prefs.setString(_cacheTextKey, banner.text.trim());
-        await prefs.setString(_cacheImageKey, banner.imageUrl.trim());
-        return banner;
-      }
-      // fallback: رجّع آخر قيمة محفوظة بدل الاختفاء
-      return cachedBanner;
-    });
+    } catch (e) {
+      // في حالة الخطأ، نكتفي بالكاش إذا كان موجوداً
+      if (cached != null) yield cached;
+    }
+  }
+
+  bool _isValid(ProCardBanner banner) {
+    final now = DateTime.now().toUtc();
+    if (!banner.isActive) return false;
+    if (banner.publishAt != null && now.isBefore(banner.publishAt!.toUtc()))
+      return false;
+    if (banner.expireAt != null && !now.isAfter(banner.expireAt!.toUtc()))
+      return false;
+    return banner.isText
+        ? banner.text.trim().isNotEmpty
+        : banner.imageUrl.trim().isNotEmpty;
+  }
+
+  ProCardBanner? _loadFromCache(SharedPreferences prefs) {
+    final text = prefs.getString(_cacheTextKey);
+    final img = prefs.getString(_cacheImageKey);
+    if ((text == null || text.isEmpty) && (img == null || img.isEmpty))
+      return null;
+
+    return ProCardBanner(
+      id: FirestorePaths.currentDoc,
+      text: text ?? '',
+      imageUrl: img ?? '',
+      contentType: prefs.getString(_cacheTypeKey) == 'image'
+          ? ProCardContentType.image
+          : ProCardContentType.text,
+      control: AdminControlFields(
+        isActive: true,
+        sectionKey: FirestorePaths.sectionKeyProCard,
+      ),
+    );
+  }
+
+  Future<void> _saveToCache(
+      SharedPreferences prefs, ProCardBanner banner) async {
+    await prefs.setString(_cacheTypeKey, banner.isImage ? 'image' : 'text');
+    await prefs.setString(_cacheTextKey, banner.text.trim());
+    await prefs.setString(_cacheImageKey, banner.imageUrl.trim());
   }
 }

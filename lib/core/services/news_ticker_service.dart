@@ -1,123 +1,94 @@
 // PATH: lib/core/services/news_ticker_service.dart
+// STATUS: FULL FILE - ULTRA-OPTIMIZED (Realtime-Only) ✅
 
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import 'package:lpro2_quiz/core/constants/firestore_paths.dart';
+import '../../core/constants/firestore_paths.dart'; // تأكد من صحة المسار النسبي
 
 class NewsTickerService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   static const String _col = FirestorePaths.newsTickerItems;
-  static const Duration _pollInterval = Duration(seconds: 5);
 
-  /// Realtime + Polling(Server) => guarantees fresh updates even if listener lags.
+  /// 🌟 نظام الاستماع اللحظي المطور
   Stream<List<Map<String, dynamic>>> streamTickerItems() {
+    // الترتيب حسب الأولوية ثم الأحدث تعديلاً
     final query = _firestore
         .collection(_col)
         .where('isActive', isEqualTo: true)
         .orderBy('priority', descending: true)
-        // keep it, but polling will cover serverTimestamp delays anyway
         .orderBy('updatedAt', descending: true);
 
     final controller = StreamController<List<Map<String, dynamic>>>.broadcast();
-
     StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? sub;
-    Timer? pollTimer;
-
     String lastSignature = '';
 
+    // معالجة البيانات والفلترة الزمنية
     List<Map<String, dynamic>> mapSnapshot(
-      QuerySnapshot<Map<String, dynamic>> snapshot,
-    ) {
+        QuerySnapshot<Map<String, dynamic>> snapshot) {
       final now = DateTime.now().toUtc();
 
-      return snapshot.docs
-          .where((doc) {
-            final data = doc.data();
+      return snapshot.docs.where((doc) {
+        final data = doc.data();
 
-            final Timestamp? start = data['startDate'] as Timestamp?;
-            final Timestamp? end = data['endDate'] as Timestamp?;
+        // جلب التواريخ بأمان
+        final Timestamp? start = data['startDate'] as Timestamp?;
+        final Timestamp? end = data['endDate'] as Timestamp?;
 
-            // Convert timestamps to UTC for consistent comparison
-            final startUtc = start?.toDate().toUtc();
-            final endUtc = end?.toDate().toUtc();
+        final startUtc = start?.toDate().toUtc();
+        final endUtc = end?.toDate().toUtc();
 
-            if (startUtc != null && now.isBefore(startUtc)) return false;
-            if (endUtc != null && !now.isBefore(endUtc)) return false;
+        // 1. فلترة الوقت: يختفي الخبر فور انتهاء مدته
+        if (startUtc != null && now.isBefore(startUtc)) return false;
+        if (endUtc != null && !now.isBefore(endUtc)) return false;
 
-            final text = data['text_ar']?.toString().trim();
-            if (text == null || text.isEmpty) return false;
+        // 2. التأكد من وجود نص
+        final text = data['text_ar']?.toString().trim();
+        if (text == null || text.isEmpty) return false;
 
-            return true;
-          })
-          .map((doc) => doc.data())
-          .toList();
+        return true;
+      }).map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id; // إضافة الـ ID للبيانات للضرورة
+        return data;
+      }).toList();
     }
 
     void emitIfChanged(List<Map<String, dynamic>> items, {String src = ''}) {
-      // signature based on text + updatedAt + id-ish fields if exist
+      // الـ Signature يعتمد على النص والتوقيت لضمان التحديث عند تغيير المحتوى
       final sig = items
           .map((e) =>
-              '${(e['text_ar'] ?? '').toString()}|${(e['updatedAt'] ?? '').toString()}|${(e['priority'] ?? 0).toString()}')
+              '${(e['text_ar'] ?? '')}|${(e['updatedAt'] ?? '')}|${(e['priority'] ?? 0)}')
           .join('##');
 
       if (sig == lastSignature) return;
       lastSignature = sig;
 
-      assert(() {
-        debugPrint('NewsTicker emit ($src): count=${items.length}');
-        return true;
-      }());
-
+      debugPrint('🚀 NewsTicker Update [$src]: count=${items.length}');
       controller.add(items);
     }
 
-    Future<void> pollServerOnce() async {
-      try {
-        final snap = await query.get(const GetOptions(source: Source.server));
-        final items = mapSnapshot(snap);
-        emitIfChanged(items, src: 'server_poll');
-      } catch (e) {
-        // ignore polling errors; realtime may still work
-        assert(() {
-          debugPrint('NewsTicker poll error: $e');
-          return true;
-        }());
-      }
-    }
-
     controller.onListen = () {
-      // 1) realtime listener
-      sub = query.snapshots(includeMetadataChanges: true).listen(
+      sub = query.snapshots(includeMetadataChanges: false).listen(
         (snap) {
-          // emit cache/server listener results (fast path)
           final items = mapSnapshot(snap);
-          emitIfChanged(items, src: snap.metadata.isFromCache ? 'cache' : 'rt');
+          emitIfChanged(items,
+              src: snap.metadata.isFromCache ? 'cache' : 'live');
         },
-        onError: (e) {
-          assert(() {
-            debugPrint('NewsTicker stream error: $e');
-            return true;
-          }());
-        },
+        onError: (e) => debugPrint('❌ NewsTicker Stream Error: $e'),
       );
-
-      // 2) server polling (hard guarantee)
-      // fire immediately, then every interval
-      pollServerOnce();
-      pollTimer = Timer.periodic(_pollInterval, (_) => pollServerOnce());
     };
 
-    controller.onCancel = () async {
-      await sub?.cancel();
-      pollTimer?.cancel();
-      await controller.close();
+    controller.onCancel = () {
+      sub?.cancel();
+      controller.close();
     };
 
     return controller.stream;
   }
 
+  /// وظيفة النشر (تستخدم من لوحة التحكم أو النظام)
   Future<void> publishNews({
     required String textAr,
     int priority = 0,
@@ -127,13 +98,6 @@ class NewsTickerService {
   }) async {
     final trimmed = textAr.trim();
     if (trimmed.isEmpty) return;
-
-    final DateTime? startUtc = startDate?.toUtc();
-    final DateTime? endUtc = endDate?.toUtc();
-
-    if (startUtc != null && endUtc != null && !startUtc.isBefore(endUtc)) {
-      throw Exception('startDate must be before endDate');
-    }
 
     final data = <String, dynamic>{
       'text_ar': trimmed,
@@ -145,12 +109,9 @@ class NewsTickerService {
       'source': 'system',
     };
 
-    if (startUtc != null) {
-      data['startDate'] = Timestamp.fromDate(startUtc);
-    }
-    if (endUtc != null) {
-      data['endDate'] = Timestamp.fromDate(endUtc);
-    }
+    if (startDate != null)
+      data['startDate'] = Timestamp.fromDate(startDate.toUtc());
+    if (endDate != null) data['endDate'] = Timestamp.fromDate(endDate.toUtc());
 
     await _firestore.collection(_col).add(data);
   }

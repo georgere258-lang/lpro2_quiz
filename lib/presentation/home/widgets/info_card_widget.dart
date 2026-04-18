@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart'; // المكتبة الجديدة
 import 'package:lpro2_quiz/core/constants/app_colors.dart';
 
 import '../../../features/pro_card/models/pro_card_banner.dart';
@@ -186,10 +187,19 @@ class _ProCardImage extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: AspectRatio(
         aspectRatio: 16 / 9,
-        child: Image.network(
-          url,
+        child: CachedNetworkImage(
+          imageUrl: url,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
+          placeholder: (context, url) => Container(
+            color: Colors.grey[50],
+            alignment: Alignment.center,
+            child: const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+          errorWidget: (context, url, error) => Container(
             color: Colors.grey[100],
             alignment: Alignment.center,
             child: Text(
@@ -200,18 +210,6 @@ class _ProCardImage extends StatelessWidget {
               ),
             ),
           ),
-          loadingBuilder: (context, child, progress) {
-            if (progress == null) return child;
-            return Container(
-              color: Colors.grey[50],
-              alignment: Alignment.center,
-              child: const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            );
-          },
         ),
       ),
     );

@@ -1,10 +1,9 @@
 // PATH: lib/features/news_ticker/repositories/news_ticker_repository.dart
+// STATUS: OPTIMIZED & READY ✅
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import '../../../core/constants/firestore_paths.dart';
 
-/// Repository for News Ticker admin CRUD operations.
 class NewsTickerRepository {
   final FirebaseFirestore _db;
 
@@ -13,9 +12,8 @@ class NewsTickerRepository {
 
   static const String _col = FirestorePaths.newsTickerItems;
 
-  /// Normalize startDate/endDate to UTC and validate invariant.
-  /// Leaves FieldValue.delete() and other types untouched.
-  Map<String, dynamic> _normalizeAndValidatePayload(Map<String, dynamic> input) {
+  Map<String, dynamic> _normalizeAndValidatePayload(
+      Map<String, dynamic> input) {
     final out = Map<String, dynamic>.from(input);
     DateTime? startUtc;
     DateTime? endUtc;
@@ -36,8 +34,7 @@ class NewsTickerRepository {
     return out;
   }
 
-  /// Watch all ticker items for admin panel (ordered by priority desc).
-  /// Admin panel applies additional client-side sorting.
+  /// مراقبة الأخبار للوحة التحكم (الترتيب بـ priority كما طلبت)
   Stream<QuerySnapshot<Map<String, dynamic>>> watchAllForAdmin() {
     return _db
         .collection(_col)
@@ -45,22 +42,28 @@ class NewsTickerRepository {
         .snapshots();
   }
 
-  /// Add a new ticker item.
+  /// إضافة خبر جديد مع بصمة زمنية
   Future<void> addItem(Map<String, dynamic> payload) async {
-    await _db.collection(_col).add(_normalizeAndValidatePayload(payload));
+    final data = _normalizeAndValidatePayload(payload);
+    // نضمن وجود updatedAt ليعمل التحديث اللحظي عند المستخدمين
+    data['updatedAt'] = FieldValue.serverTimestamp();
+    await _db.collection(_col).add(data);
   }
 
-  /// Update an existing ticker item.
+  /// تحديث خبر موجود مع تحديث البصمة الزمنية
   Future<void> updateItem(String docId, Map<String, dynamic> update) async {
-    await _db.collection(_col).doc(docId).update(_normalizeAndValidatePayload(update));
+    final data = _normalizeAndValidatePayload(update);
+    // تحديث الوقت عند أي تعديل ليقفز الخبر للأمام عند المستخدم
+    data['updatedAt'] = FieldValue.serverTimestamp();
+    await _db.collection(_col).doc(docId).update(data);
   }
 
-  /// Delete a ticker item.
+  /// حذف خبر
   Future<void> deleteItem(String docId) async {
     await _db.collection(_col).doc(docId).delete();
   }
 
-  /// Toggle isActive and update timestamp.
+  /// تفعيل / إيقاف الخبر مع تحديث التوقيت لضمان اللحظية
   Future<void> toggleActive(String docId, bool currentActive) async {
     await _db.collection(_col).doc(docId).update({
       'isActive': !currentActive,

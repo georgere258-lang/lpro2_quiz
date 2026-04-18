@@ -1,6 +1,3 @@
-// PATH: lib/presentation/screens/leaderboard_screen.dart
-// STATUS: SCROLL-LIBERATED ✅ (Flexible for Big Fonts & Small Screens)
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -12,6 +9,9 @@ import '../../core/constants/app_colors.dart';
 import '../../core/utils/sound_manager.dart';
 import '../../features/leaderboards/models/leaderboard_entry.dart';
 import '../../features/leaderboards/repositories/leaderboards_repository.dart';
+// ✅ الربط بالمحرك الموحد
+import '../../core/services/user_service.dart';
+import '../../core/data/models/user_model.dart';
 import 'stats_screen.dart';
 
 class LeaderboardScreen extends StatefulWidget {
@@ -27,15 +27,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
 
   final LeaderboardsRepository _repo = LeaderboardsRepository();
 
-  // League keys matching Firestore: general | stars | pros
   final List<String> _leagues = ['general', 'stars', 'pros'];
-
-  // Points field for each league (to read from user doc)
-  final Map<String, String> _leaguePointsField = {
-    'general': 'points',
-    'stars': 'starsPoints',
-    'pros': 'proPoints',
-  };
 
   final List<IconData> avatars = [
     Icons.workspace_premium,
@@ -51,7 +43,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
 
-    // Debug: Log Firebase project identity
     if (kDebugMode) {
       _logFirebaseIdentity();
     }
@@ -92,7 +83,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           indicatorColor: AppColors.secondaryOrange,
           indicatorWeight: 4,
           labelColor: Colors.white,
-          unselectedLabelColor: Colors.white.withValues(alpha: 0.5),
+          unselectedLabelColor: Colors.white.withOpacity(0.5),
           labelStyle:
               GoogleFonts.cairo(fontWeight: FontWeight.bold, fontSize: 13),
           tabs: const [
@@ -120,7 +111,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
       stream: _repo.streamTop10(league),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          final error = snapshot.error;
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(24),
@@ -183,7 +173,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           }
         }
 
-        // ✅ تم تغليف المحتوى بـ SingleChildScrollView لتحرير السكرول تماماً
         return SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           child: Column(
@@ -212,11 +201,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                     textAlign: TextAlign.center,
                   ),
                 ),
-              // ✅ تحويل القائمة لتعمل بذكاء داخل السكرول الخارجي
               ListView.builder(
-                shrinkWrap: true, // يضمن أن القائمة تأخذ حجم محتواها فقط
-                physics:
-                    const NeverScrollableScrollPhysics(), // يعتمد على سكرول الصفحة الرئيسي
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
                 itemCount: others.length,
@@ -229,23 +216,22 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
     );
   }
 
+  // ✅ التعديل المطلوب: تم استبدال الـ FutureBuilder بـ StreamBuilder الموحد
   Widget _buildMyStatusCard(
     LeaderboardEntry? entry,
     String league,
     String uid,
     int rank10Points,
   ) {
-    final pointsField = _leaguePointsField[league] ?? 'points';
-
-    return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseFirestore.instance.collection('users').doc(uid).get(),
+    return StreamBuilder<UserModel?>(
+      stream: UserService().currentUserStream,
       builder: (context, userSnap) {
         if (userSnap.connectionState == ConnectionState.waiting) {
           return Container(
             margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.secondaryOrange.withValues(alpha: 0.1),
+              color: AppColors.secondaryOrange.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Center(
@@ -261,35 +247,19 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           );
         }
 
-        if (userSnap.hasError) {
-          return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.orange[50],
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.warning_amber, color: Colors.orange[700], size: 18),
-                const SizedBox(width: 8),
-                Text(
-                  "تعذر تحميل بياناتك",
-                  style: GoogleFonts.cairo(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                    color: Colors.orange[800],
-                  ),
-                ),
-              ],
-            ),
-          );
+        final user = userSnap.data;
+        if (user == null) return const SizedBox.shrink();
+
+        // اختيار النقاط بدقة من الموديل الجديد بناءً على التبويب المفتوح
+        int myPoints = 0;
+        if (league == 'stars') {
+          myPoints = user.starsPoints;
+        } else if (league == 'pros') {
+          myPoints = user.proPoints;
+        } else {
+          myPoints = user.points;
         }
 
-        final userData = userSnap.data?.data() as Map<String, dynamic>? ?? {};
-        final myPoints = (userData[pointsField] as int?) ?? 0;
         final bool isInTop10 = entry != null;
         final String rankText =
             isInTop10 ? "ترتيبك: #${entry.rank}" : "ترتيبك: خارج أفضل 10";
@@ -297,22 +267,17 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
             isInTop10 ? 0 : (rank10Points - myPoints + 1).clamp(0, 999999);
 
         return InkWell(
-          onTap: () {
-            SoundManager.playTap();
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const StatsScreen()),
-            );
-          },
+          onTap:
+              null, // ✅ [تعطيل جراحي] تم إبطال النقر لمنع فتح شاشة الإحصائيات من الليدربورد
           borderRadius: BorderRadius.circular(12),
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: AppColors.secondaryOrange.withValues(alpha: 0.1),
+              color: AppColors.secondaryOrange.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: AppColors.secondaryOrange.withValues(alpha: 0.3)),
+              border:
+                  Border.all(color: AppColors.secondaryOrange.withOpacity(0.3)),
             ),
             child: Column(
               children: [
@@ -349,7 +314,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: AppColors.primaryDeepTeal.withValues(alpha: 0.1),
+                      color: AppColors.primaryDeepTeal.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -364,7 +329,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                 ],
                 const SizedBox(height: 6),
                 Text(
-                  "اضغط لعرض تفاصيل تقدمك",
+                  "المجموع الحالي لنقاطك",
                   style: GoogleFonts.cairo(
                     fontSize: 11,
                     color: Colors.grey[600],
@@ -436,7 +401,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                       Border.all(color: medalColor, width: rank == 1 ? 4 : 2)),
               child: CircleAvatar(
                   radius: size / 2,
-                  backgroundColor: Colors.white.withValues(alpha: 0.1),
+                  backgroundColor: Colors.white.withOpacity(0.1),
                   child: Icon(
                       avatars[entry.avatarIndex < avatars.length
                           ? entry.avatarIndex
@@ -481,12 +446,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withValues(alpha: 0.02),
+                color: Colors.black.withOpacity(0.02),
                 blurRadius: 10,
                 offset: const Offset(0, 4))
           ],
-          border: Border.all(
-              color: AppColors.primaryDeepTeal.withValues(alpha: 0.05))),
+          border:
+              Border.all(color: AppColors.primaryDeepTeal.withOpacity(0.05))),
       child: Row(
         children: [
           SizedBox(
@@ -498,8 +463,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                       fontSize: 15))),
           CircleAvatar(
               radius: 22,
-              backgroundColor:
-                  AppColors.primaryDeepTeal.withValues(alpha: 0.05),
+              backgroundColor: AppColors.primaryDeepTeal.withOpacity(0.05),
               child: Icon(
                   avatars[entry.avatarIndex < avatars.length
                       ? entry.avatarIndex
@@ -520,7 +484,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
           Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                  color: AppColors.primaryDeepTeal.withValues(alpha: 0.05),
+                  color: AppColors.primaryDeepTeal.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(12)),
               child: Text("${entry.points} ن",
                   style: GoogleFonts.poppins(

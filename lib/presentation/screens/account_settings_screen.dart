@@ -209,7 +209,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
                   const SizedBox(height: 16),
                   _buildSettingTile(
                     title: "حذف الحساب نهائياً",
-                    subtitle: "مسح بياناتك وفقاً لسياسة آبل",
+                    subtitle: " مسح نقاطك وكل بياناتك ",
                     icon: Icons.delete_outline_rounded,
                     color: Colors.redAccent,
                     onTap: _showPermanentDeleteDialog,

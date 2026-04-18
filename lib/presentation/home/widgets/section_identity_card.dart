@@ -24,40 +24,64 @@ class SectionIdentityCard extends StatelessWidget {
       sectionKey.contains("النجوم") || title.contains("النجوم");
   bool get _isPro =>
       sectionKey.contains("المحترفين") || title.contains("المحترفين");
+  // ✅ تعريف الأقسام الجديدة
+  bool get _isMarket =>
+      sectionKey.contains("سوق العقار") || title.contains("سوق العقار");
+  bool get _isSales =>
+      sectionKey.contains("البيع وعقد المطور") ||
+      title.contains("البيع وعقد المطور");
 
   String get _badgeText {
     if (_isStars) return "FRESH";
     if (_isPro) return "PRO";
+    if (_isMarket) return "MARKET"; // ✅ بادج مخصص للسوق
+    if (_isSales) return "SALES"; // ✅ بادج مخصص للعقود
     return "LPRO";
   }
 
   String get _badgeEmoji {
     if (_isStars) return "✨";
     if (_isPro) return "🔥";
+    if (_isMarket) return "🏙️";
+    if (_isSales) return "⚖️";
     return "⭐";
   }
 
   Color get _badgeColor {
     if (_isStars) return const Color(0xFF3498DB);
     if (_isPro) return AppColors.secondaryOrange;
+    if (_isMarket)
+      return const Color(0xFF2ECC71); // ✅ أخضر يعبر عن السوق والنمو
+    if (_isSales) return AppColors.primaryDeepTeal; // ✅ تيل فخم للعقود والبيع
     return const Color(0xFF4FA8A8);
   }
 
   String get _headline {
-    if (_isStars) return "اجمع نقاط دوري النجوم واستعد لمفاجآت قادمة 🎯\nلكن خلي بالك…\nالتطور الحقيقي مش بالنقاط بس،\nالتطور بيبدأ بالاستمرارية والفهم وبناء الأساس الصح.";
-    if (_isPro) return "اجمع نقاطك بقوة… واستنى مفاجآت قادمة 🚀\nإنت هنا مش جديد على السوق،\nإنت محترف، والمعلومة هي ثروتك الحقيقية.";
+    if (_isStars)
+      return "اجمع نقاط دوري النجوم واستعد لمفاجآت قادمة \nلكن خلي بالك…\nالتطور الحقيقي مش بالنقاط بس،\nالتطور بيبدأ بالاستمرارية والفهم وبناء الأساس الصح.";
+    if (_isPro)
+      return "اجمع نقاطك بقوة… واستنى مفاجآت قادمة 🚀\nإنت هنا مش جديد على السوق،\nإنت محترف، والمعلومة هي ثروتك الحقيقية.";
+    // ✅ نصوص خاصة بالأقسام الجديدة
+    if (_isMarket)
+      return "مكونات السوق العقارى 🏙️\nالقرار الصح بيبدأ بمعلومة صحيحة،\nوقوة المسوق في معرفته بأدق تفاصيل المناطق والمشاريع.";
+    if (_isSales)
+      return "أسرار البيع والتعاقد ⚖️\nالمحترف هو اللي فاهم بنود عقده قبل عميله،\nثباتك في 'الكلوزينج' بيجي من تمكنك القانوني والفني.";
     return "خُد خطوة ثابتة… وكمّل صح.";
   }
 
   String get _subLine {
     if (_isStars) return "بداية الطريق الصح ✨";
     if (_isPro) return "مستوى Pro 🔥";
+    if (_isMarket) return "خريطة الاستثمار العقاري 🗺️";
+    if (_isSales) return "فنون التفاوض والتعاقد 🤝";
     return "تعلم • تطور • نجاح";
   }
-  
+
   String get _footerLine {
     if (_isStars) return "تعلم مستمر ◀️ تطور كبير ◀️ نجاح أكيد 💪";
     if (_isPro) return "تطوير مستمر ◀️ نجاحات أكتر ◀️ إنت قائد Pro 👑";
+    if (_isMarket) return "فهم السوق ◀️ تحليل المشاريع ◀️ إغلاق ناجح 💪";
+    if (_isSales) return "مهارة البيع ◀️ ثقة العميل ◀️ احترافية كاملة 👑";
     return "هدفنا: تثبيت فهمك… قبل ما نحسب نقاطك.";
   }
 
@@ -140,7 +164,8 @@ class SectionIdentityCard extends StatelessWidget {
                             fontSize: 12,
                             height: 1.2,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.primaryDeepTeal.withValues(alpha: 0.75),
+                            color: AppColors.primaryDeepTeal
+                                .withValues(alpha: 0.75),
                           ),
                         ),
                       ],
@@ -162,7 +187,6 @@ class SectionIdentityCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Headline (روح الدوري)
                   Text(
                     _headline,
                     style: GoogleFonts.cairo(
@@ -173,8 +197,6 @@ class SectionIdentityCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 10),
-
-                  // Description (من النداء اللي بيجي من برا)
                   Text(
                     description,
                     style: GoogleFonts.cairo(
@@ -184,19 +206,13 @@ class SectionIdentityCard extends StatelessWidget {
                       color: Colors.black87,
                     ),
                   ),
-
                   const SizedBox(height: 16),
-
-                  // Divider خفيف
                   Container(
                     height: 1,
                     width: double.infinity,
                     color: AppColors.primaryDeepTeal.withValues(alpha: 0.08),
                   ),
-
                   const SizedBox(height: 14),
-
-                  // Benefits
                   ...benefits.map(
                     (benefit) => Padding(
                       padding: const EdgeInsets.only(bottom: 10),
@@ -236,10 +252,7 @@ class SectionIdentityCard extends StatelessWidget {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 6),
-
-                  // Accent line
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 10),
@@ -247,7 +260,8 @@ class SectionIdentityCard extends StatelessWidget {
                       color: AppColors.primaryDeepTeal.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: AppColors.primaryDeepTeal.withValues(alpha: 0.10),
+                        color:
+                            AppColors.primaryDeepTeal.withValues(alpha: 0.10),
                       ),
                     ),
                     child: Row(
@@ -262,8 +276,8 @@ class SectionIdentityCard extends StatelessWidget {
                               fontSize: 12,
                               height: 1.4,
                               fontWeight: FontWeight.w800,
-                              color:
-                                  AppColors.primaryDeepTeal.withValues(alpha: 0.85),
+                              color: AppColors.primaryDeepTeal
+                                  .withValues(alpha: 0.85),
                             ),
                           ),
                         ),
@@ -280,6 +294,7 @@ class SectionIdentityCard extends StatelessWidget {
   }
 }
 
+// الكلاس _Badge يبقى كما هو بالأسفل...
 class _Badge extends StatelessWidget {
   final Color color;
   final String text;
