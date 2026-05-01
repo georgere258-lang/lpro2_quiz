@@ -109,8 +109,9 @@ class NewsTickerService {
       'source': 'system',
     };
 
-    if (startDate != null)
+    if (startDate != null) {
       data['startDate'] = Timestamp.fromDate(startDate.toUtc());
+    }
     if (endDate != null) data['endDate'] = Timestamp.fromDate(endDate.toUtc());
 
     await _firestore.collection(_col).add(data);
