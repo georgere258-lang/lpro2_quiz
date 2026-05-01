@@ -88,7 +88,7 @@ class PremiumEventCard extends StatelessWidget {
                             size: 18),
                         const SizedBox(width: 4),
                         // ✅ القفل باللون البرتقالي للتشويق
-                        Icon(Icons.enhanced_encryption_rounded,
+                        const Icon(Icons.enhanced_encryption_rounded,
                             color: AppColors.secondaryOrange, size: 24),
                         const SizedBox(width: 4),
                         Icon(Icons.link_rounded,
