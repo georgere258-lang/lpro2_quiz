@@ -54,10 +54,12 @@ class HomeProCardService {
   bool _isValid(ProCardBanner banner) {
     final now = DateTime.now().toUtc();
     if (!banner.isActive) return false;
-    if (banner.publishAt != null && now.isBefore(banner.publishAt!.toUtc()))
+    if (banner.publishAt != null && now.isBefore(banner.publishAt!.toUtc())) {
       return false;
-    if (banner.expireAt != null && !now.isAfter(banner.expireAt!.toUtc()))
+    }
+    if (banner.expireAt != null && !now.isAfter(banner.expireAt!.toUtc())) {
       return false;
+    }
     return banner.isText
         ? banner.text.trim().isNotEmpty
         : banner.imageUrl.trim().isNotEmpty;
@@ -66,8 +68,9 @@ class HomeProCardService {
   ProCardBanner? _loadFromCache(SharedPreferences prefs) {
     final text = prefs.getString(_cacheTextKey);
     final img = prefs.getString(_cacheImageKey);
-    if ((text == null || text.isEmpty) && (img == null || img.isEmpty))
+    if ((text == null || text.isEmpty) && (img == null || img.isEmpty)) {
       return null;
+    }
 
     return ProCardBanner(
       id: FirestorePaths.currentDoc,
