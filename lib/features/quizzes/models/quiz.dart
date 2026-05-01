@@ -86,7 +86,6 @@ class Quiz implements IAdminControlled {
   void validate() {
     // Question validation
     if (question.trim().length < 5) {
-      // قللنا القيد لـ 5 لمرونة الأسئلة الحالية
       throw ArgumentError('الاستبيان يجب أن يكون على الأقل 5 أحرف');
     }
 
@@ -126,7 +125,6 @@ class Quiz implements IAdminControlled {
     final map = control.toFirestore();
     map['question'] = question.trim();
     map['options'] = options.map((o) => o.trim()).toList();
-    // نرفعها باسم correctAnswer لتوافق الداتابيز عندك
     map['correctAnswer'] = correctOptionIndex;
     map['category'] = category;
     map['league'] = league;
@@ -135,14 +133,15 @@ class Quiz implements IAdminControlled {
     if (explanation != null) {
       map['explanation'] = explanation!.trim();
     }
-    // الـ Repository هو المسؤول عن الـ Timestamps
     map.remove('createdAt');
     map.remove('updatedAt');
     return map;
   }
 
+  // ────────────────────────────────────────────────────────────────────────────
+  // ✅ منشئ الفايربيز الأصلي (Firestore Only)
+  // ────────────────────────────────────────────────────────────────────────────
   factory Quiz.fromFirestore(Map<String, dynamic> data, String id) {
-    // ✅ دعم الحقلين لضمان قراءة correctAnswer من فايربيز عندك
     final dynamic correctVal =
         data['correctAnswer'] ?? data['correctOptionIndex'] ?? 0;
 
