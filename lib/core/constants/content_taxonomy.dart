@@ -1,12 +1,12 @@
 // PATH: lib/core/constants/content_taxonomy.dart
-// STATUS: FULL FILE — Canonical Content Taxonomy + Upload Schemas (v1)
+// STATUS: FULL FILE — Canonical Content Taxonomy + Upload Schemas (v2)
 //
 // الهدف: توثيق ثابت داخل الكود لأسماء الـ Collections + تقسيم الأقسام + Schema الرسمي للرفع
 // بحيث أي حد يشتغل على التطبيق يعرف (بدون تخمين) تقسيم المحتوى وصيغ الرفع الفردي/الجماعي.
 //
 // ملاحظة مهمة:
 // - هذا الملف "مرجعي" فقط: لا يعتمد عليه UI مباشرة إلا لو قررت.
-// - لا يضيف/يغير أي منطق Firestore، فقط يوحد المعرفة داخل المشروع.
+// - لا يضيف/يغير أي منطق Firestore أو GitHub، فقط يوحد المعرفة داخل المشروع.
 
 class ContentTaxonomy {
   ContentTaxonomy._();
@@ -33,7 +33,6 @@ class ContentTaxonomy {
   ];
 
   // Schema: pro_insight document
-  // ✅ ملاحظة: المعلومة بتفرق شغالة بـ tags (List<String>) وليس sectionKey.
   static const ContentSchema proInsightSchema = ContentSchema(
     collection: colProInsight,
     description:
@@ -85,7 +84,6 @@ class ContentTaxonomy {
       kycSectionKeyByTag.values.toList(growable: false);
 
   // Schema: know_your_client document
-  // ✅ ملاحظة: اعرف عميلك شغال بـ sectionKey (String) داخل الوثيقة.
   static const ContentSchema knowYourClientSchema = ContentSchema(
     collection: colKnowYourClient,
     description:
@@ -158,11 +156,81 @@ class ContentTaxonomy {
   );
 
   // ─────────────────────────────────────────────────────────────
+  // Smart Study Quizzes (الأقسام الجديدة) — GitHub JSON Strategy (Zero Cost)
+  // ─────────────────────────────────────────────────────────────
+  // نظام المذاكرة الذكية يعتمد على استضافة JSON خارجي لتجنب تكاليف Firebase.
+
+  static const List<String> smartStudySections = <String>[
+    'سوق العقار',
+    'البيع وعقد المطور',
+  ];
+
+  // Schema: GitHub JSON Structure (Individual Question)
+  static const ContentSchema smartStudySchema = ContentSchema(
+    collection: 'GitHub: /data/*.json',
+    description: 'Smart Study / المذاكرة الذكية — Zero-cost Question Bank',
+    required: <FieldSpec>[
+      FieldSpec('id', FieldType.string), // معرف فريد لمنع التكرار محلياً
+      FieldSpec('question', FieldType.string),
+      FieldSpec('options', FieldType.stringList), // 4 خيارات
+      FieldSpec('correctAnswerIndex', FieldType.number), // 0..3
+    ],
+    optional: <FieldSpec>[
+      FieldSpec('explanation', FieldType.string), // شرح الإجابة (اختياري)
+      FieldSpec('category', FieldType.string),
+    ],
+    rules: <String>[
+      'id يجب أن يكون فريداً لكل سؤال (Unique) لضمان عمل الـ Mistakes Vault',
+      'الرفع يكون عبر دمج الجديد مع القديم لضمان الإضافة وليس الاحلال (Merge Strategy)',
+      'يجب تحديث versioning.json عند كل رفع لتنبيه التطبيق بالتحديث',
+    ],
+    examples: <String>[
+      'الملف: market.json لقسم سوق العقار',
+      'الملف: sales.json لقسم البيع وعقد المطور',
+    ],
+  );
+
+  // Schema: versioning.json document
+  static const ContentSchema versioningSchema = ContentSchema(
+    collection: 'GitHub: versioning.json',
+    description: 'Smart Versioning — لتجنب التحميل العشوائي للبيانات',
+    required: <FieldSpec>[
+      FieldSpec('market_version', FieldType.number),
+      FieldSpec('sales_version', FieldType.number),
+    ],
+    optional: [],
+    rules: [
+      'عند تعديل أي ملف أسئلة، يجب زيادة الرقم الخاص به بمقدار 1 لضمان وصول التحديث للمستخدم',
+    ],
+    examples: [
+      '{ "market_version": 2, "sales_version": 1 }',
+    ],
+  );
+
+  // ─────────────────────────────────────────────────────────────
   // Upload Payload Helpers (Static builders)
   // ─────────────────────────────────────────────────────────────
 
-  /// ✅ صيغة رفع سؤال مفرد (Map)
-  /// ملاحظة: createdAt يُفضل serverTimestamp من الـ UI/Repository.
+  /// ✅ صيغة رفع سؤال مفرد لـ GitHub (Map)
+  static Map<String, dynamic> buildSmartStudyQuestion({
+    required String id,
+    required String question,
+    required List<String> options,
+    required int correctAnswerIndex,
+    String? explanation,
+    String? category,
+  }) {
+    return <String, dynamic>{
+      'id': id,
+      'question': question,
+      'options': options,
+      'correctAnswerIndex': correctAnswerIndex,
+      if (explanation != null) 'explanation': explanation,
+      if (category != null) 'category': category,
+    };
+  }
+
+  /// ✅ صيغة رفع سؤال مفرد (Map) لـ Firestore
   static Map<String, dynamic> buildQuizQuestion({
     required String category,
     required String question,
@@ -171,7 +239,7 @@ class ContentTaxonomy {
     required int difficulty,
     required bool isActive,
     String? questionKey,
-    dynamic createdAt, // Timestamp / FieldValue.serverTimestamp()
+    dynamic createdAt,
   }) {
     return <String, dynamic>{
       'category': category,
@@ -195,8 +263,8 @@ class ContentTaxonomy {
     required String lock,
     required List<String> tags,
     required bool isActive,
-    dynamic createdAt, // Timestamp / FieldValue.serverTimestamp()
-    dynamic updatedAt, // Timestamp / FieldValue.serverTimestamp()
+    dynamic createdAt,
+    dynamic updatedAt,
     String? article,
     num? level,
     bool? isFeatured,
@@ -230,8 +298,8 @@ class ContentTaxonomy {
     required String lock,
     required String sectionKey,
     required bool isActive,
-    dynamic createdAt, // Timestamp / FieldValue.serverTimestamp()
-    dynamic updatedAt, // Timestamp / FieldValue.serverTimestamp()
+    dynamic createdAt,
+    dynamic updatedAt,
     String? article,
     num? orderInSection,
     bool? isFeatured,
