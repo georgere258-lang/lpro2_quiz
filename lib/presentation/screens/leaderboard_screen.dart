@@ -3,16 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/constants/app_colors.dart';
-import '../../core/utils/sound_manager.dart';
 import '../../features/leaderboards/models/leaderboard_entry.dart';
 import '../../features/leaderboards/repositories/leaderboards_repository.dart';
 // ✅ الربط بالمحرك الموحد
 import '../../core/services/user_service.dart';
 import '../../core/data/models/user_model.dart';
-import 'stats_screen.dart';
 
 class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
