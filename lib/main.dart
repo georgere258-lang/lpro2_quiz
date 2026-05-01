@@ -1,5 +1,5 @@
 // PATH: lib/main.dart
-// STATUS: Version 56.2 - Final Surgical Fix (Full Unified Sync)
+// STATUS: Version 56.2 - Final Surgical Fix (Full Unified Sync + Hive Integration)
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -16,6 +16,10 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+// ✅ [تعديل جراحي للقسم الجديد] استيراد مكتبات Hive والموديل الجديد
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:lpro2_quiz/features/quizzes/models/user_question_record.dart';
 
 import 'package:lpro2_quiz/firebase_options.dart';
 import 'package:lpro2_quiz/core/theme/app_theme.dart';
@@ -99,6 +103,14 @@ StreamSubscription<User?>? _authSub;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // ✅ [تعديل جراحي للقسم الجديد] تهيئة Hive وتسجيل المحول وفتح الصناديق
+  await Hive.initFlutter();
+  if (!Hive.isAdapterRegistered(0)) {
+    Hive.registerAdapter(UserQuestionRecordAdapter());
+  }
+  await Hive.openBox<UserQuestionRecord>('question_records');
+  await Hive.openBox('app_settings');
+
   // ✅ [حل الشاشة الحمراء] منع الانهيار عند تضارب الـ Keys في المحاكي
   ErrorWidget.builder = (FlutterErrorDetails details) {
     return Container(color: Colors.white);
@@ -154,7 +166,7 @@ Future<void> _postBootstrap() async {
       requestCriticalPermission: false,
     );
 
-    final initSettings = InitializationSettings(
+    const initSettings = InitializationSettings(
       android: androidInit,
       iOS: iosInit,
     );
