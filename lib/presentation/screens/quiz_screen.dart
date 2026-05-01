@@ -1,5 +1,5 @@
 // PATH: lib/presentation/screens/quiz_screen.dart
-// STATUS: SCROLL-LIBERATED ✅ (Flexible Intro & Game Flow)
+// STATUS: SCROLL-LIBERATED ✅ (Leagues Dedicated Edition)
 
 import 'dart:async';
 import 'dart:convert';
@@ -18,17 +18,15 @@ import '../home/widgets/section_identity_card.dart';
 import '../widgets/lpro_bottom_nav_bar.dart';
 import 'main_wrapper.dart';
 
-// ✅ استدعاء الملف الصحيح الذي يحتوي على getSmartBatch و saveGameSession
+// ✅ استخدام الريبوزيتوري الأصلي المخصص للدوريات وفايربيز
 import '../../features/quizzes/repositories/quiz_repository.dart';
 
 class QuizScreen extends StatefulWidget {
   final String categoryTitle;
-  final bool isStudyMode; // ✅ مضاف
 
   const QuizScreen({
     super.key,
     required this.categoryTitle,
-    this.isStudyMode = false, // ✅ مضاف
   });
 
   @override
@@ -36,7 +34,6 @@ class QuizScreen extends StatefulWidget {
 }
 
 class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
-  // ✅ استخدام الكلاس الموحد
   final QuizRepository _quizRepo = QuizRepository();
 
   static const int _roundsPerDay = 4;
@@ -48,9 +45,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   final Color accentColor = AppColors.secondaryOrange;
 
   bool get _isStars => widget.categoryTitle == "دوري النجوم";
-  String get _enterButtonText => widget.isStudyMode
-      ? "ابدأ المذاكرة 📖"
-      : (_isStars ? "انت نجم Pro ⭐" : "ملعبك يا Pro 🔥");
+
+  // ✅ العودة للنصوص الأصلية للدوريات
+  String get _enterButtonText => _isStars ? "انت نجم Pro ⭐" : "ملعبك يا Pro 🔥";
   int get _secondsPerQuestion => _isStars ? 25 : 15;
 
   List<_QuizQuestion> _candidatePool = [];
@@ -79,14 +76,13 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   bool _isFreePlaySession = false;
   bool _isSaving = false;
 
-  // ✅ تعديل: في وضع المذاكرة نعتبر الجولات المنجزة دائماً 0 لضمان عدم القفل
-  int get _roundsDoneToday => widget.isStudyMode
-      ? 0
-      : (_isStars ? _starsRoundsToday : _prosRoundsToday);
+  // ✅ العودة لحساب الجولات الحقيقي للدوريات
+  int get _roundsDoneToday => _isStars ? _starsRoundsToday : _prosRoundsToday;
 
   bool get _isCurrentLeagueLocked => _roundsDoneToday >= _roundsPerDay;
   bool get _areBothLeaguesLocked =>
       _starsRoundsToday >= _roundsPerDay && _prosRoundsToday >= _roundsPerDay;
+
   late AnimationController _glowController;
 
   final Set<String> _submittedQuestionIds = {};
@@ -95,19 +91,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   List<String> _displayOptions = [];
   int _displayCorrectIndex = 0;
   final Stopwatch _introTiming = Stopwatch();
-
-  static String _normalizeArabic(String s) {
-    String result = s.trim().replaceAll(RegExp(r'\s+'), ' ');
-    result = result
-        .replaceAll('ى', 'ي')
-        .replaceAll('أ', 'ا')
-        .replaceAll('إ', 'ا')
-        .replaceAll('آ', 'ا');
-    return result;
-  }
-
-  static bool _arabicMatch(String a, String b) =>
-      _normalizeArabic(a) == _normalizeArabic(b);
 
   @override
   void initState() {
@@ -199,31 +182,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       debugPrint("❌ Smart Fetch Fail: $e");
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  List<_QuizQuestion> _parseQuestionDocs(
-      List<QueryDocumentSnapshot<Map<String, dynamic>>> docs) {
-    return docs
-        .map((d) {
-          final data = d.data();
-          final options = ((data['options'] as List?) ?? []).cast<String>();
-          int rawCorrect =
-              (data['correctAnswer'] ?? data['correctOptionIndex'] ?? 0) as int;
-          final difficulty = ((data['difficulty'] as int?) ?? 3).clamp(1, 5);
-          return _QuizQuestion(
-            docId: d.id,
-            question: (data['question'] ?? '').toString(),
-            options: options,
-            correctAnswer: options.isNotEmpty
-                ? rawCorrect.clamp(0, options.length - 1)
-                : 0,
-            createdAtMs:
-                (data['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0,
-            difficulty: difficulty,
-          );
-        })
-        .where((q) => q.options.length >= 2 && q.question.trim().isNotEmpty)
-        .toList();
   }
 
   void _selectQuestionsForRound() {
@@ -333,7 +291,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   }
 
   void _startTimer() {
-    if (widget.isStudyMode) return; // ✅ وضع المذاكرة: تعطيل التايمر تماماً
     _timeLeft = _secondsPerQuestion;
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
@@ -387,27 +344,24 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
       _showFeedback = true;
       if (isCorrect) {
         SoundManager.playCorrect();
-        if (!widget.isStudyMode)
-          _roundScore += _isStars ? 2 : 5; // ✅ لا نقاط في المذاكرة
+        _roundScore += _isStars ? 2 : 5;
         _correctAnswersCount++;
       } else {
         SoundManager.playWrong();
       }
     });
 
-    // ✅ تعديل: وضع التحدي ينتقل تلقائياً | وضع المذاكرة ينتظر ضغطة "التالي" يدوياً
-    if (!widget.isStudyMode) {
-      Future.delayed(const Duration(milliseconds: 900), () {
-        if (!mounted) return;
-        if (_isSaving || !_gameStarted) return;
+    // ✅ العودة للانتقال التلقائي للدوريات (لا يوجد انتظار يدوي)
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (!mounted) return;
+      if (_isSaving || !_gameStarted) return;
 
-        if (_questionIndexInRound + 1 >= _questionsPerRound) {
-          _finishRound();
-        } else {
-          _nextQuestion();
-        }
-      });
-    }
+      if (_questionIndexInRound + 1 >= _questionsPerRound) {
+        _finishRound();
+      } else {
+        _nextQuestion();
+      }
+    });
   }
 
   void _nextQuestion() {
@@ -431,12 +385,6 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
   Future<void> _finishRound() async {
     _timer?.cancel();
     if (_isSaving) return;
-
-    // ✅ وضع المذاكرة: تخطي الحفظ في فايربيز والتوجه للنتائج فوراً
-    if (widget.isStudyMode) {
-      _showResultSheet();
-      return;
-    }
 
     setState(() => _isSaving = true);
     final user = FirebaseAuth.instance.currentUser;
@@ -524,17 +472,14 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                               "سؤال ${_questionIndexInRound + 1}/$_questionsPerRound",
                           color: primaryColor),
                       const SizedBox(width: 12),
-                      // ✅ إخفاء التايمر في وضع المذاكرة
-                      if (!widget.isStudyMode)
-                        _counterPill(_timeLeft.toString()),
-                      if (!widget.isStudyMode) const SizedBox(width: 12),
+                      _counterPill(
+                          _timeLeft.toString()), // التايمر عاد للظهور دائماً
+                      const SizedBox(width: 12),
                       _pill(
                           icon: Icons.emoji_events_outlined,
-                          text: widget.isStudyMode
-                              ? "وضع المذاكرة"
-                              : (_isFreePlaySession
-                                  ? "وضع التدريب"
-                                  : "جولة ${_roundsDoneToday + 1}"),
+                          text: _isFreePlaySession
+                              ? "وضع التدريب"
+                              : "جولة ${_roundsDoneToday + 1}",
                           color: primaryColor),
                     ],
                   ),
@@ -585,33 +530,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                               }),
                             ),
                           ),
-                          // ✅ زر الانتقال اليدوي يظهر فقط في وضع المذاكرة وبعد اختيار إجابة
-                          if (widget.isStudyMode && _showFeedback)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 20, vertical: 20),
-                              child: ElevatedButton(
-                                style: ElevatedButton.styleFrom(
-                                    backgroundColor: primaryColor,
-                                    minimumSize:
-                                        const Size(double.infinity, 50),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(15))),
-                                onPressed: _questionIndexInRound + 1 >=
-                                        _questionsPerRound
-                                    ? _finishRound
-                                    : _nextQuestion,
-                                child: Text(
-                                    _questionIndexInRound + 1 >=
-                                            _questionsPerRound
-                                        ? "إنهاء المراجعة"
-                                        : "السؤال التالي",
-                                    style: GoogleFonts.cairo(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white)),
-                              ),
-                            ),
+                          // ✅ تم حذف زر "السؤال التالي" اليدوي ليعود الانتقال تلقائياً
                         ],
                       ),
                     ),
@@ -662,7 +581,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                   padding: const EdgeInsets.fromLTRB(16, 26, 16, 16),
                   child: Column(
                     children: [
-                      Text(widget.isStudyMode ? "قسم المذاكرة" : "الدوريات",
+                      Text("الدوريات",
                           style: GoogleFonts.cairo(
                               fontSize: 14,
                               fontWeight: FontWeight.w900,
@@ -670,49 +589,40 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                       const SizedBox(height: 14),
                       SectionIdentityCard(
                         sectionKey: widget.categoryTitle,
-                        icon: widget.isStudyMode
-                            ? (widget.categoryTitle.contains("سوق")
-                                ? Icons.apartment_rounded
-                                : Icons.gavel_rounded)
-                            : (_isStars
-                                ? Icons.auto_awesome_rounded
-                                : Icons.workspace_premium),
+                        icon: _isStars
+                            ? Icons.auto_awesome_rounded
+                            : Icons.workspace_premium,
                         title: widget.categoryTitle,
-                        description: widget.isStudyMode
-                            ? "تعلم من خلال الأسئلة التفاعلية بدون تايمر."
-                            : (_isStars
-                                ? ""
-                                : "الاحتراف مش إنك تعرف معلومة واحدة،\nالاحتراف إن كل خيوط المعلومة تبقى في إيدك."),
+                        description: _isStars
+                            ? ""
+                            : "الاحتراف مش إنك تعرف معلومة واحدة،\nالاحتراف إن كل خيوط المعلومة تبقى في إيدك.",
                         benefits: const [],
                       ),
                       const SizedBox(height: 20),
-                      if (!widget
-                          .isStudyMode) // ✅ إخفاء عداد الجولات في وضع المذاكرة
-                        _glassCard(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 12),
-                            child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.emoji_events_outlined,
-                                      color: primaryColor, size: 18),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                      _isCurrentLeagueLocked
-                                          ? "أنهيت جولات هذا الدوري ✅"
-                                          : "تحدي اليوم: $_roundsDoneToday/$_roundsPerDay جولات",
-                                      style: GoogleFonts.cairo(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w900,
-                                          color: _isCurrentLeagueLocked
-                                              ? Colors.green
-                                              : primaryColor))
-                                ])),
+                      _glassCard(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                          child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.emoji_events_outlined,
+                                    color: primaryColor, size: 18),
+                                const SizedBox(width: 8),
+                                Text(
+                                    _isCurrentLeagueLocked
+                                        ? "أنهيت جولات هذا الدوري ✅"
+                                        : "تحدي اليوم: $_roundsDoneToday/$_roundsPerDay جولات",
+                                    style: GoogleFonts.cairo(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w900,
+                                        color: _isCurrentLeagueLocked
+                                            ? Colors.green
+                                            : primaryColor))
+                              ])),
                       const SizedBox(height: 16),
                       Builder(builder: (context) {
                         final canStart = !_isLoading &&
                             _candidatePool.length >= _questionsPerRound;
-                        final buttonLabel = _enterButtonText;
 
                         return Column(
                           mainAxisSize: MainAxisSize.min,
@@ -733,10 +643,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                 if (!canStart) {
                                   _showLoadingSheet();
                                 } else {
-                                  // ✅ المذاكرة تبدأ مباشرة | التحدي يفتح شاشة الجولات
-                                  widget.isStudyMode
-                                      ? _startRound(freePlay: false)
-                                      : _openDailyChallengeSheet();
+                                  _openDailyChallengeSheet(); // التحدي فقط هو المتاح هنا
                                 }
                               },
                               child: Row(
@@ -755,7 +662,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                       ),
                                     ),
                                   Text(
-                                    buttonLabel,
+                                    _enterButtonText,
                                     style: GoogleFonts.cairo(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w900),
@@ -845,7 +752,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.92),
+                  color: Colors.white.withOpacity(0.92),
                   borderRadius:
                       const BorderRadius.vertical(top: Radius.circular(26))),
               child: Column(
@@ -989,8 +896,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
         enableDrag: false,
         backgroundColor: Colors.transparent,
         builder: (_) {
-          // ✅ تعديل: في وضع المذاكرة يمكن دائماً لعب جولة أخرى
-          final bool canPlayMore = widget.isStudyMode ||
+          final bool canPlayMore =
               (!_isFreePlaySession && !_isCurrentLeagueLocked);
 
           return Container(
@@ -1000,12 +906,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                   borderRadius:
                       BorderRadius.vertical(top: Radius.circular(30))),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Text(
-                    widget.isStudyMode
-                        ? "تمت المراجعة بنجاح ✅"
-                        : (_isFreePlaySession
-                            ? "ملخص التدريب ✅"
-                            : "نتيجة الجولة"),
+                Text(_isFreePlaySession ? "ملخص التدريب ✅" : "نتيجة الجولة",
                     style: GoogleFonts.cairo(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,
@@ -1014,8 +915,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                 Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      if (!widget.isStudyMode)
-                        _resultDetail("النقاط", "+$_roundScore", accentColor),
+                      _resultDetail("النقاط", "+$_roundScore", accentColor),
                       _resultDetail(
                           "الدقة",
                           "$_correctAnswersCount/$_questionsPerRound",
@@ -1041,15 +941,12 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                             borderRadius:
                                                 BorderRadius.circular(25))),
                                     child: FittedBox(
-                                        child: Text(
-                                            widget.isStudyMode
-                                                ? "العب جولة أخرى"
-                                                : "لعب جولة أخرى",
+                                        child: Text("لعب جولة أخرى",
                                             style: GoogleFonts.cairo(
                                                 fontWeight: FontWeight.w900,
                                                 color: Colors.white))))),
                           if (canPlayMore) const SizedBox(height: 12),
-                          if (_isFreePlaySession && !widget.isStudyMode)
+                          if (_isFreePlaySession)
                             SizedBox(
                                 width: double.infinity,
                                 height: 48,
@@ -1068,8 +965,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                                             style: GoogleFonts.cairo(
                                                 fontWeight: FontWeight.w900,
                                                 color: Colors.white))))),
-                          if (_isFreePlaySession && !widget.isStudyMode)
-                            const SizedBox(height: 12),
+                          if (_isFreePlaySession) const SizedBox(height: 12),
                           SizedBox(
                               width: double.infinity,
                               height: 48,
@@ -1112,6 +1008,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
             style: GoogleFonts.poppins(
                 fontSize: 24, fontWeight: FontWeight.w900, color: c))
       ]);
+
   Widget _optionTile(String t, Color b, Color f) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
@@ -1119,7 +1016,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
+                color: Colors.black.withOpacity(0.03),
                 blurRadius: 8,
                 offset: const Offset(0, 4))
           ]),
@@ -1128,6 +1025,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
               textAlign: TextAlign.center,
               style: GoogleFonts.cairo(
                   fontSize: 13.5, fontWeight: FontWeight.w800, color: f))));
+
   Widget _pill(
           {required IconData icon,
           required String text,
@@ -1137,7 +1035,7 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: color.withValues(alpha: 0.15))),
+              border: Border.all(color: color.withOpacity(0.15))),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(icon, size: 15, color: color),
             const SizedBox(width: 5),
@@ -1145,36 +1043,40 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
                 style: GoogleFonts.cairo(
                     fontSize: 11, fontWeight: FontWeight.w800))
           ]));
+
   Widget _counterPill(String v) => Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
       decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: accentColor.withValues(alpha: 0.25))),
+          border: Border.all(color: accentColor.withOpacity(0.25))),
       child: Text(v,
           style: GoogleFonts.poppins(
               fontSize: 22, fontWeight: FontWeight.w800, color: accentColor)));
+
   Widget _questionCard({required Widget child}) => Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-              color: primaryColor.withValues(alpha: 0.2), width: 1.5),
+          border: Border.all(color: primaryColor.withOpacity(0.2), width: 1.5),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
+                color: Colors.black.withOpacity(0.04),
                 blurRadius: 12,
                 offset: const Offset(0, 6))
           ]),
       child: child);
+
   Widget _animatedGlowBackground() => AnimatedBuilder(
       animation: _glowController,
       builder: (_, __) => Container(color: const Color(0xFFFDFBF7)));
+
   Widget _buildEmptyState() => Scaffold(
       appBar: AppBar(title: Text(widget.categoryTitle)),
       body: const Center(child: Text("انتهت الجولة")));
+
   Widget _glassCard(
           {required Widget child,
           EdgeInsets padding = const EdgeInsets.all(18)}) =>
@@ -1182,9 +1084,9 @@ class _QuizScreenState extends State<QuizScreen> with TickerProviderStateMixin {
           width: double.infinity,
           padding: padding,
           decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.88),
+              color: Colors.white.withOpacity(0.88),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.black.withValues(alpha: 0.04))),
+              border: Border.all(color: Colors.black.withOpacity(0.04))),
           child: child);
 }
 
