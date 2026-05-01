@@ -43,10 +43,12 @@ class QuizRepositoryImpl {
     final k = raw.trim();
     if (k == 'stars' || k == 'pros' || k == 'freeplay') return k;
     if (k == 'دوري النجوم' || k.toLowerCase() == 'stars league') return 'stars';
-    if (k == 'دوري المحترفين' || k.toLowerCase() == 'pros league')
+    if (k == 'دوري المحترفين' || k.toLowerCase() == 'pros league') {
       return 'pros';
-    if (k == 'لعب حر' || k == 'اللعب الحر' || k.toLowerCase() == 'free play')
+    }
+    if (k == 'لعب حر' || k == 'اللعب الحر' || k.toLowerCase() == 'free play') {
       return 'freeplay';
+    }
     return 'freeplay';
   }
 
@@ -114,12 +116,15 @@ class QuizRepositoryImpl {
         };
 
         if (!isSameDay) {
-          if (dailyField != 'dailyStarsRounds')
+          if (dailyField != 'dailyStarsRounds') {
             userUpdates['dailyStarsRounds'] = 0;
-          if (dailyField != 'dailyProsRounds')
+          }
+          if (dailyField != 'dailyProsRounds') {
             userUpdates['dailyProsRounds'] = 0;
-          if (dailyField != 'dailyFreePlayRounds')
+          }
+          if (dailyField != 'dailyFreePlayRounds') {
             userUpdates['dailyFreePlayRounds'] = 0;
+          }
         }
 
         if (!isFreePlay) {
