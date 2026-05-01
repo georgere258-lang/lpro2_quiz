@@ -12,6 +12,7 @@ import '../home/widgets/home_pro_card_container.dart';
 import '../home/widgets/premium_event_card.dart';
 
 import 'quiz_screen.dart';
+import 'section_quiz_screen.dart'; // ✅ الاستيراد الجديد
 import 'stats_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -93,16 +94,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
-                SliverToBoxAdapter(
+                const SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    child: const RepaintBoundary(child: _WelcomeCard()),
+                    padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: RepaintBoundary(child: _WelcomeCard()),
                   ),
                 ),
                 const SliverToBoxAdapter(child: SizedBox(height: 16)),
-                SliverToBoxAdapter(
+                const SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: EdgeInsets.symmetric(horizontal: 16),
                     child: RepaintBoundary(child: HomeProCardContainer()),
                   ),
                 ),
@@ -142,9 +143,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         accent: const Color(0xFF2ECC71),
                         onTap: () => _go(
                             context,
-                            const QuizScreen(
-                                categoryTitle: "سوق العقار",
-                                isStudyMode: true)),
+                            const SectionQuizScreen(
+                                categoryTitle: "سوق العقار")), // ✅ التعديل هنا
                       ),
                       _SectionCard(
                         title: "البيع وعقد المطور",
@@ -152,9 +152,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         accent: AppColors.primaryDeepTeal,
                         onTap: () => _go(
                             context,
-                            const QuizScreen(
-                                categoryTitle: "البيع وعقد المطور",
-                                isStudyMode: true)),
+                            const SectionQuizScreen(
+                                categoryTitle:
+                                    "البيع وعقد المطور")), // ✅ التعديل هنا
                       ),
                     ]),
                   ),
