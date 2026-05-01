@@ -2,7 +2,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:hive_flutter/hive_flutter.dart'; // ✅ [جديد] للتعامل مع الإحصائيات
 import '../../../core/constants/app_colors.dart';
+// ✅ [جديد] استيراد الموديل للحسابات الدقيقة
+import '../../../features/quizzes/models/user_question_record.dart';
 
 class SectionIdentityCard extends StatelessWidget {
   final String sectionKey;
@@ -24,7 +27,8 @@ class SectionIdentityCard extends StatelessWidget {
       sectionKey.contains("النجوم") || title.contains("النجوم");
   bool get _isPro =>
       sectionKey.contains("المحترفين") || title.contains("المحترفين");
-  // ✅ تعريف الأقسام الجديدة
+
+  // ✅ تعريف الأقسام الجديدة (بدون لمس القديم)
   bool get _isMarket =>
       sectionKey.contains("سوق العقار") || title.contains("سوق العقار");
   bool get _isSales =>
@@ -34,8 +38,8 @@ class SectionIdentityCard extends StatelessWidget {
   String get _badgeText {
     if (_isStars) return "FRESH";
     if (_isPro) return "PRO";
-    if (_isMarket) return "MARKET"; // ✅ بادج مخصص للسوق
-    if (_isSales) return "SALES"; // ✅ بادج مخصص للعقود
+    if (_isMarket) return "MARKET";
+    if (_isSales) return "SALES";
     return "LPRO";
   }
 
@@ -50,22 +54,24 @@ class SectionIdentityCard extends StatelessWidget {
   Color get _badgeColor {
     if (_isStars) return const Color(0xFF3498DB);
     if (_isPro) return AppColors.secondaryOrange;
-    if (_isMarket)
-      return const Color(0xFF2ECC71); // ✅ أخضر يعبر عن السوق والنمو
-    if (_isSales) return AppColors.primaryDeepTeal; // ✅ تيل فخم للعقود والبيع
+    if (_isMarket) return const Color(0xFF2ECC71);
+    if (_isSales) return AppColors.primaryDeepTeal;
     return const Color(0xFF4FA8A8);
   }
 
   String get _headline {
-    if (_isStars)
+    if (_isStars) {
       return "اجمع نقاط دوري النجوم واستعد لمفاجآت قادمة \nلكن خلي بالك…\nالتطور الحقيقي مش بالنقاط بس،\nالتطور بيبدأ بالاستمرارية والفهم وبناء الأساس الصح.";
-    if (_isPro)
+    }
+    if (_isPro) {
       return "اجمع نقاطك بقوة… واستنى مفاجآت قادمة 🚀\nإنت هنا مش جديد على السوق،\nإنت محترف، والمعلومة هي ثروتك الحقيقية.";
-    // ✅ نصوص خاصة بالأقسام الجديدة
-    if (_isMarket)
+    }
+    if (_isMarket) {
       return "مكونات السوق العقارى 🏙️\nالقرار الصح بيبدأ بمعلومة صحيحة،\nوقوة المسوق في معرفته بأدق تفاصيل المناطق والمشاريع.";
-    if (_isSales)
+    }
+    if (_isSales) {
       return "أسرار البيع والتعاقد ⚖️\nالمحترف هو اللي فاهم بنود عقده قبل عميله،\nثباتك في 'الكلوزينج' بيجي من تمكنك القانوني والفني.";
+    }
     return "خُد خطوة ثابتة… وكمّل صح.";
   }
 
@@ -83,6 +89,68 @@ class SectionIdentityCard extends StatelessWidget {
     if (_isMarket) return "فهم السوق ◀️ تحليل المشاريع ◀️ إغلاق ناجح 💪";
     if (_isSales) return "مهارة البيع ◀️ ثقة العميل ◀️ احترافية كاملة 👑";
     return "هدفنا: تثبيت فهمك… قبل ما نحسب نقاطك.";
+  }
+
+  // ✅ [جديد] بناء صف الإحصائيات الذكية للأقسام الجديدة فقط
+  Widget _buildSmartStats(Color themeColor) {
+    return ValueListenableBuilder(
+      valueListenable: Hive.box('app_settings').listenable(),
+      builder: (context, Box settingsBox, _) {
+        // سحب البيانات المخزنة محلياً لهذا القسم
+        final int attempted =
+            settingsBox.get('total_attempted_$title', defaultValue: 0);
+        final int correct =
+            settingsBox.get('total_correct_$title', defaultValue: 0);
+
+        // حساب عدد الأخطاء الحالية من صندوق السجلات
+        final recordsBox = Hive.box<UserQuestionRecord>('question_records');
+        final mistakesCount = recordsBox.values
+            .where((r) =>
+                r.wasCorrect == false &&
+                r.questionId.contains(_isMarket ? "mkt" : "sls"))
+            .length;
+
+        final double accuracy = attempted > 0 ? (correct / attempted) * 100 : 0;
+
+        return Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+              decoration: BoxDecoration(
+                color: themeColor.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: themeColor.withValues(alpha: 0.1)),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _statItem(
+                      "الدقة", "${accuracy.toStringAsFixed(1)}%", Colors.green),
+                  _statItem("المتقنة", "$correct", AppColors.primaryDeepTeal),
+                  _statItem("أخطاء", "$mistakesCount", Colors.redAccent),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _statItem(String label, String value, Color color) {
+    return Column(
+      children: [
+        Text(label,
+            style: GoogleFonts.cairo(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[600])),
+        Text(value,
+            style: GoogleFonts.cairo(
+                fontSize: 14, fontWeight: FontWeight.w900, color: color)),
+      ],
+    );
   }
 
   @override
@@ -206,6 +274,10 @@ class SectionIdentityCard extends StatelessWidget {
                       color: Colors.black87,
                     ),
                   ),
+
+                  // ✅ [جديد] إضافة الإحصائيات هنا للقسمين الجديدين فقط
+                  if (_isMarket || _isSales) _buildSmartStats(_badgeColor),
+
                   const SizedBox(height: 16),
                   Container(
                     height: 1,
@@ -294,7 +366,6 @@ class SectionIdentityCard extends StatelessWidget {
   }
 }
 
-// الكلاس _Badge يبقى كما هو بالأسفل...
 class _Badge extends StatelessWidget {
   final Color color;
   final String text;
