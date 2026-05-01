@@ -424,7 +424,7 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
                             color: AppColors.primaryDeepTeal)),
-                    Icon(Icons.notifications_active_outlined,
+                    const Icon(Icons.notifications_active_outlined,
                         color: AppColors.secondaryOrange, size: 22),
                   ],
                 ),
@@ -492,7 +492,7 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
               decoration: BoxDecoration(
                   color: AppColors.primaryDeepTeal.withValues(alpha: 0.1),
                   shape: BoxShape.circle),
-              child: Icon(Icons.flash_on_rounded,
+              child: const Icon(Icons.flash_on_rounded,
                   color: AppColors.secondaryOrange, size: 18),
             ),
             const SizedBox(width: 12),
@@ -523,7 +523,7 @@ class _MainWrapperState extends State<MainWrapper> with WidgetsBindingObserver {
                   margin: const EdgeInsets.only(top: 5),
                   width: 8,
                   height: 8,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                       color: AppColors.secondaryOrange,
                       shape: BoxShape.circle)),
           ],
