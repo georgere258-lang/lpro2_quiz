@@ -6,7 +6,7 @@ import '../../../core/constants/firestore_paths.dart';
 import '../../../core/models/admin_control_models.dart';
 import '../models/quiz.dart';
 
-/// Repository for Quiz CRUD operations.
+/// Repository for Quiz CRUD operations (Firebase/Leagues Only).
 class QuizRepository {
   final FirebaseFirestore _firestore;
   late final CollectionReference<Map<String, dynamic>> _collection;
@@ -17,7 +17,7 @@ class QuizRepository {
   }
 
   // ────────────────────────────────────────────────────────────────────────────
-  // 1. الذكاء الاصطناعي للسحب (Smart Fetch) - الموفر للقراءات
+  // 1. الذكاء الاصطناعي للسحب (Smart Fetch) - نسخة فايربيز الأصلية للدوريات
   // ────────────────────────────────────────────────────────────────────────────
 
   Future<List<Quiz>> getSmartBatch({
@@ -26,23 +26,24 @@ class QuizRepository {
     required List<String> excludedIds,
     int limit = 15,
   }) async {
+    // 1. تنظيف النص لضمان المطابقة الدقيقة
+    final String cleanCategory = category.trim();
+    debugPrint("🏠 [QuizRepo-Firebase] Fetching for: '$cleanCategory'");
+
     try {
-      // ✅ تبسيط الاستعلام للبحث بالقسم فقط لضمان العمل بدون Composite Index
       final snap = await _collection
-          .where('category', isEqualTo: category)
+          .where('category', isEqualTo: cleanCategory)
           .where('isActive', isEqualTo: true)
           .get();
 
       if (snap.docs.isEmpty) {
-        debugPrint("⚠️ [QuizRepo] No questions found for category: $category");
+        debugPrint("⚠️ [QuizRepo] Firestore is empty for: $cleanCategory");
         return [];
       }
 
-      // تحويل المستندات إلى كائنات Quiz
       final List<Quiz> allResults =
           snap.docs.map((d) => Quiz.fromFirestore(d.data(), d.id)).toList();
 
-      // ✅ فلترة النتائج محلياً لضمان أقصى درجات المرونة
       List<Quiz> filtered = allResults.where((q) {
         final bool isNotDeleted = q.isDeleted == false;
         final bool isNotSeen = !excludedIds.contains(q.id);
@@ -50,7 +51,6 @@ class QuizRepository {
         return isNotDeleted && isNotSeen && matchesDiff;
       }).toList();
 
-      // 🛡️ خطة دفاعية: إذا لم نجد أسئلة في الصعوبة المطلوبة، نسحب أي أسئلة غير ممسوحة لفتح اللعبة
       if (filtered.isEmpty) {
         filtered = allResults.where((q) => q.isDeleted == false).toList();
       }
@@ -58,15 +58,14 @@ class QuizRepository {
       filtered.shuffle();
       return filtered.take(limit).toList();
     } catch (e) {
-      debugPrint("❌ [QuizRepo] getSmartBatch Error: $e");
+      debugPrint("❌ [QuizRepo] Firestore Error: $e");
       return [];
     }
   }
 
   // ────────────────────────────────────────────────────────────────────────────
-  // 2. نظام الحفظ (Save Session) - مدمج لضمان سلامة البيانات
+  // 2. نظام الحفظ (Save Session) - مخصص للدوريات (نجوم، محترفين)
   // ────────────────────────────────────────────────────────────────────────────
-
   Future<void> saveGameSession({
     required String uid,
     required String leagueKey,
@@ -74,7 +73,6 @@ class QuizRepository {
     required int correctAnswers,
     required int totalQuestions,
   }) async {
-    // توحيد المفاتيح برمجياً بناءً على المسميات العربية المستلمة
     String k = leagueKey.trim();
     String normalized = 'freeplay';
     if (k == 'stars' || k == 'دوري النجوم') normalized = 'stars';
@@ -97,7 +95,6 @@ class QuizRepository {
                 ? 'dailyProsRounds'
                 : 'dailyFreePlayRounds');
 
-        // تحديث جدول المستخدم (النقاط والعدادات اليومية)
         final userUpdates = <String, dynamic>{
           dailyField: (userData[dailyField] ?? 0) + 1,
           'updatedAt': FieldValue.serverTimestamp(),
@@ -110,7 +107,6 @@ class QuizRepository {
 
         transaction.set(userRef, userUpdates, SetOptions(merge: true));
 
-        // تحديث جدول الإحصائيات (Map-Safe) لليوزرز في الدوري المحدد
         final Map<String, dynamic> leagueMap = rootData[normalized] is Map
             ? Map<String, dynamic>.from(rootData[normalized])
             : {};
@@ -139,7 +135,6 @@ class QuizRepository {
   // ────────────────────────────────────────────────────────────────────────────
   // 3. العمليات التقليدية (Admin & Streams)
   // ────────────────────────────────────────────────────────────────────────────
-
   Stream<List<Quiz>> watchByCategoryLeague({
     required String category,
     required String league,
@@ -206,8 +201,9 @@ class QuizRepository {
 
   Future<void> move(String id,
       {required String newCategory, required String newLeague}) async {
-    if (!QuizCategory.isValid(newCategory))
+    if (!QuizCategory.isValid(newCategory)) {
       throw ArgumentError('Invalid category');
+    }
     if (!QuizLeague.isValid(newLeague)) throw ArgumentError('Invalid league');
     await _collection.doc(id).update({
       'category': newCategory,
